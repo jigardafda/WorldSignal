@@ -1,0 +1,19 @@
+{
+  "all": true,
+  "src": ["src"],
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/test-utils/**",
+    "src/server.ts",
+    "src/config/env.ts",
+    "**/*.d.ts"
+  ],
+  "reporter": ["text", "text-summary", "html"],
+  "report-dir": "./coverage",
+  "check-coverage": true,
+  "lines": 95,
+  "statements": 95,
+  "functions": 95,
+  "branches": 95
+}

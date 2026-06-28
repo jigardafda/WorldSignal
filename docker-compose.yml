@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: worldsignal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: worldsignal
+      POSTGRES_PASSWORD: worldsignal
+      POSTGRES_DB: worldsignal
+    ports:
+      - "5432:5432"
+    volumes:
+      - worldsignal_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U worldsignal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  worldsignal_pg:

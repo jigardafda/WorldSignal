@@ -1,0 +1,284 @@
+// WorldSignal — canonical signal graph. Postgres only.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Sources ───────────────────────────────────────────────────────────────
+
+model Source {
+  id             String     @id @default(cuid())
+  name           String
+  type           SourceType @default(RSS)
+  url            String     @unique
+  country        String?
+  region         String?
+  language       String?    @default("en")
+  category       String?
+  priority       Int        @default(5) // 0 = highest (P0), 4 = archival
+  credibility    Float      @default(0.5)
+  crawlFrequency Int        @default(900) // seconds
+  parserType     String     @default("rss")
+  enabled        Boolean    @default(true)
+  config         Json?
+
+  lastFetchedAt DateTime?
+  lastSuccessAt DateTime?
+  lastFailureAt DateTime?
+  failureCount  Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rawItems RawItem[]
+  articles Article[]
+
+  @@index([enabled, priority])
+  @@index([country])
+  @@index([type])
+}
+
+// ── Raw evidence (never mutated after fetch) ────────────────────────────────
+
+model RawItem {
+  id          String        @id @default(cuid())
+  sourceId    String
+  source      Source        @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  rawUrl      String?
+  sourceGuid  String?
+  rawTitle    String?
+  rawContent  String?
+  rawPayload  Json?
+  contentHash String?
+  publishedAt DateTime?
+  fetchedAt   DateTime      @default(now())
+  status      RawItemStatus @default(PENDING)
+
+  article Article?
+
+  @@unique([sourceId, sourceGuid])
+  @@index([contentHash])
+  @@index([status])
+  @@index([publishedAt])
+}
+
+// ── Normalized article ──────────────────────────────────────────────────────
+
+model Article {
+  id        String   @id @default(cuid())
+  rawItemId String?  @unique
+  rawItem   RawItem? @relation(fields: [rawItemId], references: [id], onDelete: SetNull)
+  sourceId  String
+  source    Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  canonicalUrl String?
+  title        String
+  body         String?
+  summary      String?
+  author       String?
+  language     String? @default("en")
+  country      String?
+  publishedAt  DateTime?
+  fetchedAt    DateTime  @default(now())
+
+  contentHash String?
+  // space-separated normalized token set used for lightweight similarity
+  tokenSet    String?
+
+  metadata Json?
+
+  signalLinks SignalArticle[]
+
+  @@index([sourceId])
+  @@index([canonicalUrl])
+  @@index([contentHash])
+  @@index([publishedAt])
+}
+
+// ── Canonical Signal ─────────────────────────────────────────────────────────
+
+model Signal {
+  id           String       @id @default(cuid())
+  title        String
+  summary      String
+  whatHappened String?
+  whyItMatters String?
+  status       SignalStatus @default(UNVERIFIED)
+  severity     Severity     @default(MEDIUM)
+  confidence   Float        @default(0.5)
+  eventType    String?
+  country      String?
+  region       String?
+
+  firstSeenAt DateTime
+  lastSeenAt  DateTime
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sourceCount Int  @default(1)
+  metadata    Json?
+
+  articles   SignalArticle[]
+  tags       SignalTag[]
+  deliveries DeliveryEvent[]
+
+  @@index([status])
+  @@index([severity])
+  @@index([confidence])
+  @@index([country])
+  @@index([lastSeenAt])
+}
+
+model SignalArticle {
+  signalId        String
+  articleId       String
+  signal          Signal                @relation(fields: [signalId], references: [id], onDelete: Cascade)
+  article         Article               @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  relationType    SignalArticleRelation @default(PRIMARY)
+  similarityScore Float?
+  addedAt         DateTime              @default(now())
+
+  @@id([signalId, articleId])
+  @@index([articleId])
+}
+
+// ── Closed taxonomy ───────────────────────────────────────────────────────────
+
+model TaxonomyTag {
+  id          String        @id @default(cuid())
+  code        String        @unique // e.g. DISASTER.EARTHQUAKE
+  label       String
+  description String?
+  parentId    String?
+  parent      TaxonomyTag?  @relation("TagHierarchy", fields: [parentId], references: [id])
+  children    TaxonomyTag[] @relation("TagHierarchy")
+  aliases     String[]
+  active      Boolean       @default(true)
+
+  signals SignalTag[]
+}
+
+model SignalTag {
+  signalId   String
+  tagId      String
+  signal     Signal      @relation(fields: [signalId], references: [id], onDelete: Cascade)
+  tag        TaxonomyTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  confidence Float       @default(0.5)
+
+  @@id([signalId, tagId])
+  @@index([tagId])
+}
+
+// ── Subscribers & delivery ─────────────────────────────────────────────────────
+
+model Subscriber {
+  id            String           @id @default(cuid())
+  name          String
+  status        SubscriberStatus @default(ACTIVE)
+  createdAt     DateTime         @default(now())
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id           String          @id @default(cuid())
+  subscriberId String
+  subscriber   Subscriber      @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  name         String
+  channel      DeliveryChannel @default(WEBHOOK)
+  // JSON filter: { tags, countries, minConfidence, minSeverity }
+  filter       Json
+  // channel config: { url } for webhooks
+  config       Json
+  enabled      Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+
+  deliveries DeliveryEvent[]
+}
+
+model DeliveryEvent {
+  id             String          @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription    @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  signalId       String
+  signal         Signal          @relation(fields: [signalId], references: [id], onDelete: Cascade)
+  channel        DeliveryChannel
+  status         DeliveryStatus  @default(PENDING)
+  payload        Json
+  attempts       Int             @default(0)
+  deliveredAt    DateTime?
+  failedAt       DateTime?
+  errorMessage   String?
+  createdAt      DateTime        @default(now())
+
+  @@unique([subscriptionId, signalId])
+  @@index([status])
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────────────
+
+enum SourceType {
+  RSS
+  ATOM
+  SITEMAP
+  WEB_PAGE
+  API
+  WEBHOOK
+  MANUAL
+}
+
+enum RawItemStatus {
+  PENDING
+  PARSED
+  FAILED
+  DUPLICATE
+}
+
+enum SignalStatus {
+  UNVERIFIED
+  DEVELOPING
+  CONFIRMED
+  DISPUTED
+  CORRECTED
+  RETRACTED
+  RESOLVED
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum DeliveryChannel {
+  WEBHOOK
+  POLLING
+  EMAIL
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  RETRYING
+  DEAD_LETTERED
+}
+
+enum SubscriberStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum SignalArticleRelation {
+  PRIMARY
+  DUPLICATE
+  SUPPORTING
+  CONTRADICTING
+  UPDATE
+}
