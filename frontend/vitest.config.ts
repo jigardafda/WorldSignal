@@ -8,6 +8,9 @@ export default defineConfig({
     globals: true,
     include: ["src/**/*.test.{ts,tsx}"], // unit tests only; e2e/ runs under Playwright
     setupFiles: ["./src/test/setup.ts"],
+    // Mantine 9 + React 19 + recharts render heavier trees; userEvent's realistic
+    // typing delays push the slowest interaction tests past the 5s default on CI.
+    testTimeout: 20000,
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
