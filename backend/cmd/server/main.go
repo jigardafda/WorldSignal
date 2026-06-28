@@ -46,6 +46,10 @@ func run() error {
 	if err := database.MigrateAuth(ctx); err != nil {
 		return err
 	}
+	// Extended source metadata + validation-log tables.
+	if err := database.MigrateContent(ctx); err != nil {
+		return err
+	}
 	if created, err := httpapi.SeedDefaultAdmin(ctx, database, cfg.AdminEmail, cfg.AdminPassword); err != nil {
 		return err
 	} else if created {

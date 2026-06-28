@@ -25,7 +25,7 @@ func URL() string {
 // tables are truncated in dependency-safe order (CASCADE handles the rest).
 var tables = []string{
 	"DeliveryEvent", "Subscription", "Subscriber", "SignalTag", "SignalArticle",
-	"Signal", "Article", "RawItem", "Source", "TaxonomyTag",
+	"Signal", "Article", "RawItem", "SourceValidationLog", "Source", "TaxonomyTag",
 	"Session", "TeamMember", "Team", "User",
 }
 
@@ -40,6 +40,10 @@ func Connect(t *testing.T) *db.DB {
 	if err := d.MigrateAuth(context.Background()); err != nil {
 		d.Close()
 		t.Fatalf("migrate auth: %v", err)
+	}
+	if err := d.MigrateContent(context.Background()); err != nil {
+		d.Close()
+		t.Fatalf("migrate content: %v", err)
 	}
 	t.Cleanup(d.Close)
 	return d

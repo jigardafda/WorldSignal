@@ -26,6 +26,28 @@ model Source {
   enabled        Boolean    @default(true)
   config         Json?
 
+  // Rich metadata (global-source expansion) — added via db.MigrateContent so it
+  // applies to existing databases without a Prisma migration.
+  websiteUrl          String?
+  languages           String[] @default([])
+  geographicScope     String? // GLOBAL | CONTINENTAL | REGIONAL | NATIONAL | STATE | CITY
+  industry            String?
+  subcategory         String?
+  publisher           String?
+  orgType             String? // GOVERNMENT | PUBLIC | PRIVATE | INDEPENDENT
+  sourceType          String? // RSS | ATOM | NEWS_API | OFFICIAL_FEED | PRESS_RELEASE | GOVERNMENT_FEED | SECURITY_ADVISORY | RESEARCH_FEED | AGGREGATOR
+  officialFeed        Boolean  @default(false)
+  contentType         String?
+  updateFrequency     String?
+  tags                String[] @default([])
+  biasRating          String?
+  healthScore         Int? // 0-100
+  validationStatus    String   @default("PENDING") // PENDING | VALID | INVALID
+  lastValidatedAt     DateTime?
+  lastValidationError String?
+  avgResponseMs       Int?
+  metadata            Json? // long-tail: keywords, license, copyright, timezone, encoding, rateLimits, auth, discoverySource
+
   lastFetchedAt DateTime?
   lastSuccessAt DateTime?
   lastFailureAt DateTime?
@@ -34,12 +56,35 @@ model Source {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  rawItems RawItem[]
-  articles Article[]
+  rawItems        RawItem[]
+  articles        Article[]
+  validationLogs  SourceValidationLog[]
 
   @@index([enabled, priority])
   @@index([country])
   @@index([type])
+  @@index([language])
+  @@index([region])
+  @@index([industry])
+  @@index([geographicScope])
+  @@index([validationStatus])
+}
+
+// Historical validation log: one row per validation attempt for a source.
+model SourceValidationLog {
+  id           String   @id @default(cuid())
+  sourceId     String
+  source       Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  checkedAt    DateTime @default(now())
+  ok           Boolean
+  httpStatus   Int?
+  responseMs   Int?
+  itemCount    Int?
+  newestItemAt DateTime?
+  redirectedTo String?
+  error        String?
+
+  @@index([sourceId, checkedAt])
 }
 
 // ── Raw evidence (never mutated after fetch) ────────────────────────────────
