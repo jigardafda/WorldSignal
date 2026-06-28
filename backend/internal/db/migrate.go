@@ -86,7 +86,24 @@ CREATE TABLE IF NOT EXISTS "SourceValidationLog" (
   "redirectedTo" text,
   "error"        text
 );
-CREATE INDEX IF NOT EXISTS "SourceValidationLog_source_idx" ON "SourceValidationLog"("sourceId","checkedAt" DESC);`
+CREATE INDEX IF NOT EXISTS "SourceValidationLog_source_idx" ON "SourceValidationLog"("sourceId","checkedAt" DESC);
+
+CREATE TABLE IF NOT EXISTS "LLMKey" (
+  "id"            text PRIMARY KEY,
+  "provider"      text NOT NULL DEFAULT 'OPENAI',
+  "label"         text NOT NULL,
+  "keyCiphertext" text NOT NULL,
+  "keyLast4"      text NOT NULL,
+  "model"         text,
+  "isActive"      boolean NOT NULL DEFAULT false,
+  "status"        text NOT NULL DEFAULT 'UNTESTED',
+  "lastTestedAt"  timestamptz,
+  "lastError"     text,
+  "createdBy"     text,
+  "createdAt"     timestamptz NOT NULL DEFAULT now(),
+  "updatedAt"     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "LLMKey_provider_active_idx" ON "LLMKey"("provider","isActive");`
 
 // MigrateContent ensures the extended source-metadata columns and the
 // SourceValidationLog table exist. Safe to run repeatedly.

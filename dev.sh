@@ -7,6 +7,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Load local secrets (gitignored) if present: OPENAI_API_KEY, OPENAI_MODEL, etc.
+if [ -f "$ROOT/backend/.env.local" ]; then
+  set -a; . "$ROOT/backend/.env.local"; set +a
+  echo "loaded backend/.env.local"
+fi
+
 export DATABASE_URL="${DATABASE_URL:-postgresql://jigardafda@localhost:5432/worldsignal?sslmode=disable}"
 export OPENAI_API_KEY="${OPENAI_API_KEY:-}"          # empty → heuristic enrichment
 export ROLE="${ROLE:-all}"                            # api + workers + scheduler

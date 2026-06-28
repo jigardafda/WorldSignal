@@ -89,6 +89,39 @@ func (g *OpenAIGateway) JSONCompletion(ctx context.Context, system, user string,
 	return []byte(parsed.Choices[0].Message.Content), nil
 }
 
+// KeyResolver returns the API key and model to use for a request. An empty key
+// means the LLM is disabled (callers fall back to the heuristic enricher).
+type KeyResolver func(ctx context.Context) (apiKey, model string)
+
+// DynamicGateway resolves the effective key/model on every call, so an
+// admin-managed key added at runtime takes effect without a restart.
+type DynamicGateway struct {
+	Resolve KeyResolver
+	BaseURL string
+	Client  *http.Client
+}
+
+// NewDynamicGateway builds a DynamicGateway from a resolver.
+func NewDynamicGateway(resolve KeyResolver) *DynamicGateway {
+	return &DynamicGateway{Resolve: resolve, Client: &http.Client{Timeout: 30 * time.Second}}
+}
+
+func (g *DynamicGateway) current(ctx context.Context) *OpenAIGateway {
+	key, model := g.Resolve(ctx)
+	return &OpenAIGateway{APIKey: key, Model: model, BaseURL: g.BaseURL, Client: g.Client}
+}
+
+// Enabled reports whether a key is currently resolvable.
+func (g *DynamicGateway) Enabled() bool {
+	key, _ := g.Resolve(context.Background())
+	return len(key) > 0
+}
+
+// JSONCompletion resolves the current key/model then delegates to OpenAIGateway.
+func (g *DynamicGateway) JSONCompletion(ctx context.Context, system, user string, maxTokens int) ([]byte, error) {
+	return g.current(ctx).JSONCompletion(ctx, system, user, maxTokens)
+}
+
 func buildTaxonomyList() string {
 	var b strings.Builder
 	for i, t := range taxonomy.LeafTags() {

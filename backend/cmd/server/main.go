@@ -56,9 +56,16 @@ func run() error {
 		log.Info(fmt.Sprintf("seeded default admin %s (change the password!)", cfg.AdminEmail))
 	}
 
-	gateway := llm.NewOpenAIGateway(cfg.OpenAIAPIKey, cfg.OpenAIModel)
+	// The server resolves the effective LLM key (admin-managed DB key, else the
+	// env system key); the gateway consults it per request.
+	srv := &httpapi.Server{
+		DB: database, SigningSecret: cfg.WebhookSigningSecret,
+		OpenAIAPIKey: cfg.OpenAIAPIKey, OpenAIModel: cfg.OpenAIModel,
+	}
+	gateway := llm.NewDynamicGateway(srv.ResolveLLMKey)
 	queue := jobs.New(database.Pool)
 	workers := jobs.NewWorkers(queue, database, gateway, cfg.WebhookSigningSecret)
+	srv.Enqueue = workers
 
 	// Ensure the jobs table exists regardless of role (the API exposes a jobs view).
 	if err := queue.Migrate(ctx); err != nil {
@@ -73,8 +80,6 @@ func run() error {
 		scheduler = jobs.NewScheduler(database, workers, time.Duration(cfg.SchedulerTickMS)*time.Millisecond)
 		scheduler.Start(ctx)
 	}
-
-	srv := &httpapi.Server{DB: database, Enqueue: workers, SigningSecret: cfg.WebhookSigningSecret}
 
 	var httpSrv *http.Server
 	if cfg.Role == "all" || cfg.Role == "api" {

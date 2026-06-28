@@ -4,6 +4,7 @@ package httpapi
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/worldsignal/backend/internal/db"
@@ -24,6 +25,17 @@ type Server struct {
 	Enqueue       Enqueuer
 	SigningSecret string
 	SessionTTL    time.Duration // session lifetime; defaults to 7 days when zero
+	// LLM: the system key/model from the environment. Admin-managed DB keys
+	// (encrypted with SigningSecret) take precedence at runtime.
+	OpenAIAPIKey string
+	OpenAIModel  string
+
+	// llmCache memoizes the resolved active key for a short TTL so per-article
+	// enrichment doesn't hit the DB on every call.
+	llmCacheMu    sync.Mutex
+	llmCacheKey   string
+	llmCacheModel string
+	llmCacheExp   time.Time
 }
 
 func (s *Server) sessionTTL() time.Duration {
