@@ -25,6 +25,7 @@ const NAV: NavItem[] = [
   { to: "/jobs", label: "Jobs", icon: <IconListCheck size={18} />, perm: "jobs:read" },
   { to: "/users", label: "Users", icon: <IconUsers size={18} />, perm: "users:manage" },
   { to: "/teams", label: "Teams", icon: <IconUsersGroup size={18} />, perm: "teams:manage" },
+  { to: "/settings", label: "Settings", icon: <IconSettings size={18} />, perm: "settings:manage" },
 ];
 
 export function Layout() {

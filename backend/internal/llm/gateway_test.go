@@ -91,3 +91,36 @@ func TestBuildTaxonomyListNonEmpty(t *testing.T) {
 		t.Fatal("taxonomy list should not be empty")
 	}
 }
+
+func TestDynamicGateway(t *testing.T) {
+	// A server that echoes a minimal chat-completion response.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer dyn-key" {
+			w.WriteHeader(401)
+			return
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"ok\":true}"}}]}`))
+	}))
+	defer srv.Close()
+
+	// Resolver returns a key+model → gateway is enabled and delegates.
+	key := "dyn-key"
+	g := NewDynamicGateway(func(ctx context.Context) (string, string) { return key, "gpt-4o" })
+	g.BaseURL = srv.URL
+	if !g.Enabled() {
+		t.Fatal("expected enabled when resolver returns a key")
+	}
+	out, err := g.JSONCompletion(context.Background(), "s", "u", 50)
+	if err != nil || string(out) != `{"ok":true}` {
+		t.Fatalf("dynamic completion: out=%s err=%v", out, err)
+	}
+
+	// Empty key → disabled, completion returns nil.
+	key = ""
+	if g.Enabled() {
+		t.Fatal("expected disabled when resolver returns empty key")
+	}
+	if out, err := g.JSONCompletion(context.Background(), "s", "u", 50); out != nil || err != nil {
+		t.Fatalf("disabled dynamic should return nil,nil; got %s,%v", out, err)
+	}
+}

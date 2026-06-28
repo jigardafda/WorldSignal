@@ -16,6 +16,9 @@ const RESP: Record<string, unknown> = {
   signals: [{ id: "s" }], signalCount: 3, signal: { id: "s" },
   sources: [{ id: "s" }], source: { id: "s" }, createSource: { id: "s" }, updateSource: { id: "s" },
   deleteSource: true, setSourceEnabled: { id: "s" }, triggerFetch: true,
+  sourceCount: 7, sourceCoverage: { byRegion: [] }, revalidateSource: { id: "s" },
+  llmKeys: [{ id: "k" }], llmStatus: { enabled: true }, createLLMKey: { id: "k" },
+  setActiveLLMKey: { id: "k" }, testLLMKey: { ok: true }, deleteLLMKey: true,
   articles: { items: [], total: 0 }, article: { id: "a" },
   rawItems: { items: [], total: 0 }, rawItem: { id: "r" },
   deliveries: { items: [], total: 0 }, delivery: { id: "d" }, retryDelivery: true,
@@ -65,6 +68,17 @@ describe("api wrappers", () => {
     expect(await api.deleteSource("s")).toBe(true);
     expect(await api.setSourceEnabled("s", false)).toEqual(RESP.setSourceEnabled);
     expect(await api.triggerFetch("s")).toBe(true);
+    expect(await api.sources({ region: "Africa", enabled: true }, 25, 0)).toEqual(RESP.sources);
+    expect(await api.sourceCount({ language: "en" })).toBe(7);
+    expect(await api.sourceCoverage()).toEqual(RESP.sourceCoverage);
+    expect(await api.revalidateSource("s")).toEqual(RESP.revalidateSource);
+
+    expect(await api.llmKeys()).toEqual(RESP.llmKeys);
+    expect(await api.llmStatus()).toEqual(RESP.llmStatus);
+    expect(await api.createLLMKey({ label: "L", key: "sk-x" })).toEqual(RESP.createLLMKey);
+    expect(await api.setActiveLLMKey("k")).toEqual(RESP.setActiveLLMKey);
+    expect(await api.testLLMKey("k")).toEqual(RESP.testLLMKey);
+    expect(await api.deleteLLMKey("k")).toBe(true);
 
     expect(await api.articles({})).toEqual(RESP.articles);
     expect(await api.article("a")).toEqual(RESP.article);

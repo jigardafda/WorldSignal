@@ -221,10 +221,13 @@ func testProviderKey(ctx context.Context, provider, key string) (string, *string
 	}
 }
 
+// openAIModelsURL is the validation endpoint; overridable in tests.
+var openAIModelsURL = "https://api.openai.com/v1/models"
+
 func testOpenAIKey(ctx context.Context, key string) (string, *string) {
 	cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(cctx, http.MethodGet, "https://api.openai.com/v1/models", nil)
+	req, err := http.NewRequestWithContext(cctx, http.MethodGet, openAIModelsURL, nil)
 	if err != nil {
 		msg := err.Error()
 		return "INVALID", &msg

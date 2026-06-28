@@ -62,6 +62,16 @@ export interface ArticleDetail extends ArticleRow {
   contentHash: string | null; tokenSet: string | null;
   signals: { id: string; title: string; relationType: string; similarityScore: number | null }[];
 }
+export interface LLMKey {
+  id: string; provider: string; label: string; keyLast4: string; model: string | null;
+  isActive: boolean; status: string; lastTestedAt: string | null; lastError: string | null;
+  createdBy: string | null; createdAt: string; updatedAt: string;
+}
+export interface LLMStatus {
+  provider: string; enabled: boolean; source: string; model: string;
+  hasSystemKey: boolean; activeLabel: string | null;
+}
+export interface LLMTestResult { ok: boolean; status: string; error?: string | null }
 export interface RawItemRow {
   id: string; sourceId: string; sourceName: string; sourceGuid: string | null;
   rawUrl: string | null; rawTitle: string | null; status: string;
@@ -219,4 +229,20 @@ export const api = {
     gql<{ jobs: Page<Job> }>(`query($queue:String,$state:String,$limit:Int,$offset:Int){jobs(queue:$queue,state:$state,limit:$limit,offset:$offset){items{id queue state retryCount retryLimit createdAt startedAt completedAt lastError} total}}`, vars).then((d) => d.jobs),
   jobCounts: () => gql<{ jobCounts: Bucket[] }>(`{jobCounts{key count}}`).then((d) => d.jobCounts),
   retryJob: (id: string) => gql<{ retryJob: boolean }>(`mutation($id:ID!){retryJob(id:$id)}`, { id }).then((d) => d.retryJob),
+
+  // LLM keys (settings:manage)
+  llmKeys: () =>
+    gql<{ llmKeys: LLMKey[] }>(`{llmKeys{${LLM_KEY_FIELDS}}}`).then((d) => d.llmKeys),
+  llmStatus: () =>
+    gql<{ llmStatus: LLMStatus }>(`{llmStatus{provider enabled source model hasSystemKey activeLabel}}`).then((d) => d.llmStatus),
+  createLLMKey: (input: { provider?: string; label: string; key: string; model?: string }) =>
+    gql<{ createLLMKey: LLMKey }>(`mutation($i:CreateLLMKeyInput!){createLLMKey(input:$i){${LLM_KEY_FIELDS}}}`, { i: input }).then((d) => d.createLLMKey),
+  setActiveLLMKey: (id: string) =>
+    gql<{ setActiveLLMKey: LLMKey }>(`mutation($id:ID!){setActiveLLMKey(id:$id){${LLM_KEY_FIELDS}}}`, { id }).then((d) => d.setActiveLLMKey),
+  testLLMKey: (id: string) =>
+    gql<{ testLLMKey: LLMTestResult }>(`mutation($id:ID!){testLLMKey(id:$id){ok status error}}`, { id }).then((d) => d.testLLMKey),
+  deleteLLMKey: (id: string) =>
+    gql<{ deleteLLMKey: boolean }>(`mutation($id:ID!){deleteLLMKey(id:$id)}`, { id }).then((d) => d.deleteLLMKey),
 };
+
+const LLM_KEY_FIELDS = `id provider label keyLast4 model isActive status lastTestedAt lastError createdBy createdAt updatedAt`;

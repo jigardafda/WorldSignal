@@ -72,6 +72,10 @@ func TestSourceMetadataQueries(t *testing.T) {
 	if err != nil || len(page) != 1 {
 		t.Fatalf("pagination: %v len=%d", err, len(page))
 	}
+	// Limit 0 → default page size applied (covers the default branch).
+	if all, total, err := d.ListSourcesFiltered(ctx, db.SourceFilter{}); err != nil || total != 3 || len(all) != 3 {
+		t.Fatalf("default limit: total=%d len=%d err=%v", total, len(all), err)
+	}
 
 	// Coverage aggregates.
 	cov, err := d.SourceCoverage(ctx)
@@ -101,6 +105,38 @@ func TestSourceMetadataQueries(t *testing.T) {
 	src, _ := d.GetSource(ctx, id1)
 	if src.ValidationStatus != "INVALID" || src.LastValidationError == nil || *src.LastValidationError != "boom" {
 		t.Fatalf("record validation did not update source: %+v", src.ValidationStatus)
+	}
+}
+
+// TestSourceMetaDBErrors covers the DB-error branch of the metadata query
+// functions by hiding their tables.
+func TestSourceMetaDBErrors(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	ctx := context.Background()
+	if _, err := d.Pool.Exec(ctx, `ALTER TABLE "SourceValidationLog" RENAME TO "svl__h"`); err != nil {
+		t.Fatal(err)
+	}
+	defer d.Pool.Exec(ctx, `ALTER TABLE "svl__h" RENAME TO "SourceValidationLog"`)
+	if _, err := d.Pool.Exec(ctx, `ALTER TABLE "Source" RENAME TO "Source__h"`); err != nil {
+		t.Fatal(err)
+	}
+	defer d.Pool.Exec(ctx, `ALTER TABLE "Source__h" RENAME TO "Source"`)
+
+	if _, _, err := d.ListSourcesFiltered(ctx, db.SourceFilter{Limit: 5}); err == nil {
+		t.Fatal("ListSourcesFiltered should error")
+	}
+	if _, err := d.CountSources(ctx, db.SourceFilter{}); err == nil {
+		t.Fatal("CountSources should error")
+	}
+	if _, err := d.SourceCoverage(ctx); err == nil {
+		t.Fatal("SourceCoverage should error")
+	}
+	if _, err := d.ListValidationLogs(ctx, "x", 5); err == nil {
+		t.Fatal("ListValidationLogs should error")
+	}
+	if _, err := d.ListSources(ctx); err == nil {
+		t.Fatal("ListSources should error")
 	}
 }
 
