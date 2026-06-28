@@ -21,6 +21,19 @@ export function StatusBadge({ status }: { status: string }) {
   return <Badge color={STATUS_COLORS[status] ?? "gray"} variant="light">{status}</Badge>;
 }
 
+const VALIDATION_COLORS: Record<string, string> = { VALID: "green", INVALID: "red", PENDING: "yellow" };
+
+export function ValidationBadge({ status }: { status?: string }) {
+  if (!status) return <Text size="sm" c="dimmed">—</Text>;
+  return <Badge color={VALIDATION_COLORS[status] ?? "gray"} variant="light">{status}</Badge>;
+}
+
+export function HealthBadge({ score }: { score?: number | null }) {
+  if (score == null) return <Text size="sm" c="dimmed">—</Text>;
+  const color = score >= 85 ? "green" : score >= 60 ? "yellow" : score >= 40 ? "orange" : "red";
+  return <Badge color={color} variant="light">{score}</Badge>;
+}
+
 export function ConfidenceBar({ value }: { value: number }) {
   const v = Math.round(value * 100);
   return (

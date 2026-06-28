@@ -15,6 +15,7 @@ const NAV: NavItem[] = [
   { to: "/signals", label: "Signals", icon: <IconActivity size={18} />, perm: "signals:read" },
   { to: "/analytics", label: "Analytics", icon: <IconChartBar size={18} />, perm: "analytics:read" },
   { to: "/sources", label: "Sources", icon: <IconBroadcast size={18} />, perm: "sources:read" },
+  { to: "/coverage", label: "Coverage", icon: <IconChartBar size={18} />, perm: "sources:read" },
   { to: "/articles", label: "Articles", icon: <IconArticle size={18} />, perm: "signals:read" },
   { to: "/raw-items", label: "Raw Items", icon: <IconFileText size={18} />, perm: "signals:read" },
   { to: "/subscriptions", label: "Subscriptions", icon: <IconBell size={18} />, perm: "subscriptions:read" },

@@ -10,6 +10,7 @@ import { SignalDetail } from "./pages/SignalDetail";
 import { Analytics } from "./pages/Analytics";
 import { Sources } from "./pages/Sources";
 import { SourceDetail } from "./pages/SourceDetail";
+import { Coverage } from "./pages/Coverage";
 import { Articles } from "./pages/Articles";
 import { ArticleDetail } from "./pages/ArticleDetail";
 import { RawItems } from "./pages/RawItems";
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/sources" element={<Sources />} />
         <Route path="/sources/:id" element={<SourceDetail />} />
+        <Route path="/coverage" element={<Coverage />} />
         <Route path="/articles" element={<Articles />} />
         <Route path="/articles/:id" element={<ArticleDetail />} />
         <Route path="/raw-items" element={<RawItems />} />

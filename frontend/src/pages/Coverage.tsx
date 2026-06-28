@@ -1,0 +1,82 @@
+import { Paper, SimpleGrid, Stack, Title } from "@mantine/core";
+import { BarChart, DonutChart } from "@mantine/charts";
+import { api, type SourceCoverage, type Bucket } from "../lib/api";
+import { useAsync } from "../lib/useAsync";
+import { AsyncBoundary } from "../components/States";
+import { PageHeader } from "../components/PageHeader";
+import { StatCard } from "../components/StatCard";
+import { DataTable } from "../components/DataTable";
+
+const DONUT = ["blue", "teal", "grape", "orange", "red", "cyan", "lime", "violet", "indigo", "pink"];
+
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Paper withBorder p="md" radius="md">
+      <Title order={5} mb="sm">{title}</Title>
+      {children}
+    </Paper>
+  );
+}
+
+function sum(bs: Bucket[]): number {
+  return bs.reduce((n, b) => n + b.count, 0);
+}
+
+export function Coverage() {
+  const state = useAsync<SourceCoverage>(() => api.sourceCoverage(), []);
+  return (
+    <>
+      <PageHeader title="Source Coverage" subtitle="Global breadth of the validated source registry" />
+      <AsyncBoundary state={state}>
+        {(c) => {
+          const valid = c.byValidation.find((b) => b.key === "VALID")?.count ?? 0;
+          return (
+            <Stack gap="lg">
+              <SimpleGrid cols={{ base: 2, sm: 3, lg: 6 }}>
+                <StatCard label="Total sources" value={sum(c.byValidation)} />
+                <StatCard label="Validated" value={valid} color="green" />
+                <StatCard label="Countries" value={c.byCountry.filter((b) => b.key !== "(none)").length} color="blue" />
+                <StatCard label="Languages" value={c.byLanguage.length} color="grape" />
+                <StatCard label="Regions" value={c.byRegion.filter((b) => b.key !== "(none)").length} color="teal" />
+                <StatCard label="Industries" value={c.byIndustry.filter((b) => b.key !== "(none)").length} color="orange" />
+              </SimpleGrid>
+
+              <SimpleGrid cols={{ base: 1, md: 2 }}>
+                <Panel title="By region">
+                  <BarChart h={280} data={c.byRegion} dataKey="key" orientation="vertical" series={[{ name: "count", color: "blue.6" }]} />
+                </Panel>
+                <Panel title="By geographic scope">
+                  <DonutChart h={280} withLabels data={c.byScope.map((b, i) => ({ name: b.key, value: b.count, color: DONUT[i % DONUT.length] }))} />
+                </Panel>
+                <Panel title="By organization type">
+                  <DonutChart h={280} withLabels data={c.byOrgType.filter((b) => b.key !== "(none)").map((b, i) => ({ name: b.key, value: b.count, color: DONUT[i % DONUT.length] }))} />
+                </Panel>
+                <Panel title="By source type">
+                  <BarChart h={280} data={c.bySourceType.filter((b) => b.key !== "(none)")} dataKey="key" orientation="vertical" series={[{ name: "count", color: "grape.6" }]} />
+                </Panel>
+                <Panel title="Top languages">
+                  <BarChart h={320} data={c.byLanguage.slice(0, 20)} dataKey="key" orientation="vertical" series={[{ name: "count", color: "teal.6" }]} />
+                </Panel>
+                <Panel title="Top industries">
+                  <BarChart h={320} data={c.byIndustry.filter((b) => b.key !== "(none)").slice(0, 20)} dataKey="key" orientation="vertical" series={[{ name: "count", color: "orange.6" }]} />
+                </Panel>
+              </SimpleGrid>
+
+              <Panel title="Countries by source count">
+                <DataTable
+                  rows={c.byCountry.filter((b) => b.key !== "(none)")}
+                  getKey={(b) => b.key}
+                  emptyMessage="No countries."
+                  columns={[
+                    { key: "key", header: "Country", render: (b) => b.key },
+                    { key: "count", header: "Sources", render: (b) => b.count },
+                  ]}
+                />
+              </Panel>
+            </Stack>
+          );
+        }}
+      </AsyncBoundary>
+    </>
+  );
+}

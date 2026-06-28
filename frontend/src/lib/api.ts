@@ -29,6 +29,28 @@ export interface Source {
   enabled: boolean; failureCount: number;
   lastSuccessAt?: string | null; lastFailureAt?: string | null; lastFetchedAt?: string | null;
   createdAt?: string; updatedAt?: string;
+  // Rich metadata (global-source expansion).
+  websiteUrl?: string | null; languages?: string[]; geographicScope?: string | null;
+  industry?: string | null; subcategory?: string | null; publisher?: string | null;
+  orgType?: string | null; sourceType?: string | null; officialFeed?: boolean;
+  contentType?: string | null; updateFrequency?: string | null; biasRating?: string | null;
+  tags?: string[]; healthScore?: number | null; validationStatus?: string;
+  lastValidatedAt?: string | null; lastValidationError?: string | null; avgResponseMs?: number | null;
+  metadata?: unknown; validationLogs?: ValidationLog[];
+}
+export interface ValidationLog {
+  id: string; checkedAt: string; ok: boolean; httpStatus?: number | null;
+  responseMs?: number | null; itemCount?: number | null; newestItemAt?: string | null;
+  redirectedTo?: string | null; error?: string | null;
+}
+export interface SourceFilter {
+  search?: string; country?: string; region?: string; language?: string; scope?: string;
+  industry?: string; orgType?: string; sourceType?: string; validationStatus?: string;
+  tag?: string; enabled?: boolean;
+}
+export interface SourceCoverage {
+  byRegion: Bucket[]; byScope: Bucket[]; byOrgType: Bucket[]; byValidation: Bucket[];
+  byIndustry: Bucket[]; byCountry: Bucket[]; bySourceType: Bucket[]; byLanguage: Bucket[];
 }
 export interface Page<T> { items: T[]; total: number }
 export interface ArticleRow {
@@ -77,7 +99,20 @@ export interface Team { id: string; name: string; createdAt: string; memberCount
 export interface TeamMember { userId: string; email: string; name: string; role: string; addedAt: string }
 
 const SIGNAL_FIELDS = `id title summary whatHappened whyItMatters status severity confidence eventType country sourceCount firstSeenAt lastSeenAt tags{code confidence} sources{publisher url publishedAt}`;
-const SOURCE_FIELDS = `id name type url country region language category priority credibility crawlFrequency parserType enabled failureCount lastSuccessAt lastFailureAt lastFetchedAt createdAt updatedAt`;
+const SOURCE_LIST_FIELDS = `id name type url country region language languages category priority credibility enabled failureCount sourceType officialFeed industry publisher orgType geographicScope healthScore validationStatus tags lastSuccessAt lastFailureAt lastValidatedAt`;
+const SOURCE_FIELDS = `${SOURCE_LIST_FIELDS} crawlFrequency parserType subcategory websiteUrl contentType updateFrequency biasRating avgResponseMs lastValidationError lastFetchedAt createdAt updatedAt`;
+const VALIDATION_LOG_FIELDS = `id checkedAt ok httpStatus responseMs itemCount newestItemAt redirectedTo error`;
+
+// argList renders a SourceFilter as inline GraphQL arguments (skip undefined).
+function sourceArgs(f: SourceFilter = {}, extra: Record<string, string | number> = {}): string {
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(f)) {
+    if (v === undefined || v === "") continue;
+    parts.push(typeof v === "boolean" ? `${k}:${v}` : `${k}:${JSON.stringify(v)}`);
+  }
+  for (const [k, v] of Object.entries(extra)) parts.push(`${k}:${typeof v === "number" ? v : JSON.stringify(v)}`);
+  return parts.length ? `(${parts.join(",")})` : "";
+}
 const USER_FIELDS = `id email name role status createdAt updatedAt`;
 
 export const api = {
@@ -125,8 +160,18 @@ export const api = {
   signal: (id: string) => gql<{ signal: Signal | null }>(`query($id:ID!){signal(id:$id){${SIGNAL_FIELDS}}}`, { id }).then((d) => d.signal),
 
   // sources
-  sources: () => gql<{ sources: Source[] }>(`{sources{${SOURCE_FIELDS}}}`).then((d) => d.sources),
-  source: (id: string) => gql<{ source: Source | null }>(`query($id:ID!){source(id:$id){${SOURCE_FIELDS} config}}`, { id }).then((d) => d.source),
+  sources: (filter: SourceFilter = {}, limit = 50, offset = 0) =>
+    gql<{ sources: Source[] }>(`{sources${sourceArgs(filter, { limit, offset })}{${SOURCE_LIST_FIELDS}}}`).then((d) => d.sources),
+  sourceCount: (filter: SourceFilter = {}) =>
+    gql<{ sourceCount: number }>(`{sourceCount${sourceArgs(filter)}}`).then((d) => d.sourceCount),
+  sourceCoverage: () =>
+    gql<{ sourceCoverage: SourceCoverage }>(
+      `{sourceCoverage{byRegion{key count} byScope{key count} byOrgType{key count} byValidation{key count} byIndustry{key count} byCountry{key count} bySourceType{key count} byLanguage{key count}}}`,
+    ).then((d) => d.sourceCoverage),
+  source: (id: string) =>
+    gql<{ source: Source | null }>(`query($id:ID!){source(id:$id){${SOURCE_FIELDS} config validationLogs{${VALIDATION_LOG_FIELDS}}}}`, { id }).then((d) => d.source),
+  revalidateSource: (id: string) =>
+    gql<{ revalidateSource: Source }>(`mutation($id:ID!){revalidateSource(id:$id){${SOURCE_FIELDS} validationLogs{${VALIDATION_LOG_FIELDS}}}}`, { id }).then((d) => d.revalidateSource),
   createSource: (input: Record<string, unknown>) =>
     gql<{ createSource: Source }>(`mutation($i:CreateSourceInput!){createSource(input:$i){${SOURCE_FIELDS}}}`, { i: input }).then((d) => d.createSource),
   updateSource: (id: string, input: Record<string, unknown>) =>
