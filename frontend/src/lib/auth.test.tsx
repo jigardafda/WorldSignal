@@ -59,6 +59,7 @@ describe("AuthProvider", () => {
 
   it("logs in and out", async () => {
     mockApi.login.mockResolvedValue({ token: "newtok", user: { email: "a@b.c", role: "VIEWER", permissions: [] } });
+    mockApi.me.mockResolvedValue({ email: "a@b.c", role: "VIEWER", permissions: [] });
     mockApi.logout.mockResolvedValue(true);
     setup();
     await waitFor(() => expect(screen.getByTestId("user")).toHaveTextContent("anon"));
@@ -72,6 +73,7 @@ describe("AuthProvider", () => {
 
   it("clears locally even if logout call fails", async () => {
     mockApi.login.mockResolvedValue({ token: "t2", user: { email: "a@b.c", role: "VIEWER", permissions: [] } });
+    mockApi.me.mockResolvedValue({ email: "a@b.c", role: "VIEWER", permissions: [] });
     mockApi.logout.mockRejectedValue(new Error("network"));
     setup();
     await userEvent.click(await screen.findByText("login"));

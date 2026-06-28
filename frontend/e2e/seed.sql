@@ -1,5 +1,10 @@
 -- Deterministic seed for end-to-end tests (applied to worldsignal_e2e).
 TRUNCATE TABLE "DeliveryEvent","Subscription","Subscriber","SignalTag","SignalArticle","Signal","Article","RawItem","Source","TaxonomyTag" RESTART IDENTITY CASCADE;
+TRUNCATE TABLE "Session","TeamMember","Team","User" RESTART IDENTITY CASCADE;
+
+-- Admin account used to log in during e2e. Password is "admin12345" (bcrypt cost 10).
+INSERT INTO "User" ("id","email","name","passwordHash","role","status","createdAt","updatedAt")
+VALUES ('e_admin','admin@worldsignal.local','E2E Admin','$2a$10$nRmQ72FEbXqLz461pnCWX.OUTUqgAssob6YLoJfMHgd0GAb6g/MRa','ADMIN','ACTIVE',now(),now());
 
 INSERT INTO "TaxonomyTag" ("id","code","label","active") VALUES
   ('t_dis','DISASTER','Disaster',true),

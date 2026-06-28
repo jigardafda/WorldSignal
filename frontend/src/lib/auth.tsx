@@ -38,9 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { token, user: u } = await api.login(email, password);
+    const { token } = await api.login(email, password);
     setToken(token);
-    setUser(u);
+    // The login mutation's user payload omits permissions; fetch the full
+    // identity via `me` so RBAC-gated UI (nav, actions) works immediately
+    // without requiring a page reload.
+    setUser(await api.me());
   }, []);
 
   const logout = useCallback(async () => {
