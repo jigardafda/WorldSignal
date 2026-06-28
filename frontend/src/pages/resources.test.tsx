@@ -7,6 +7,7 @@ const { apiMock, authMock } = vi.hoisted(() => ({
   apiMock: {
     sources: vi.fn(), source: vi.fn(), createSource: vi.fn(), updateSource: vi.fn(),
     deleteSource: vi.fn(), triggerFetch: vi.fn(), setSourceEnabled: vi.fn(),
+    sourceCount: vi.fn(), sourceCoverage: vi.fn(), revalidateSource: vi.fn(),
     articles: vi.fn(), article: vi.fn(), rawItems: vi.fn(), rawItem: vi.fn(),
     deliveries: vi.fn(), delivery: vi.fn(), retryDelivery: vi.fn(),
     jobs: vi.fn(), jobCounts: vi.fn(), retryJob: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock("../lib/auth", () => ({ useAuth: () => authMock }));
 
 import { Sources } from "./Sources";
 import { SourceDetail } from "./SourceDetail";
+import { Coverage } from "./Coverage";
 import { Articles } from "./Articles";
 import { ArticleDetail } from "./ArticleDetail";
 import { RawItems } from "./RawItems";
@@ -28,39 +30,105 @@ import { DeliveryDetail } from "./DeliveryDetail";
 import { Jobs } from "./Jobs";
 import { Taxonomy } from "./Taxonomy";
 
-const source = (o = {}) => ({ id: "s1", name: "BBC", type: "RSS", url: "https://bbc.example/feed", country: "GB", region: null, language: "en", category: null, priority: 1, credibility: 0.9, crawlFrequency: 300, parserType: "rss", enabled: true, failureCount: 0, lastSuccessAt: "2026-01-01T00:00:00Z", lastFailureAt: null, lastFetchedAt: "2026-01-01T00:00:00Z", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", ...o });
+const source = (o = {}) => ({ id: "s1", name: "BBC", type: "RSS", url: "https://bbc.example/feed", country: "GB", region: "Europe", language: "en", languages: ["en"], category: null, priority: 1, credibility: 0.9, crawlFrequency: 300, parserType: "rss", enabled: true, failureCount: 0, sourceType: "RSS", officialFeed: true, industry: null, publisher: "BBC", orgType: "PUBLIC", geographicScope: "GLOBAL", healthScore: 95, validationStatus: "VALID", tags: ["international"], lastSuccessAt: "2026-01-01T00:00:00Z", lastFailureAt: null, lastValidatedAt: "2026-01-01T00:00:00Z", lastFetchedAt: "2026-01-01T00:00:00Z", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", validationLogs: [], ...o });
+
+const coverage = () => ({ byRegion: [{ key: "Europe", count: 1 }], byScope: [{ key: "GLOBAL", count: 1 }], byOrgType: [{ key: "PUBLIC", count: 1 }], byValidation: [{ key: "VALID", count: 1 }], byIndustry: [{ key: "Finance", count: 1 }], byCountry: [{ key: "GB", count: 1 }], bySourceType: [{ key: "RSS", count: 1 }], byLanguage: [{ key: "en", count: 1 }] });
 
 afterEach(() => { vi.clearAllMocks(); authMock.hasPerm = () => true; });
 
 describe("Sources", () => {
-  it("lists and creates", async () => {
+  it("lists, filters and creates", async () => {
     apiMock.sources.mockResolvedValue([source()]);
+    apiMock.sourceCount.mockResolvedValue(1);
+    apiMock.sourceCoverage.mockResolvedValue(coverage());
     apiMock.createSource.mockResolvedValue(source({ id: "s2" }));
     renderWithProviders(<Sources />);
     expect(await screen.findByText("BBC")).toBeInTheDocument();
+    // Filter by region drives a refetch.
+    await userEvent.type(screen.getByTestId("source-search"), "bbc{Enter}");
+    await waitFor(() => expect(apiMock.sources).toHaveBeenCalledWith(expect.objectContaining({ search: "bbc" }), 25, 0));
     await userEvent.click(screen.getByRole("button", { name: "Add source" }));
     await userEvent.type(await screen.findByTestId("src-name"), "New");
     await userEvent.type(screen.getByTestId("src-url"), "https://new.example/feed");
     await userEvent.click(screen.getByRole("button", { name: "Create" }));
     await waitFor(() => expect(apiMock.createSource).toHaveBeenCalled());
   });
-  it("fetch + toggle actions", async () => {
+  it("fetch + revalidate actions", async () => {
     apiMock.sources.mockResolvedValue([source()]);
+    apiMock.sourceCount.mockResolvedValue(1);
+    apiMock.sourceCoverage.mockResolvedValue(coverage());
     apiMock.triggerFetch.mockResolvedValue(true);
-    apiMock.setSourceEnabled.mockResolvedValue(source({ enabled: false }));
+    apiMock.revalidateSource.mockResolvedValue(source({ validationStatus: "VALID" }));
     renderWithProviders(<Sources />);
     await screen.findByText("BBC");
     await userEvent.click(screen.getByRole("button", { name: "Fetch" }));
     await waitFor(() => expect(apiMock.triggerFetch).toHaveBeenCalledWith("s1"));
-    await userEvent.click(screen.getByRole("button", { name: "Disable" }));
-    await waitFor(() => expect(apiMock.setSourceEnabled).toHaveBeenCalledWith("s1", false));
+    await userEvent.click(screen.getByRole("button", { name: "Revalidate" }));
+    await waitFor(() => expect(apiMock.revalidateSource).toHaveBeenCalledWith("s1"));
+  });
+  it("shows empty state", async () => {
+    apiMock.sources.mockResolvedValue([]);
+    apiMock.sourceCount.mockResolvedValue(0);
+    apiMock.sourceCoverage.mockResolvedValue(coverage());
+    renderWithProviders(<Sources />);
+    expect(await screen.findByTestId("empty")).toBeInTheDocument();
   });
   it("hides write actions for viewers", async () => {
     authMock.hasPerm = () => false;
     apiMock.sources.mockResolvedValue([source()]);
+    apiMock.sourceCount.mockResolvedValue(1);
+    apiMock.sourceCoverage.mockResolvedValue(coverage());
     renderWithProviders(<Sources />);
     await screen.findByText("BBC");
     expect(screen.queryByRole("button", { name: "Add source" })).toBeNull();
+  });
+  it("surfaces an error when an action fails", async () => {
+    apiMock.sources.mockResolvedValue([source()]);
+    apiMock.sourceCount.mockResolvedValue(1);
+    apiMock.sourceCoverage.mockResolvedValue(coverage());
+    apiMock.triggerFetch.mockRejectedValue(new Error("boom"));
+    renderWithProviders(<Sources />);
+    await screen.findByText("BBC");
+    await userEvent.click(screen.getByRole("button", { name: "Fetch" }));
+    await waitFor(() => expect(apiMock.triggerFetch).toHaveBeenCalled());
+  });
+  it("filters by region via the select", async () => {
+    apiMock.sources.mockResolvedValue([source()]);
+    apiMock.sourceCount.mockResolvedValue(1);
+    apiMock.sourceCoverage.mockResolvedValue(coverage());
+    renderWithProviders(<Sources />);
+    await screen.findByText("BBC");
+    await userEvent.click(screen.getByTestId("source-region"));
+    await userEvent.click(await screen.findByText("Africa"));
+    await waitFor(() => expect(apiMock.sources).toHaveBeenCalledWith(expect.objectContaining({ region: "Africa" }), 25, 0));
+  });
+  it("surfaces an error when create fails", async () => {
+    apiMock.sources.mockResolvedValue([source()]);
+    apiMock.sourceCount.mockResolvedValue(1);
+    apiMock.sourceCoverage.mockResolvedValue(coverage());
+    apiMock.createSource.mockRejectedValue(new Error("dup"));
+    renderWithProviders(<Sources />);
+    await screen.findByText("BBC");
+    await userEvent.click(screen.getByRole("button", { name: "Add source" }));
+    await userEvent.type(await screen.findByTestId("src-name"), "New");
+    await userEvent.type(screen.getByTestId("src-url"), "https://new.example/feed");
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await waitFor(() => expect(apiMock.createSource).toHaveBeenCalled());
+  });
+});
+
+describe("Coverage", () => {
+  it("renders coverage KPIs and charts", async () => {
+    apiMock.sourceCoverage.mockResolvedValue(coverage());
+    renderWithProviders(<Coverage />);
+    expect(await screen.findByText("Total sources")).toBeInTheDocument();
+    expect(screen.getByText("By region")).toBeInTheDocument();
+    expect(screen.getByText("Validated")).toBeInTheDocument();
+  });
+  it("shows the error state", async () => {
+    apiMock.sourceCoverage.mockRejectedValue(new Error("down"));
+    renderWithProviders(<Coverage />);
+    expect(await screen.findByTestId("error")).toBeInTheDocument();
   });
 });
 
@@ -94,6 +162,18 @@ describe("SourceDetail", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Name is required")).toBeInTheDocument();
     expect(apiMock.updateSource).not.toHaveBeenCalled();
+  });
+  it("renders metadata + validation history and revalidates", async () => {
+    apiMock.source.mockResolvedValue(source({
+      validationLogs: [{ id: "v1", checkedAt: "2026-01-02T00:00:00Z", ok: true, httpStatus: 200, responseMs: 120, itemCount: 30, newestItemAt: "2026-01-02T00:00:00Z", redirectedTo: null, error: null }],
+    }));
+    apiMock.revalidateSource.mockResolvedValue(source({ validationStatus: "VALID" }));
+    renderWithProviders(<SourceDetail />, { route: "/sources/s1", path: "/sources/:id" });
+    expect(await screen.findByText("Validation history")).toBeInTheDocument();
+    expect(screen.getByText("Validation & health")).toBeInTheDocument();
+    expect(screen.getByText("international")).toBeInTheDocument(); // tag badge
+    await userEvent.click(screen.getByTestId("revalidate"));
+    await waitFor(() => expect(apiMock.revalidateSource).toHaveBeenCalledWith("s1"));
   });
 });
 

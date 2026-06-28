@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
-import { ConfidenceBar, SeverityBadge, StatusBadge } from "./badges";
+import { ConfidenceBar, HealthBadge, SeverityBadge, StatusBadge, ValidationBadge } from "./badges";
 import { AsyncBoundary, EmptyState, ErrorState, LoadingState } from "./States";
 import { StatCard } from "./StatCard";
 import { DataTable } from "./DataTable";
@@ -20,6 +20,25 @@ describe("badges", () => {
   it("falls back to gray for unknown values", () => {
     renderWithProviders(<><SeverityBadge severity="ZZZ" /><StatusBadge status="ZZZ" /></>);
     expect(screen.getAllByText("ZZZ")).toHaveLength(2);
+  });
+  it("renders health score across all tiers and the em-dash fallback", () => {
+    renderWithProviders(<div>
+      <HealthBadge score={95} /><HealthBadge score={70} /><HealthBadge score={50} /><HealthBadge score={20} /><HealthBadge score={null} />
+    </div>);
+    expect(screen.getByText("95")).toBeInTheDocument();
+    expect(screen.getByText("70")).toBeInTheDocument();
+    expect(screen.getByText("50")).toBeInTheDocument();
+    expect(screen.getByText("20")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+  it("renders validation status and the undefined fallback", () => {
+    renderWithProviders(<div>
+      <ValidationBadge status="VALID" /><ValidationBadge status="INVALID" /><ValidationBadge status="WAT" /><ValidationBadge />
+    </div>);
+    expect(screen.getByText("VALID")).toBeInTheDocument();
+    expect(screen.getByText("INVALID")).toBeInTheDocument();
+    expect(screen.getByText("WAT")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 });
 
