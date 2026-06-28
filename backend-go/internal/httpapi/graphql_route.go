@@ -128,12 +128,7 @@ func (s *Server) resolveSources(ctx context.Context, _ map[string]any) (any, err
 	}
 	out := make([]any, len(rows))
 	for i, src := range rows {
-		out[i] = map[string]any{
-			"id": src.ID, "name": src.Name, "type": src.Type, "url": src.URL,
-			"country": src.Country, "priority": src.Priority, "credibility": src.Credibility,
-			"enabled": src.Enabled, "lastSuccessAt": timePtr(src.LastSuccessAt),
-			"lastFailureAt": timePtr(src.LastFailureAt), "failureCount": src.FailureCount,
-		}
+		out[i] = sourceToGqlMap(src)
 	}
 	return out, nil
 }

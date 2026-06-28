@@ -4,6 +4,9 @@ import "net/http"
 
 func (s *Server) registerSourceRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/sources", s.listSources)
+	mux.HandleFunc("POST /v1/sources", s.createSourceREST)
+	mux.HandleFunc("PATCH /v1/sources/{id}", s.patchSourceREST)
+	mux.HandleFunc("POST /v1/sources/{id}/fetch", s.fetchSourceREST)
 }
 
 // listSources mirrors GET /v1/sources → { data: rows } where rows are raw Source

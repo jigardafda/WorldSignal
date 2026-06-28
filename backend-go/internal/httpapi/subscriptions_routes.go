@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -9,7 +10,38 @@ import (
 
 func (s *Server) registerSubscriptionRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/subscriptions", s.listSubscriptions)
+	mux.HandleFunc("POST /v1/subscriptions", s.createSubscriptionREST)
 	mux.HandleFunc("GET /v1/deliveries", s.listDeliveries)
+}
+
+type createSubscriptionBody struct {
+	Name    *string         `json:"name"`
+	Channel *string         `json:"channel"`
+	Filter  json.RawMessage `json:"filter"`
+	Config  json.RawMessage `json:"config"`
+}
+
+func (s *Server) createSubscriptionREST(w http.ResponseWriter, r *http.Request) {
+	var b createSubscriptionBody
+	if err := readJSON(r, &b); err != nil || b.Name == nil || *b.Name == "" {
+		writeJSON(w, http.StatusBadRequest, struct {
+			Error string `json:"error"`
+		}{"name required"})
+		return
+	}
+	in := db.CreateSubscriptionInput{Name: *b.Name, Filter: db.RawJSON(b.Filter), Config: db.RawJSON(b.Config)}
+	if b.Channel != nil {
+		in.Channel = *b.Channel
+	}
+	sub, err := s.DB.CreateSubscription(r.Context(), in)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusCreated, restSubscriptionScalar{
+		ID: sub.ID, SubscriberID: sub.SubscriberID, Name: sub.Name, Channel: sub.Channel,
+		Filter: sub.Filter, Config: sub.Config, Enabled: sub.Enabled, CreatedAt: db.NewTime(sub.CreatedAt),
+	})
 }
 
 type restSubscriber struct {

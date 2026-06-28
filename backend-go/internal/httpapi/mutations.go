@@ -1,8 +1,120 @@
 package httpapi
 
-import "github.com/worldsignal/backend/internal/gql"
+import (
+	"context"
+	"fmt"
 
-// mutationResolvers wires GraphQL mutations. Implemented in Phase 2.
+	"github.com/worldsignal/backend/internal/db"
+	"github.com/worldsignal/backend/internal/gql"
+	"github.com/worldsignal/backend/internal/jsonx"
+)
+
+// sourceToGqlMap projects a Source onto the GraphQL Source type fields.
+func sourceToGqlMap(src *db.Source) map[string]any {
+	return map[string]any{
+		"id": src.ID, "name": src.Name, "type": src.Type, "url": src.URL,
+		"country": src.Country, "priority": src.Priority, "credibility": src.Credibility,
+		"enabled": src.Enabled, "lastSuccessAt": timePtr(src.LastSuccessAt),
+		"lastFailureAt": timePtr(src.LastFailureAt), "failureCount": src.FailureCount,
+	}
+}
+
 func (s *Server) mutationResolvers() map[string]gql.FieldResolver {
-	return map[string]gql.FieldResolver{}
+	return map[string]gql.FieldResolver{
+		"createSource":       s.mutCreateSource,
+		"setSourceEnabled":   s.mutSetSourceEnabled,
+		"triggerFetch":       s.mutTriggerFetch,
+		"createSubscription": s.mutCreateSubscription,
+	}
+}
+
+func (s *Server) mutCreateSource(ctx context.Context, args map[string]any) (any, error) {
+	input, _ := args["input"].(map[string]any)
+	if input == nil {
+		return nil, fmt.Errorf("input required")
+	}
+	in := db.CreateSourceInput{Type: "RSS", Priority: 5, CrawlFrequency: 900, Credibility: 0.5}
+	if v, ok := input["name"].(string); ok {
+		in.Name = v
+	}
+	if v, ok := input["url"].(string); ok {
+		in.URL = v
+	}
+	if v, ok := input["type"].(string); ok {
+		in.Type = v
+	}
+	if v, ok := input["country"].(string); ok {
+		c := v
+		in.Country = &c
+	}
+	if v, ok := toFloatOK(input["priority"]); ok {
+		in.Priority = int(v)
+	}
+	if v, ok := toFloatOK(input["crawlFrequency"]); ok {
+		in.CrawlFrequency = int(v)
+	}
+	if v, ok := toFloatOK(input["credibility"]); ok {
+		in.Credibility = v
+	}
+	// GraphQL createSource does NOT enqueue a fetch (only the REST route does).
+	src, err := s.DB.CreateSource(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return sourceToGqlMap(src), nil
+}
+
+func (s *Server) mutSetSourceEnabled(ctx context.Context, args map[string]any) (any, error) {
+	id, _ := args["id"].(string)
+	enabled, _ := args["enabled"].(bool)
+	src, err := s.DB.SetSourceEnabled(ctx, id, enabled)
+	if err != nil {
+		return nil, err
+	}
+	return sourceToGqlMap(src), nil
+}
+
+func (s *Server) mutTriggerFetch(_ context.Context, args map[string]any) (any, error) {
+	id, _ := args["id"].(string)
+	if err := s.Enqueue.EnqueueFetchSource(id); err != nil {
+		return nil, err
+	}
+	return true, nil
+}
+
+func (s *Server) mutCreateSubscription(ctx context.Context, args map[string]any) (any, error) {
+	input, _ := args["input"].(map[string]any)
+	if input == nil {
+		return nil, fmt.Errorf("input required")
+	}
+	in := db.CreateSubscriptionInput{}
+	if v, ok := input["name"].(string); ok {
+		in.Name = v
+	}
+	if v, ok := input["channel"].(string); ok {
+		in.Channel = v
+	}
+	if v, ok := input["filter"]; ok && v != nil {
+		in.Filter = jsonRaw(v)
+	}
+	if v, ok := input["config"]; ok && v != nil {
+		in.Config = jsonRaw(v)
+	}
+	sub, err := s.DB.CreateSubscription(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"id": sub.ID, "name": sub.Name, "channel": sub.Channel, "enabled": sub.Enabled,
+		"filter": sub.Filter, "config": sub.Config, "createdAt": sub.CreatedAt,
+	}, nil
+}
+
+// jsonRaw marshals an arbitrary GraphQL JSON value to raw bytes for storage.
+func jsonRaw(v any) db.RawJSON {
+	b, err := jsonx.Marshal(v)
+	if err != nil {
+		return nil
+	}
+	return db.RawJSON(b)
 }

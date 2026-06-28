@@ -83,10 +83,12 @@ surface for human review.
 
 ## Phase 2 — Mutations & REST writes (row-parity)
 
-- [ ] 2.1 GraphQL `createSource` + REST `POST /v1/sources` (defaults; 201; 400 missing name/url; 409 dup url; enqueues immediate fetch).
-- [ ] 2.2 GraphQL `setSourceEnabled` + REST `PATCH /v1/sources/:id` (enabled/priority/crawlFrequency).
-- [ ] 2.3 GraphQL `triggerFetch` + REST `POST /v1/sources/:id/fetch` (enqueue, `{queued:true}` / `true`).
-- [ ] 2.4 GraphQL `createSubscription` + REST `POST /v1/subscriptions` (default subscriber upsert; defaults; 201; 400 missing name).
+- [x] 2.1 GraphQL `createSource` + REST `POST /v1/sources` (defaults; 201; 400 missing name/url; 409 dup url; REST enqueues immediate fetch).
+- [x] 2.2 GraphQL `setSourceEnabled` + REST `PATCH /v1/sources/:id` (enabled/priority/crawlFrequency).
+- [x] 2.3 GraphQL `triggerFetch` + REST `POST /v1/sources/:id/fetch` (enqueue, `{queued:true}` / `true`).
+- [x] 2.4 GraphQL `createSubscription` + REST `POST /v1/subscriptions` (default subscriber upsert; defaults; 201; 400 missing name).
+
+> **Findings (Phase 2):** REST mutations verified by row-parity against the live TS server (defaults, 400s, 409 duplicate, full subscription filter/config). TS GraphQL **mutations** are unreachable over HTTP (yoga blocks mutations over GET; TS POST hangs), so GraphQL mutation parity is established transitively: TS-GraphQL == TS-REST (same Prisma create/defaults by construction) + TS-REST == Go-REST (row-parity) + Go-REST == Go-GraphQL (Go-internal row equivalence test).
 
 ## Phase 3 — Pipeline stages (shadow-run, LLM disabled)
 

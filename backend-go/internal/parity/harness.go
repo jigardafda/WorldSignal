@@ -141,6 +141,11 @@ func (s *Server) PostJSON(path string, body []byte) (*Response, error) {
 	return s.do(http.MethodPost, path, "application/json", body)
 }
 
+// Post issues a bodyless POST (no Content-Type), e.g. for action endpoints.
+func (s *Server) Post(path string) (*Response, error) {
+	return s.do(http.MethodPost, path, "", nil)
+}
+
 // PatchJSON issues a PATCH with a JSON body.
 func (s *Server) PatchJSON(path string, body []byte) (*Response, error) {
 	return s.do(http.MethodPatch, path, "application/json", body)
