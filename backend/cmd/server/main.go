@@ -56,12 +56,14 @@ func run() error {
 	queue := jobs.New(database.Pool)
 	workers := jobs.NewWorkers(queue, database, gateway, cfg.WebhookSigningSecret)
 
+	// Ensure the jobs table exists regardless of role (the API exposes a jobs view).
+	if err := queue.Migrate(ctx); err != nil {
+		return err
+	}
+
 	var scheduler *jobs.Scheduler
 	runWorkers := cfg.Role == "all" || cfg.Role == "worker"
 	if runWorkers {
-		if err := queue.Migrate(ctx); err != nil {
-			return err
-		}
 		workers.Register()
 		queue.Start(ctx)
 		scheduler = jobs.NewScheduler(database, workers, time.Duration(cfg.SchedulerTickMS)*time.Millisecond)

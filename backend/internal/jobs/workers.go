@@ -58,6 +58,11 @@ func (w *Workers) enqueueSendDelivery(ctx context.Context, deliveryID string) er
 		SendOptions{RetryLimit: deliveryRetryLimit, RetryDelay: 5, RetryBackoff: true})
 }
 
+// EnqueueSendDelivery enqueues a delivery send (used by the API retry action).
+func (w *Workers) EnqueueSendDelivery(deliveryID string) error {
+	return w.enqueueSendDelivery(context.Background(), deliveryID)
+}
+
 // Register attaches all pipeline handlers to the queue.
 func (w *Workers) Register() {
 	w.Q.RegisterWorker(QFetchSource, func(ctx context.Context, data []byte, _ bool) error {

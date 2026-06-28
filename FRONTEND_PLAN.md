@@ -24,17 +24,17 @@ validation / loading / empty / error states.
 
 ## Phase B — Backend: expose every entity + analytics
 
-- [ ] B1 Sources: detail, update, delete, enable/disable, fetch, raw-item counts.
-- [ ] B2 Articles: list (filters/paging) + detail (signal links + source).
-- [ ] B3 RawItems: list (by source/status) + detail (raw payload).
-- [ ] B4 Signals: list paging/total, related articles, timeline.
-- [ ] B5 Subscriptions + Subscribers: full CRUD, delivery history.
-- [ ] B6 Deliveries: list (filters) + detail (payload, attempts) + retry.
-- [ ] B7 Taxonomy: tree + per-tag signal counts.
-- [ ] B8 Jobs/queue: list by queue/state, counts, retry/cancel.
-- [ ] B9 Analytics: counts over time, by severity/status/eventType/country, top sources,
+- [x] B1 Sources: detail, update, delete, enable/disable, fetch, raw-item counts.
+- [x] B2 Articles: list (filters/paging) + detail (signal links + source).
+- [x] B3 RawItems: list (by source/status) + detail (raw payload).
+- [x] B4 Signals: list paging/total, related articles, timeline.
+- [x] B5 Subscriptions + Subscribers: full CRUD, delivery history.
+- [x] B6 Deliveries: list (filters) + detail (payload, attempts) + retry.
+- [x] B7 Taxonomy: tree + per-tag signal counts.
+- [x] B8 Jobs/queue: list by queue/state, counts, retry/cancel.
+- [x] B9 Analytics: counts over time, by severity/status/eventType/country, top sources,
       delivery success rates, ingestion throughput.
-- [ ] B10 Tests ≥95% for all new queries/mutations.
+- [x] B10 Tests ≥95% for all new queries/mutations.
 
 ## Phase C — Frontend foundation (Mantine + router + auth)
 

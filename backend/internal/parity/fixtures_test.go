@@ -22,7 +22,8 @@ func goServer(t *testing.T, d *db.DB) *parity.Server {
 
 type noopEnqueuer struct{ last string }
 
-func (n *noopEnqueuer) EnqueueFetchSource(id string) error { n.last = id; return nil }
+func (n *noopEnqueuer) EnqueueFetchSource(id string) error  { n.last = id; return nil }
+func (n *noopEnqueuer) EnqueueSendDelivery(id string) error { n.last = id; return nil }
 
 // insertFixtures populates a deterministic dataset (fixed ids + timestamps) so
 // both backends read identical rows. Returns key ids.

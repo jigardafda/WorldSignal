@@ -74,7 +74,8 @@ func scanSignal(row pgx.Row) (*Signal, error) {
 
 // ListSignals returns signals matching the filter, ordered by lastSeenAt desc,
 // each with tags and sources loaded.
-func (d *DB) ListSignals(ctx context.Context, f SignalFilter) ([]*SignalAggregate, error) {
+// signalWhere builds the shared WHERE clause + args for the signal filter.
+func signalWhere(f SignalFilter) (string, []any) {
 	var conds []string
 	var args []any
 	add := func(cond string, val any) {
@@ -103,11 +104,22 @@ func (d *DB) ListSignals(ctx context.Context, f SignalFilter) ([]*SignalAggregat
 		p := "$" + itoa(len(args))
 		conds = append(conds, `EXISTS (SELECT 1 FROM "SignalTag" st JOIN "TaxonomyTag" tt ON tt."id"=st."tagId" WHERE st."signalId"="Signal"."id" AND tt."code" = ANY(`+p+`))`)
 	}
-
-	where := ""
-	if len(conds) > 0 {
-		where = " WHERE " + strings.Join(conds, " AND ")
+	if len(conds) == 0 {
+		return "", args
 	}
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+// CountSignals returns the number of signals matching the filter.
+func (d *DB) CountSignals(ctx context.Context, f SignalFilter) (int, error) {
+	where, args := signalWhere(f)
+	var n int
+	err := d.Pool.QueryRow(ctx, `SELECT count(*) FROM "Signal"`+where, args...).Scan(&n)
+	return n, err
+}
+
+func (d *DB) ListSignals(ctx context.Context, f SignalFilter) ([]*SignalAggregate, error) {
+	where, args := signalWhere(f)
 	limit := f.Limit
 	if limit <= 0 {
 		limit = 50

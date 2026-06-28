@@ -5,12 +5,13 @@ import (
 	"time"
 )
 
-// Subscriber mirrors the Prisma Subscriber model.
+// Subscriber mirrors the Prisma Subscriber model (+ a subscription count for lists).
 type Subscriber struct {
-	ID        string
-	Name      string
-	Status    string
-	CreatedAt time.Time
+	ID                string
+	Name              string
+	Status            string
+	CreatedAt         time.Time
+	SubscriptionCount int
 }
 
 // Subscription mirrors the Prisma Subscription model plus the includes used by

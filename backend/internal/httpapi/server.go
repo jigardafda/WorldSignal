@@ -11,10 +11,11 @@ import (
 	"github.com/worldsignal/backend/internal/taxonomy"
 )
 
-// Enqueuer abstracts the job queue so the API can enqueue fetches without
+// Enqueuer abstracts the job queue so the API can enqueue work without
 // depending on the worker implementation.
 type Enqueuer interface {
 	EnqueueFetchSource(sourceID string) error
+	EnqueueSendDelivery(deliveryID string) error
 }
 
 // Server holds dependencies for the HTTP handlers.

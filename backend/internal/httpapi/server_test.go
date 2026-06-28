@@ -13,9 +13,16 @@ import (
 	"github.com/worldsignal/backend/internal/httpapi"
 )
 
-type recordEnqueuer struct{ ids []string }
+type recordEnqueuer struct {
+	ids         []string
+	deliveryIDs []string
+}
 
 func (e *recordEnqueuer) EnqueueFetchSource(id string) error { e.ids = append(e.ids, id); return nil }
+func (e *recordEnqueuer) EnqueueSendDelivery(id string) error {
+	e.deliveryIDs = append(e.deliveryIDs, id)
+	return nil
+}
 
 func newServer(t *testing.T, d *db.DB) (*httptest.Server, *recordEnqueuer) {
 	t.Helper()
@@ -24,6 +31,15 @@ func newServer(t *testing.T, d *db.DB) (*httptest.Server, *recordEnqueuer) {
 	ht := httptest.NewServer(srv.Handler())
 	t.Cleanup(ht.Close)
 	return ht, enq
+}
+
+// newServerWith starts a server with a specific enqueuer, returning its base URL.
+func newServerWith(t *testing.T, d *db.DB, enq httpapi.Enqueuer) string {
+	t.Helper()
+	srv := &httpapi.Server{DB: d, Enqueue: enq, SigningSecret: "s"}
+	ht := httptest.NewServer(srv.Handler())
+	t.Cleanup(ht.Close)
+	return ht.URL
 }
 
 func seed(t *testing.T, d *db.DB) {
@@ -243,7 +259,8 @@ func TestRESTMutationsAndEdges(t *testing.T) {
 
 type failEnqueuer struct{}
 
-func (failEnqueuer) EnqueueFetchSource(string) error { return context.DeadlineExceeded }
+func (failEnqueuer) EnqueueFetchSource(string) error  { return context.DeadlineExceeded }
+func (failEnqueuer) EnqueueSendDelivery(string) error { return context.DeadlineExceeded }
 
 func TestTriggerFetchEnqueueError(t *testing.T) {
 	d := dbtest.Connect(t)
