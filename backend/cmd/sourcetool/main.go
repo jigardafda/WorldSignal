@@ -32,6 +32,7 @@ func main() {
 	limit := fs.Int("limit", 0, "limit number of candidates (0 = no limit)")
 	concurrency := fs.Int("concurrency", 24, "parallel validations")
 	out := fs.String("out", "", "write a JSON report to this path")
+	from := fs.String("from", "", "seed from an existing JSON report instead of re-validating")
 	dbURL := fs.String("db", os.Getenv("DATABASE_URL"), "database URL (seed)")
 	_ = fs.Parse(os.Args[2:])
 
@@ -47,8 +48,14 @@ func main() {
 		results := run(cands, *concurrency)
 		report(results, *out)
 	case "seed":
-		results := run(cands, *concurrency)
-		report(results, *out)
+		var results []sources.Result
+		if *from != "" {
+			results = loadReport(*from)
+			fmt.Fprintf(os.Stderr, "loaded %d results from %s\n", len(results), *from)
+		} else {
+			results = run(cands, *concurrency)
+			report(results, *out)
+		}
 		seed(*dbURL, results)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n", cmd)
@@ -114,6 +121,21 @@ func report(results []sources.Result, path string) {
 		return
 	}
 	fmt.Fprintf(os.Stderr, "wrote report → %s\n", path)
+}
+
+func loadReport(path string) []sources.Result {
+	f, err := os.Open(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "open report:", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+	var results []sources.Result
+	if err := json.NewDecoder(f).Decode(&results); err != nil {
+		fmt.Fprintln(os.Stderr, "decode report:", err)
+		os.Exit(1)
+	}
+	return results
 }
 
 func seed(dbURL string, results []sources.Result) {

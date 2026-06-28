@@ -56,11 +56,13 @@ func SeedValid(ctx context.Context, d *db.DB, results []Result) (SeedSummary, er
 		if r.NewestItem != nil {
 			newest = r.NewestItem
 		}
-		now := time.Now()
 
 		id := cuid.New()
 		var sourceID string
 		var inserted bool
+		// lastValidatedAt is timestamptz (new) while lastSuccessAt/lastFetchedAt are
+		// Prisma's timestamp(3) — using the SQL now() for all three avoids binding a
+		// single Go time.Time to columns of differing types.
 		err := d.Pool.QueryRow(ctx, `
 INSERT INTO "Source" (
   "id","name","type","url","websiteUrl","country","region","language","languages",
@@ -70,7 +72,7 @@ INSERT INTO "Source" (
   "avgResponseMs","metadata","createdAt","updatedAt"
 ) VALUES (
   $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,true,$22,
-  $23,'VALID',$24,$24,$24,$25,$26,now(),now()
+  $23,'VALID',now(),now(),now(),$24,$25,now(),now()
 )
 ON CONFLICT ("url") DO UPDATE SET
   "name"=EXCLUDED."name","websiteUrl"=EXCLUDED."websiteUrl","country"=EXCLUDED."country",
@@ -79,7 +81,7 @@ ON CONFLICT ("url") DO UPDATE SET
   "industry"=EXCLUDED."industry","subcategory"=EXCLUDED."subcategory","publisher"=EXCLUDED."publisher",
   "orgType"=EXCLUDED."orgType","sourceType"=EXCLUDED."sourceType","officialFeed"=EXCLUDED."officialFeed",
   "tags"=EXCLUDED."tags","healthScore"=EXCLUDED."healthScore","validationStatus"='VALID',
-  "lastValidatedAt"=EXCLUDED."lastValidatedAt","lastSuccessAt"=EXCLUDED."lastSuccessAt",
+  "lastValidatedAt"=now(),"lastSuccessAt"=now(),
   "lastValidationError"=NULL,"avgResponseMs"=EXCLUDED."avgResponseMs","metadata"=EXCLUDED."metadata",
   "updatedAt"=now()
 RETURNING "id", (xmax = 0) AS inserted`,
@@ -87,7 +89,7 @@ RETURNING "id", (xmax = 0) AS inserted`,
 			nullStr(c.Region), lang, c.Languages, nullStr(c.GeographicScope), nullStr(c.Category),
 			nullStr(c.Industry), nullStr(c.Subcategory), nullStr(c.Publisher), nullStr(c.OrgType),
 			nullStr(c.SourceType), c.OfficialFeed, c.Priority, c.Credibility, 900, parser,
-			c.Tags, r.HealthScore, now, r.ResponseMs, metaJSON,
+			c.Tags, r.HealthScore, r.ResponseMs, metaJSON,
 		).Scan(&sourceID, &inserted)
 		if err != nil {
 			return sum, err
