@@ -86,6 +86,15 @@ describe("SourceDetail", () => {
     renderWithProviders(<SourceDetail />, { route: "/sources/x", path: "/sources/:id" });
     expect(await screen.findByText("Source not found.")).toBeInTheDocument();
   });
+  it("blocks save when the name is cleared", async () => {
+    apiMock.source.mockResolvedValue(source());
+    renderWithProviders(<SourceDetail />, { route: "/sources/s1", path: "/sources/:id" });
+    const name = await screen.findByLabelText("Name");
+    await userEvent.clear(name);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Name is required")).toBeInTheDocument();
+    expect(apiMock.updateSource).not.toHaveBeenCalled();
+  });
 });
 
 describe("Articles", () => {

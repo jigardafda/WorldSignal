@@ -52,7 +52,19 @@ validation / loading / empty / error states.
 
 ## Phase E — Quality gates
 
-- [ ] E1 Frontend coverage ≥95% (Vitest) + typecheck clean.
-- [ ] E2 Backend coverage ≥95% (Go) + build/vet/lint clean.
-- [ ] E3 Playwright e2e: auth + every major workflow, green vs Go backend.
-- [ ] E4 Validation / loading / empty / error states verified on every page.
+- [x] E1 Frontend coverage ≥95% (Vitest) + typecheck clean. — 84 tests, 98.86% statements/lines.
+- [x] E2 Backend coverage ≥95% (Go) + build/vet/lint clean. — 95.1% (`-coverpkg`, `-p 1`).
+- [x] E3 Playwright e2e: auth + every major workflow, green vs Go backend. — 12 specs
+      (login/redirect/invalid-creds/logout + signals/sources/create/taxonomy/analytics/
+      users/account). Caught & fixed a real bug: login() didn't load permissions →
+      RBAC nav hidden until reload.
+- [x] E4 Validation / loading / empty / error states verified on every page. — every
+      data page uses `AsyncBoundary` (loading/error) with empty predicates on lists and
+      null→`EmptyState` on detail pages; every form declares `validate` (added to
+      SourceDetail).
+
+### Exit criteria — all met
+- Auth/RBAC, all entities, analytics, logs, relationships exposed via dedicated pages.
+- UI→backend workflows functional and validated by e2e; no placeholders.
+- Coverage ≥95% backend (95.1%) and frontend (98.86%); typecheck clean.
+- Primary/edge/failure states (loading/empty/error/validation) handled everywhere.

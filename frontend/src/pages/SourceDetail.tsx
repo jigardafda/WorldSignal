@@ -37,6 +37,10 @@ function SourceBody({ source, canWrite, reload, navigate }: { source: Source; ca
       name: source.name, country: source.country ?? "", priority: source.priority,
       credibility: source.credibility, crawlFrequency: source.crawlFrequency, enabled: source.enabled,
     },
+    validate: {
+      name: (v) => (v.trim() ? null : "Name is required"),
+      crawlFrequency: (v) => (v >= 30 ? null : "Must be at least 30 seconds"),
+    },
   });
 
   async function save(v: typeof form.values) {
