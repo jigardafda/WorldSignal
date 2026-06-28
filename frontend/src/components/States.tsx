@@ -52,7 +52,8 @@ export function AsyncBoundary<T>({
 }) {
   if (state.loading && state.data === null) return <LoadingState />;
   if (state.error) return <ErrorState message={state.error} onRetry={state.reload} />;
-  if (state.data === null) return <EmptyState />;
-  if (empty && empty(state.data)) return <EmptyState />;
-  return <>{children(state.data)}</>;
+  // Loaded: pass the value (which may be null for "not found" detail pages) to
+  // children, unless an `empty` predicate flags an empty collection.
+  if (state.data !== null && empty && empty(state.data)) return <EmptyState />;
+  return <>{children(state.data as T)}</>;
 }

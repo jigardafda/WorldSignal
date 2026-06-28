@@ -42,8 +42,8 @@ describe("States", () => {
     expect(screen.getByTestId("loading")).toBeInTheDocument();
     rerender(<AsyncBoundary state={{ ...base, data: null, loading: false, error: "e" }}>{() => <div>x</div>}</AsyncBoundary>);
     expect(screen.getByTestId("error")).toBeInTheDocument();
-    rerender(<AsyncBoundary state={{ ...base, data: null, loading: false, error: null }}>{() => <div>x</div>}</AsyncBoundary>);
-    expect(screen.getByTestId("empty")).toBeInTheDocument();
+    rerender(<AsyncBoundary state={{ ...base, data: null, loading: false, error: null }}>{(d) => <div>val:{String(d)}</div>}</AsyncBoundary>);
+    expect(screen.getByText("val:null")).toBeInTheDocument(); // null passed through (detail "not found")
     rerender(<AsyncBoundary state={{ ...base, data: [], loading: false, error: null }} empty={(d: unknown[]) => d.length === 0}>{() => <div>x</div>}</AsyncBoundary>);
     expect(screen.getByTestId("empty")).toBeInTheDocument();
     rerender(<AsyncBoundary state={{ ...base, data: [1], loading: false, error: null }}>{() => <div>loaded</div>}</AsyncBoundary>);
