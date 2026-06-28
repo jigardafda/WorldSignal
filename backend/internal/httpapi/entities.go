@@ -515,6 +515,18 @@ func (s *Server) resolveAnalytics(ctx context.Context, _ map[string]any) (any, e
 	if err != nil {
 		return nil, err
 	}
+	sentiment, err := s.DB.SignalsBySentiment(ctx)
+	if err != nil {
+		return nil, err
+	}
+	geoScope, err := s.DB.SignalsByGeoScope(ctx)
+	if err != nil {
+		return nil, err
+	}
+	industries, err := s.DB.TopIndustries(ctx, 10)
+	if err != nil {
+		return nil, err
+	}
 	overTime, err := s.DB.SignalsOverTime(ctx, 30)
 	if err != nil {
 		return nil, err
@@ -540,6 +552,9 @@ func (s *Server) resolveAnalytics(ctx context.Context, _ map[string]any) (any, e
 		"signalsByStatus":    buckets(status),
 		"signalsByEventType": buckets(evt),
 		"signalsByCountry":   buckets(country),
+		"signalsBySentiment": buckets(sentiment),
+		"signalsByGeoScope":  buckets(geoScope),
+		"topIndustries":      buckets(industries),
 		"signalsOverTime":    buckets(overTime),
 		"topSources":         topSources,
 		"deliveryStats": map[string]any{

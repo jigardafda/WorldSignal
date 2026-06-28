@@ -58,3 +58,41 @@ export function ConfidenceBar({ value }: { value: number }) {
     </Group>
   );
 }
+
+const SENTIMENT_COLORS: Record<string, string> = { POSITIVE: "green", NEGATIVE: "red", NEUTRAL: "gray", MIXED: "yellow" };
+
+export function SentimentBadge({ sentiment, size = "sm" }: { sentiment?: string | null; size?: string }) {
+  if (!sentiment) return null;
+  return <Badge size={size} color={SENTIMENT_COLORS[sentiment] ?? "gray"} variant="light">{sentiment}</Badge>;
+}
+
+const INFLUENCE_COLORS: Record<string, string> = { NEGLIGIBLE: "gray", LOW: "blue", MEDIUM: "grape", HIGH: "orange", CRITICAL: "red" };
+
+export function InfluenceBadge({ influence, size = "sm" }: { influence?: string | null; size?: string }) {
+  if (!influence) return null;
+  return <Badge size={size} color={INFLUENCE_COLORS[influence] ?? "gray"} variant="light">Influence: {influence}</Badge>;
+}
+
+/** Minimal shape SignalIntel needs — a subset of api.Signal. */
+export interface SignalIntelData {
+  region?: string | null; city?: string | null; geoScope?: string | null;
+  sentiment?: string | null; influence?: string | null; relevance?: number | null;
+  attributes?: { key: string; valueCode: string }[];
+}
+
+/** Compact summary of a signal's enrichment, for list rows and cards. */
+export function SignalIntel({ signal }: { signal: SignalIntelData }) {
+  const loc = [signal.city, signal.region].filter(Boolean).join(", ") || null;
+  const industries = (signal.attributes ?? []).filter((a) => a.key === "industry").slice(0, 3);
+  const hasAny = loc || signal.sentiment || signal.influence || signal.relevance != null || industries.length > 0;
+  if (!hasAny) return null;
+  return (
+    <Group gap={6} mt={3} wrap="wrap" data-testid="signal-intel">
+      {loc && <Text size="xs" c="dimmed">📍 {loc}</Text>}
+      <SentimentBadge sentiment={signal.sentiment} size="xs" />
+      <InfluenceBadge influence={signal.influence} size="xs" />
+      {signal.relevance != null && <Badge size="xs" variant="light" color="blue">Rel {Math.round(signal.relevance * 100)}%</Badge>}
+      {industries.map((a) => <Badge key={a.valueCode} size="xs" variant="outline">{a.valueCode}</Badge>)}
+    </Group>
+  );
+}

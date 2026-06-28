@@ -15,6 +15,8 @@ export interface User {
 export interface SignalTag { code: string; confidence: number }
 export interface SignalSource { publisher: string; url: string | null; publishedAt: string | null }
 export interface SignalAttribute { key: string; valueCode: string; valueText: string; valueNum: number | null; confidence: number }
+export interface AttributeValue { code: string; label: string }
+export interface AttributeDefinition { key: string; label: string; kind: string; description: string; values: AttributeValue[] }
 export interface Signal {
   id: string; title: string; summary: string;
   whatHappened?: string | null; whyItMatters?: string | null;
@@ -111,6 +113,7 @@ export interface Bucket { key: string; count: number }
 export interface Analytics {
   signalsBySeverity: Bucket[]; signalsByStatus: Bucket[]; signalsByEventType: Bucket[];
   signalsByCountry: Bucket[]; signalsOverTime: Bucket[];
+  signalsBySentiment: Bucket[]; signalsByGeoScope: Bucket[]; topIndustries: Bucket[];
   topSources: { id: string; name: string; articleCount: number }[];
   deliveryStats: { total: number; sent: number; pending: number; retrying: number; failed: number; deadLettered: number };
   ingestionStats: { rawItems: number; parsed: number; duplicates: number; failed: number; articles: number };
@@ -184,6 +187,8 @@ export const api = {
   signalCount: (filter: Record<string, unknown>) =>
     gql<{ signalCount: number }>(`query($f:SignalFilter){signalCount(filter:$f)}`, { f: filter }).then((d) => d.signalCount),
   signal: (id: string) => gql<{ signal: Signal | null }>(`query($id:ID!){signal(id:$id){${SIGNAL_FIELDS}}}`, { id }).then((d) => d.signal),
+  attributeDictionary: () =>
+    gql<{ attributeDictionary: AttributeDefinition[] }>(`{attributeDictionary{key label kind description values{code label}}}`).then((d) => d.attributeDictionary),
 
   // sources
   sources: (filter: SourceFilter = {}, limit = 50, offset = 0) =>

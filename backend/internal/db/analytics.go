@@ -47,6 +47,25 @@ func (d *DB) SignalsByCountry(ctx context.Context, limit int) ([]Bucket, error) 
 		`SELECT COALESCE("country",'(unknown)'), count(*) FROM "Signal" GROUP BY "country" ORDER BY count(*) DESC LIMIT $1`, limit)
 }
 
+// SignalsBySentiment counts signals grouped by extracted sentiment.
+func (d *DB) SignalsBySentiment(ctx context.Context) ([]Bucket, error) {
+	return d.bucketQuery(ctx,
+		`SELECT COALESCE("sentiment",'(none)'), count(*) FROM "Signal" GROUP BY "sentiment" ORDER BY count(*) DESC`)
+}
+
+// SignalsByGeoScope counts signals grouped by geographic scope.
+func (d *DB) SignalsByGeoScope(ctx context.Context) ([]Bucket, error) {
+	return d.bucketQuery(ctx,
+		`SELECT COALESCE("geoScope",'(none)'), count(*) FROM "Signal" GROUP BY "geoScope" ORDER BY count(*) DESC`)
+}
+
+// TopIndustries returns the most common industry attributes across signals.
+func (d *DB) TopIndustries(ctx context.Context, limit int) ([]Bucket, error) {
+	return d.bucketQuery(ctx,
+		`SELECT "valueCode", count(*) FROM "SignalAttribute" WHERE "key"='industry'
+		 GROUP BY "valueCode" ORDER BY count(*) DESC LIMIT $1`, limit)
+}
+
 // SignalsOverTime returns daily signal counts for the last n days (oldest first).
 func (d *DB) SignalsOverTime(ctx context.Context, days int) ([]Bucket, error) {
 	return d.bucketQuery(ctx,

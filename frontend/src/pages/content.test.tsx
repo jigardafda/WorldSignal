@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
@@ -6,6 +6,7 @@ import { renderWithProviders } from "../test/utils";
 const { apiMock } = vi.hoisted(() => ({
   apiMock: {
     stats: vi.fn(), signals: vi.fn(), signalCount: vi.fn(), signal: vi.fn(), countries: vi.fn(),
+    attributeDictionary: vi.fn(),
   },
 }));
 vi.mock("../lib/api", () => ({ api: apiMock }));
@@ -34,6 +35,9 @@ afterEach(() => vi.clearAllMocks());
 beforeEach(() => {
   _resetCountriesCache();
   apiMock.countries.mockResolvedValue([{ code: "US", name: "United States", flag: "🇺🇸", currency: "USD", capital: "Washington, D.C.", capitalLat: 38.9, capitalLng: -77.04 }]);
+  apiMock.attributeDictionary.mockResolvedValue([
+    { key: "industry", label: "Industry", kind: "TAGSET", description: "", values: [{ code: "CYBERSECURITY", label: "Cybersecurity" }, { code: "BANKING", label: "Banking" }] },
+  ]);
 });
 
 describe("Dashboard", () => {
@@ -63,6 +67,27 @@ describe("Signals", () => {
     await waitFor(() => expect(apiMock.signals).toHaveBeenCalledWith(expect.objectContaining({ search: "quake" }), 25, 0));
 
     await userEvent.click(screen.getByText("Quake")); // row click → navigate
+  });
+  it("shows enrichment intel in rows", async () => {
+    apiMock.signals.mockResolvedValue([signal()]);
+    apiMock.signalCount.mockResolvedValue(1);
+    renderWithProviders(<Signals />);
+    expect(await screen.findByText("Quake")).toBeInTheDocument();
+    const intel = screen.getByTestId("signal-intel");
+    expect(intel).toHaveTextContent("NEGATIVE");
+    expect(intel).toHaveTextContent("Los Angeles, California");
+    expect(intel).toHaveTextContent("CYBERSECURITY");
+  });
+  it("filters by sentiment", async () => {
+    apiMock.signals.mockResolvedValue([signal()]);
+    apiMock.signalCount.mockResolvedValue(1);
+    renderWithProviders(<Signals />);
+    await screen.findByText("Quake");
+    // Mantine 9 Combobox: open via native click; options stay display:none in jsdom.
+    fireEvent.click(screen.getByTestId("signal-sentiment"));
+    const listbox = document.getElementById(screen.getByTestId("signal-sentiment").getAttribute("aria-controls")!)!;
+    fireEvent.click(await within(listbox).findByRole("option", { name: "NEGATIVE", hidden: true }));
+    await waitFor(() => expect(apiMock.signals).toHaveBeenCalledWith(expect.objectContaining({ sentiment: "NEGATIVE" }), 25, 0));
   });
   it("shows empty state", async () => {
     apiMock.signals.mockResolvedValue([]);

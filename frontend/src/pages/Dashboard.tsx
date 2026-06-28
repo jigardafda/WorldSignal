@@ -1,4 +1,4 @@
-import { SimpleGrid, Stack, Paper, Title, Group } from "@mantine/core";
+import { SimpleGrid, Stack, Paper, Text, Title, Group } from "@mantine/core";
 import { IconActivity, IconArticle, IconBroadcast, IconSend, IconClock } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { api, type Signal, type Stats } from "../lib/api";
@@ -7,7 +7,7 @@ import { AsyncBoundary } from "../components/States";
 import { PageHeader } from "../components/PageHeader";
 import { StatCard } from "../components/StatCard";
 import { DataTable } from "../components/DataTable";
-import { SeverityBadge, ConfidenceBar } from "../components/badges";
+import { SeverityBadge, ConfidenceBar, SignalIntel } from "../components/badges";
 import { fmtDate } from "../lib/format";
 
 export function Dashboard() {
@@ -43,7 +43,12 @@ export function Dashboard() {
                 onRowClick={(r) => navigate(`/signals/${r.id}`)}
                 columns={[
                   { key: "severity", header: "Severity", render: (r) => <SeverityBadge severity={r.severity} /> },
-                  { key: "title", header: "Title", render: (r) => r.title },
+                  { key: "title", header: "Title", render: (r) => (
+                    <div>
+                      <Text fw={500} size="sm">{r.title}</Text>
+                      <SignalIntel signal={r} />
+                    </div>
+                  ) },
                   { key: "sourceCount", header: "Sources", render: (r) => r.sourceCount },
                   { key: "confidence", header: "Confidence", render: (r) => <ConfidenceBar value={r.confidence} /> },
                   { key: "lastSeenAt", header: "Last seen", render: (r) => fmtDate(r.lastSeenAt) },

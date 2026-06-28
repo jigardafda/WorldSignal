@@ -187,6 +187,8 @@ describe("Analytics", () => {
     apiMock.analytics.mockResolvedValue({
       signalsBySeverity: [{ key: "HIGH", count: 3 }], signalsByStatus: [{ key: "CONFIRMED", count: 2 }],
       signalsByEventType: [{ key: "DISASTER.FLOOD", count: 1 }], signalsByCountry: [{ key: "US", count: 4 }],
+      signalsBySentiment: [{ key: "NEGATIVE", count: 3 }], signalsByGeoScope: [{ key: "LOCAL", count: 2 }],
+      topIndustries: [{ key: "CYBERSECURITY", count: 5 }],
       signalsOverTime: [{ key: "2026-01-01", count: 5 }],
       topSources: [{ id: "s1", name: "BBC", articleCount: 9 }],
       deliveryStats: { total: 10, sent: 8, pending: 1, retrying: 0, failed: 1, deadLettered: 0 },
@@ -199,6 +201,7 @@ describe("Analytics", () => {
   it("handles empty analytics", async () => {
     apiMock.analytics.mockResolvedValue({
       signalsBySeverity: [], signalsByStatus: [], signalsByEventType: [], signalsByCountry: [],
+      signalsBySentiment: [], signalsByGeoScope: [], topIndustries: [],
       signalsOverTime: [], topSources: [],
       deliveryStats: { total: 0, sent: 0, pending: 0, retrying: 0, failed: 0, deadLettered: 0 },
       ingestionStats: { rawItems: 0, parsed: 0, duplicates: 0, failed: 0, articles: 0 },
