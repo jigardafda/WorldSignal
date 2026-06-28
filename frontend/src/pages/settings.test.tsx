@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
@@ -64,8 +64,11 @@ describe("Settings (LLM keys)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add OpenAI key" }));
     await userEvent.type(await screen.findByTestId("llm-label"), "Prod");
     await userEvent.type(screen.getByTestId("llm-key"), "sk-test-1234567890");
-    await userEvent.click(screen.getByTestId("llm-model"));
-    await userEvent.click(await screen.findByRole("option", { name: "gpt-4o" }));
+    // Mantine 9's Combobox opens on a native click; fireEvent emits it directly.
+    // jsdom can't lay out the floating dropdown, so the popover keeps
+    // `display:none` and byRole filters the options out — match with hidden:true.
+    fireEvent.click(screen.getByTestId("llm-model"));
+    fireEvent.click(await screen.findByRole("option", { name: "gpt-4o", hidden: true }));
     await userEvent.click(screen.getByRole("button", { name: /Add & validate/ }));
     await waitFor(() => expect(apiMock.createLLMKey).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-4o" })));
   });

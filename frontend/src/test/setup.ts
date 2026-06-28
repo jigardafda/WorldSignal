@@ -27,6 +27,15 @@ class ResizeObserverMock {
 window.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
+// Mantine 9's Textarea autosize subscribes to font-loading events; jsdom has no
+// FontFaceSet on `document.fonts`.
+if (!("fonts" in document)) {
+  Object.defineProperty(document, "fonts", {
+    writable: true,
+    value: { addEventListener: vi.fn(), removeEventListener: vi.fn(), ready: Promise.resolve() },
+  });
+}
+
 // localStorage shim (jsdom provides one, but ensure a clean stub if missing).
 if (!("localStorage" in window)) {
   const store: Record<string, string> = {};

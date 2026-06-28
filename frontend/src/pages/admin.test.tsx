@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
@@ -81,8 +81,16 @@ describe("Users", () => {
     expect(screen.getAllByRole("button", { name: "Delete" })).toHaveLength(1);
 
     // Change the other user's role via the inline select (before any modal opens).
-    await userEvent.click(screen.getAllByDisplayValue("VIEWER")[0]);
-    await userEvent.click(await screen.findByRole("option", { name: "EDITOR" }));
+    // Mantine 9's Combobox opens on a native click event, which fireEvent emits
+    // directly (userEvent's pointer sequence no longer toggles the dropdown).
+    // jsdom can't lay out the floating dropdown, so the popover keeps
+    // `display:none` and byRole filters the options out — match with hidden:true.
+    const roleSelect = screen.getAllByRole("combobox").find((el) => (el as HTMLInputElement).value === "VIEWER")!;
+    fireEvent.click(roleSelect);
+    // Every Select keeps its dropdown mounted, so scope the option lookup to the
+    // listbox this combobox controls.
+    const listbox = document.getElementById(roleSelect.getAttribute("aria-controls")!)!;
+    fireEvent.click(await within(listbox).findByRole("option", { name: "EDITOR", hidden: true }));
     await waitFor(() => expect(apiMock.updateUser).toHaveBeenCalledWith("u2", { role: "EDITOR" }));
 
     // Delete the other user (confirm).
