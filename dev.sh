@@ -13,7 +13,7 @@ if [ -f "$ROOT/backend/.env.local" ]; then
   echo "loaded backend/.env.local"
 fi
 
-export DATABASE_URL="${DATABASE_URL:-postgresql://jigardafda@localhost:5432/worldsignal?sslmode=disable}"
+export DATABASE_URL="${DATABASE_URL:-postgresql://worldsignal:worldsignal@localhost:5432/worldsignal?sslmode=disable}"
 export OPENAI_API_KEY="${OPENAI_API_KEY:-}"          # empty → heuristic enrichment
 export ROLE="${ROLE:-all}"                            # api + workers + scheduler
 export HOST="${HOST:-127.0.0.1}"

@@ -19,7 +19,7 @@ func URL() string {
 	if v := os.Getenv("TEST_DATABASE_URL"); v != "" {
 		return v
 	}
-	return "postgresql://jigardafda@localhost:5432/worldsignal_test?sslmode=disable"
+	return "postgresql://worldsignal:worldsignal@localhost:5432/worldsignal_test?sslmode=disable"
 }
 
 // tables are truncated in dependency-safe order (CASCADE handles the rest).

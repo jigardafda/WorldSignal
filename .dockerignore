@@ -1,0 +1,33 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies
+node_modules
+**/node_modules
+
+# Build output
+dist
+**/dist
+frontend/dist
+
+# Test / coverage artifacts
+coverage
+**/coverage
+test-results
+**/test-results
+playwright-report
+**/playwright-report
+*.tsbuildinfo
+
+# Logs
+*.log
+
+# Env / secrets
+.env
+.env.*
+
+# Temp / OS
+/tmp
+**/tmp
+.DS_Store

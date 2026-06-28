@@ -1,0 +1,88 @@
+# GoReleaser config — run from the backend/ module (the release workflow sets
+# workdir: backend). Produces cross-platform archives for both binaries with
+# checksums, SBOMs (syft) and keyless cosign signatures.
+version: 2
+
+project_name: worldsignal
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: server
+    main: ./cmd/server
+    binary: worldsignal-server
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+  - id: sourcetool
+    main: ./cmd/sourcetool
+    binary: worldsignal-sourcetool
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: default
+    ids: [server, sourcetool]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - ../LICENSE
+      - ../README.md
+      - ../CHANGELOG.md
+      - src: ../backend/schema/schema.sql
+        dst: schema
+
+checksum:
+  name_template: "checksums.txt"
+
+sboms:
+  - id: archive
+    artifacts: archive
+
+signs:
+  - cmd: cosign
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+  groups:
+    - title: Features
+      regexp: '^feat'
+      order: 0
+    - title: Bug fixes
+      regexp: '^fix'
+      order: 1
+    - title: Others
+      order: 99
+
+release:
+  draft: false
+  prerelease: auto
+  footer: |
+    ---
+    SBOMs and a cosign-signed `checksums.txt` are attached. Verify with:
+    `cosign verify-blob --certificate checksums.txt.pem --signature checksums.txt.sig checksums.txt`

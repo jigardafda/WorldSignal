@@ -140,7 +140,7 @@ func loadReport(path string) []sources.Result {
 
 func seed(dbURL string, results []sources.Result) {
 	if dbURL == "" {
-		dbURL = "postgresql://jigardafda@localhost:5432/worldsignal?sslmode=disable"
+		dbURL = "postgresql://worldsignal:worldsignal@localhost:5432/worldsignal?sslmode=disable"
 	}
 	ctx := context.Background()
 	d, err := db.Connect(ctx, dbURL)

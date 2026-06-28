@@ -1,0 +1,30 @@
+title: "[Idea]: "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for WorldSignal? Share it here. For concrete, well-scoped
+        feature requests you can also open a
+        [feature request issue](https://github.com/jigardafda/WorldSignal/issues/new?template=feature_request.yml).
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What would you like to see? What problem does it solve?
+    validations:
+      required: true
+  - type: textarea
+    id: benefit
+    attributes:
+      label: Who benefits and how?
+      description: Describe the use case and the value this would provide.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links, references, prior art, or sketches.
+    validations:
+      required: false

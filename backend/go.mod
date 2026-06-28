@@ -6,6 +6,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/vektah/gqlparser/v2 v2.5.35
+	golang.org/x/crypto v0.53.0
 )
 
 require (
@@ -18,7 +19,6 @@ require (
 	github.com/mmcdole/goxpp v1.1.1-0.20240225020742-a0c311522b23 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/text v0.38.0 // indirect

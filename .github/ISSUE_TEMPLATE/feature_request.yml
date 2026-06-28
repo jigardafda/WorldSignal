@@ -1,0 +1,49 @@
+name: Feature request
+description: Suggest an idea or enhancement for WorldSignal.
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement! For open-ended ideas or
+        discussion, consider starting a
+        [Discussion](https://github.com/jigardafda/WorldSignal/discussions)
+        instead. Please check the [Roadmap](https://github.com/jigardafda/WorldSignal/blob/main/ROADMAP.md)
+        and existing issues first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem are you trying to solve? What is the use case?
+      placeholder: "I'm frustrated when... / It's hard to..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the change or feature you'd like to see.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative solutions or workarounds you've considered.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any other context, mockups, links, or references.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I have searched existing issues and discussions for this idea.
+          required: true

@@ -1,0 +1,42 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#0E1A33"/>
+    </linearGradient>
+    <linearGradient id="ws-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#2F6DF6"/>
+      <stop offset="1" stop-color="#22C3E6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <!-- subtle grid glow -->
+  <circle cx="1080" cy="120" r="260" fill="#2F6DF6" opacity="0.10"/>
+  <circle cx="200" cy="560" r="220" fill="#22C3E6" opacity="0.08"/>
+
+  <!-- Mark -->
+  <g transform="translate(150,200)">
+    <rect width="240" height="240" rx="56" fill="url(#ws-grad)"/>
+    <g stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" fill="none" opacity="0.96" transform="translate(0,0)">
+      <circle cx="96" cy="142" r="58"/>
+      <ellipse cx="96" cy="142" rx="25" ry="58"/>
+      <line x1="38" y1="142" x2="154" y2="142"/>
+    </g>
+    <circle cx="166" cy="74" r="13" fill="#FFFFFF"/>
+    <g stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" fill="none">
+      <path d="M184 56 a30 30 0 0 1 0 38" opacity="0.85"/>
+      <path d="M198 42 a48 48 0 0 1 0 66" opacity="0.55"/>
+    </g>
+  </g>
+
+  <!-- Wordmark + tagline -->
+  <text x="450" y="300" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif" font-size="92" font-weight="800" letter-spacing="-2">
+    <tspan fill="#F8FAFC">World</tspan><tspan fill="#38BDF8">Signal</tspan>
+  </text>
+  <text x="452" y="360" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif" font-size="34" font-weight="500" fill="#94A3B8">
+    The world's news, turned into clean, deduplicated Signals.
+  </text>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="600" fill="#64748B">
+    <text x="452" y="430">Go · Postgres · GraphQL · React</text>
+  </g>
+</svg>

@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  goreleaser:
+    name: Release (GoReleaser)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub Release + upload artifacts
+      id-token: write # cosign keyless signing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+      - uses: sigstore/cosign-installer@v3
+      - uses: anchore/sbom-action/download-syft@v0
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          workdir: backend
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

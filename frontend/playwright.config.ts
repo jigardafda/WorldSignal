@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const E2E_DB = "postgresql://jigardafda@localhost:5432/worldsignal_e2e?sslmode=disable";
+const E2E_DB = "postgresql://worldsignal:worldsignal@localhost:5432/worldsignal_e2e?sslmode=disable";
 
 // End-to-end tests run the real Go backend (api role, LLM disabled) against a
 // seeded Postgres DB, with the Vite dev server proxying /graphql to it.

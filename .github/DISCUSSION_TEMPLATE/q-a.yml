@@ -1,0 +1,32 @@
+title: "[Q&A]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Need help using WorldSignal? Ask here. Please check the
+        [documentation](https://github.com/jigardafda/WorldSignal/tree/main/docs)
+        and [existing discussions](https://github.com/jigardafda/WorldSignal/discussions)
+        first.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What are you trying to do, and what do you need help with?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
+      description: Steps you've already taken, docs you've read, and what happened.
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: WorldSignal release tag or git commit SHA, if relevant.
+      placeholder: "v0.1.0 or abc1234"
+    validations:
+      required: false

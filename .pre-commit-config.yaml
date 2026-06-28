@@ -1,0 +1,43 @@
+# Pre-commit hooks for WorldSignal.
+# Install with: pip install pre-commit && pre-commit install
+minimum_pre_commit_version: "3.0.0"
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^.*\.md$
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: gofmt
+        name: gofmt (backend)
+        entry: bash -c 'out="$(cd backend && gofmt -l .)"; if [ -n "$out" ]; then echo "gofmt needed for:"; echo "$out"; exit 1; fi'
+        language: system
+        files: ^backend/.*\.go$
+        pass_filenames: false
+
+      - id: go-vet
+        name: go vet (backend)
+        entry: bash -c 'cd backend && go vet ./...'
+        language: system
+        files: ^backend/.*\.go$
+        pass_filenames: false
+
+  # Optional: full Go linting via the golangci-lint mirror.
+  # The hook config tells it to run inside the backend/ module.
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.1.6
+    hooks:
+      - id: golangci-lint
+        name: golangci-lint (backend)
+        entry: bash -c 'cd backend && golangci-lint run'
+        language: system
+        files: ^backend/.*\.go$
+        pass_filenames: false

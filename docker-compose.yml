@@ -11,6 +11,9 @@ services:
       - "5432:5432"
     volumes:
       - worldsignal_pg:/var/lib/postgresql/data
+      # Bootstrap the base content schema on first init; the Go server then runs
+      # its idempotent migrations (auth, source metadata, queue) on boot.
+      - ./backend/schema/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U worldsignal"]
       interval: 5s
@@ -31,6 +34,16 @@ services:
       WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-change-me-in-prod}
     ports:
       - "4000:4000"
+
+  frontend:
+    build: ./frontend
+    container_name: worldsignal-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    # nginx serves the SPA and proxies /graphql + /v1 to the backend service.
+    ports:
+      - "8080:80"
 
 volumes:
   worldsignal_pg:

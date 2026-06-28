@@ -1,0 +1,56 @@
+# golangci-lint v2 configuration. Run from the backend/ module
+# (CI sets working-directory: backend). gosimple is folded into staticcheck in v2;
+# gofmt/goimports are configured under `formatters`.
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - unconvert
+    - bodyclose
+    - revive
+  settings:
+    misspell:
+      locale: US
+    revive:
+      severity: warning
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: increment-decrement
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: indent-error-flow
+        - name: errorf
+  exclusions:
+    generated: lax
+    rules:
+      # Tests favor brevity; relax the noisy linters there.
+      - path: _test\.go
+        linters: [errcheck, bodyclose, revive]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes: [github.com/worldsignal]

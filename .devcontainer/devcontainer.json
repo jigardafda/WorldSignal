@@ -1,0 +1,28 @@
+{
+  // WorldSignal dev container: Go backend + Node/Vite frontend.
+  "name": "WorldSignal",
+  "image": "mcr.microsoft.com/devcontainers/go:1.26-bookworm",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+
+  // Backend (:4000), Vite dev server (:5173), Postgres (:5432).
+  "forwardPorts": [4000, 5173, 5432],
+
+  // Pre-fetch dependencies after the container is created.
+  "postCreateCommand": "cd backend && go mod download && cd ../frontend && npm ci",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}
