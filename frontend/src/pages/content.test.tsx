@@ -74,4 +74,11 @@ describe("SignalDetail", () => {
     renderWithProviders(<SignalDetail />, { route: "/signals/x", path: "/signals/:id" });
     expect(await screen.findByText("Signal not found.")).toBeInTheDocument();
   });
+  it("renders empty tags/sources and omits optional sections", async () => {
+    apiMock.signal.mockResolvedValue(signal({ tags: [], sources: [], whatHappened: null, whyItMatters: null, eventType: null, country: null }));
+    renderWithProviders(<SignalDetail />, { route: "/signals/sg", path: "/signals/:id" });
+    expect(await screen.findByText("No linked sources.")).toBeInTheDocument();
+    expect(screen.getByText("No tags.")).toBeInTheDocument();
+    expect(screen.queryByText("Why it matters")).toBeNull();
+  });
 });
