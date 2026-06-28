@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/worldsignal/backend/internal/db"
@@ -20,6 +21,10 @@ func FetchSource(ctx context.Context, d *db.DB, sourceID string, now time.Time, 
 
 	items, ferr := ingestion.FetchRSSSource(ctx, source.URL)
 	if ferr != nil {
+		// A throttle deferral is not a failure — leave the source due for a later tick.
+		if errors.Is(ferr, ingestion.ErrThrottled) {
+			return nil, nil
+		}
 		if err := d.MarkSourceFetchFailure(ctx, sourceID, now, failureThreshold, cooldown, ferr.Error()); err != nil {
 			return nil, err
 		}
