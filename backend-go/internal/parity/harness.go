@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -122,6 +123,19 @@ type Response struct {
 // Get issues a GET request.
 func (s *Server) Get(path string) (*Response, error) { return s.do(http.MethodGet, path, "", nil) }
 
+// GetGraphQL issues a GraphQL query over GET (query + optional JSON variables).
+// GET is used for read parity because the legacy server's POST body handling
+// hangs (Fastify drains the body before graphql-yoga reads it); the response
+// body is identical to what POST would return.
+func (s *Server) GetGraphQL(query string, variablesJSON string) (*Response, error) {
+	u := url.Values{}
+	u.Set("query", query)
+	if variablesJSON != "" {
+		u.Set("variables", variablesJSON)
+	}
+	return s.do(http.MethodGet, "/graphql?"+u.Encode(), "", nil)
+}
+
 // PostJSON issues a POST with a JSON body.
 func (s *Server) PostJSON(path string, body []byte) (*Response, error) {
 	return s.do(http.MethodPost, path, "application/json", body)
@@ -130,6 +144,11 @@ func (s *Server) PostJSON(path string, body []byte) (*Response, error) {
 // PatchJSON issues a PATCH with a JSON body.
 func (s *Server) PatchJSON(path string, body []byte) (*Response, error) {
 	return s.do(http.MethodPatch, path, "application/json", body)
+}
+
+// Options issues an OPTIONS preflight request.
+func (s *Server) Options(path string) (*Response, error) {
+	return s.do(http.MethodOptions, path, "", nil)
 }
 
 func (s *Server) do(method, path, contentType string, body []byte) (*Response, error) {

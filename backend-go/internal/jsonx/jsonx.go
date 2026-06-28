@@ -8,6 +8,10 @@ import (
 	"encoding/json"
 )
 
+// Unmarshal is a thin alias for json.Unmarshal, kept here so callers depend only
+// on this package for JSON handling.
+func Unmarshal(b []byte, v any) error { return json.Unmarshal(b, v) }
+
 // Marshal is like json.Marshal but does not HTML-escape &, <, > and emits no
 // trailing newline.
 func Marshal(v any) ([]byte, error) {

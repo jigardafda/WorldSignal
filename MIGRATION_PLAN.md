@@ -62,18 +62,24 @@ surface for human review.
 
 ## Phase 1 — Read API parity (byte-parity)
 
-- [ ] 1.1 REST `GET /health`.
-- [ ] 1.2 REST `GET /v1/stats` (+ pending count) and GraphQL `stats`.
-- [ ] 1.3 REST `GET /v1/taxonomy` and GraphQL `taxonomy`.
-- [ ] 1.4 REST `GET /v1/sources` (`{data: rows}`, ordered priority asc, name asc — full Prisma row shape).
-- [ ] 1.5 GraphQL `sources` (projected fields, selection-order serialization).
-- [ ] 1.6 REST `GET /v1/signals` (filters: country, status, minConfidence, since, search, tags, limit/offset; `{data:[...]}` serializeSignal incl. tag label + relation).
-- [ ] 1.7 GraphQL `signals(filter,limit,offset)` (serializeSignal: tags{code,confidence}, sources{publisher,url,publishedAt}).
-- [ ] 1.8 REST `GET /v1/signals/:id` (+ 404 body).
-- [ ] 1.9 GraphQL `signal(id)` (+ null).
-- [ ] 1.10 REST `GET /v1/subscriptions` and GraphQL `subscriptions`.
-- [ ] 1.11 REST `GET /v1/deliveries`.
-- [ ] 1.12 CORS headers + OPTIONS 204 parity; GraphQL error-envelope parity.
+- [x] 1.1 REST `GET /health`.
+- [x] 1.2 REST `GET /v1/stats` (+ pending count) and GraphQL `stats`.
+- [x] 1.3 REST `GET /v1/taxonomy` and GraphQL `taxonomy`.
+- [x] 1.4 REST `GET /v1/sources` (`{data: rows}`, ordered priority asc, name asc — full Prisma row shape).
+- [x] 1.5 GraphQL `sources` (projected fields, selection-order serialization).
+- [x] 1.6 REST `GET /v1/signals` (filters: country, status, minConfidence, since, search, tags, limit/offset; `{data:[...]}` serializeSignal incl. tag label + relation).
+- [x] 1.7 GraphQL `signals(filter,limit,offset)` (serializeSignal: tags{code,confidence}, sources{publisher,url,publishedAt}).
+- [x] 1.8 REST `GET /v1/signals/:id` (+ 404 body).
+- [x] 1.9 GraphQL `signal(id)` (+ null).
+- [x] 1.10 REST `GET /v1/subscriptions` and GraphQL `subscriptions`.
+- [x] 1.11 REST `GET /v1/deliveries`.
+- [x] 1.12 CORS headers + OPTIONS 204 parity; GraphQL error-envelope parity (structural).
+
+> **Findings (Phase 1):**
+> - All JSON output goes through `jsonx` (no HTML escaping) to match `JSON.stringify`.
+> - Timestamps serialize via `PrismaTime` as `…THH:MM:SS.000Z` (UTC, ms) to match Prisma/JS `Date`.
+> - A custom selection-order GraphQL executor (`internal/gql`) replicates yoga's per-object field ordering. *Within* an object, field/alias order is preserved; *multiple top-level* fields are ordered by promise-completion in graphql-js (non-deterministic) — but every real query has a single top-level field, so this is moot.
+> - The legacy TS `/graphql` **POST** hangs (Fastify drains the body before yoga reads it); GraphQL read-parity is verified over **GET** (identical response body). The Go backend handles POST correctly — a fix, exercised by Phase 4 e2e.
 
 ## Phase 2 — Mutations & REST writes (row-parity)
 
