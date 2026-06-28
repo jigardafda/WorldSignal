@@ -2,7 +2,7 @@ package db
 
 import "context"
 
-// Bucket is a labelled count used by analytics group-by queries.
+// Bucket is a labeled count used by analytics group-by queries.
 type Bucket struct {
 	Key   string
 	Count int

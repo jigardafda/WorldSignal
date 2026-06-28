@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Logger writes scoped, levelled lines.
+// Logger writes scoped, leveled lines.
 type Logger struct {
 	scope string
 	out   io.Writer
@@ -30,9 +30,9 @@ func (l *Logger) emit(level, msg string, extra ...any) {
 		w = l.errw
 	}
 	if len(extra) > 0 {
-		fmt.Fprintln(w, append([]any{line}, extra...)...)
+		_, _ = fmt.Fprintln(w, append([]any{line}, extra...)...)
 	} else {
-		fmt.Fprintln(w, line)
+		_, _ = fmt.Fprintln(w, line)
 	}
 }
 

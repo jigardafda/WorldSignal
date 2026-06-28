@@ -13,6 +13,7 @@ import (
 
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/parser"
+
 	"github.com/worldsignal/backend/internal/jsonx"
 )
 
@@ -138,7 +139,7 @@ func writeComposite(buf *bytes.Buffer, val any, set ast.SelectionSet, frags ast.
 	}
 	rv := reflect.ValueOf(val)
 	switch rv.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if rv.IsNil() {
 			buf.WriteString("null")
 			return nil

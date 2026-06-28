@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mmcdole/gofeed"
+
 	"github.com/worldsignal/backend/internal/textutil"
 )
 
@@ -40,7 +41,7 @@ func FetchRSSSource(ctx context.Context, url string) ([]DiscoveredItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	feed, err := gofeed.NewParser().Parse(resp.Body)
 	if err != nil {

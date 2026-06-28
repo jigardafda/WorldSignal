@@ -191,8 +191,8 @@ func SendDelivery(ctx context.Context, d *db.DB, client *http.Client, secret, de
 	}
 	resp, err := client.Do(req)
 	if err == nil {
-		defer resp.Body.Close()
-		io.Copy(io.Discard, resp.Body)
+		defer func() { _ = resp.Body.Close() }()
+		_, _ = io.Copy(io.Discard, resp.Body)
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			return d.MarkDeliverySent(ctx, deliveryID, now)
 		}

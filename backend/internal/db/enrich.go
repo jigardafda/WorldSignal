@@ -113,7 +113,7 @@ func (d *DB) ApplyEnrichment(ctx context.Context, signalID string, u EnrichmentU
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx,
 		`UPDATE "Signal" SET "title"=$2,"summary"=$3,"whatHappened"=$4,"whyItMatters"=$5,

@@ -20,6 +20,10 @@ linters:
     - bodyclose
     - revive
   settings:
+    staticcheck:
+      # Keep SA/ST correctness checks; drop advisory "quickfix" (QF) nits and the
+      # ST1003 initialism style rule (legacy identifiers like SourceGuid/StripHtml).
+      checks: ["all", "-QF1002", "-QF1008", "-ST1003"]
     misspell:
       locale: US
     revive:

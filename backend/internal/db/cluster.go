@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
 	"github.com/worldsignal/backend/internal/cuid"
 	"github.com/worldsignal/backend/internal/jsonx"
 )
@@ -84,7 +85,7 @@ func (d *DB) AttachArticleToSignal(ctx context.Context, signalID, articleID stri
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO "SignalArticle" ("signalId","articleId","relationType","similarityScore") VALUES ($1,$2,'SUPPORTING',$3)`,
 		signalID, articleID, score); err != nil {
@@ -116,7 +117,7 @@ func (d *DB) CreateSignalFromArticle(ctx context.Context, a *ClusterArticle, now
 	if err != nil {
 		return "", err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO "Signal" ("id","title","summary","status","firstSeenAt","lastSeenAt","country","sourceCount","metadata","updatedAt")
 		 VALUES ($1,$2,$3,'UNVERIFIED',$4,$5,$6,1,$7,now())`,

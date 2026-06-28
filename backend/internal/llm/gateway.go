@@ -72,7 +72,7 @@ func (g *OpenAIGateway) JSONCompletion(ctx context.Context, system, user string,
 	if err != nil {
 		return nil, nil // caller falls back to heuristic
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var parsed struct {
 		Choices []struct {
 			Message struct {

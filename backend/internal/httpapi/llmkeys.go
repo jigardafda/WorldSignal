@@ -274,7 +274,7 @@ func listOpenAIModels(ctx context.Context, key string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("provider returned HTTP %d", resp.StatusCode)
 	}
@@ -325,7 +325,7 @@ func testOpenAIKey(ctx context.Context, key string) (string, *string) {
 		msg := "request failed: " + err.Error()
 		return "INVALID", &msg
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusOK {
 		return "VALID", nil
 	}

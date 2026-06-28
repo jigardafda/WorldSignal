@@ -114,7 +114,7 @@ func (v *Validator) validateOne(ctx context.Context, c Candidate) Result {
 		r.Error = "fetch failed: " + err.Error()
 		return r
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	r.HTTPStatus = resp.StatusCode
 	if final := resp.Request.URL.String(); normalizedURL(final) != normalizedURL(c.FeedURL) {
 		r.RedirectedTo = final

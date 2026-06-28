@@ -1,4 +1,4 @@
-// Package textutil ports backend/src/lib/text.ts. Behaviour must match the
+// Package textutil ports backend/src/lib/text.ts. Behavior must match the
 // TypeScript implementation exactly so clustering/dedupe stay byte-compatible.
 package textutil
 

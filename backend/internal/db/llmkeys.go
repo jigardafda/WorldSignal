@@ -100,7 +100,7 @@ func (d *DB) SetActiveLLMKey(ctx context.Context, id string) (*LLMKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var provider string
 	if err := tx.QueryRow(ctx, `SELECT "provider" FROM "LLMKey" WHERE "id"=$1`, id).Scan(&provider); err != nil {

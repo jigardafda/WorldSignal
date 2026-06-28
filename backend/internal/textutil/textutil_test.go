@@ -3,7 +3,9 @@ package textutil
 import "testing"
 
 func TestContentHashIdentical(t *testing.T) {
-	if ContentHash("Big News", "Body here.") != ContentHash("Big News", "Body here.") {
+	h1 := ContentHash("Big News", "Body here.")
+	h2 := ContentHash("Big News", "Body here.")
+	if h1 != h2 {
 		t.Fatal("identical content should hash identically")
 	}
 }

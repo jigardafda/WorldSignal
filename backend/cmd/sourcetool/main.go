@@ -113,7 +113,7 @@ func report(results []sources.Result, path string) {
 		fmt.Fprintln(os.Stderr, "report:", err)
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(results); err != nil {
@@ -129,7 +129,7 @@ func loadReport(path string) []sources.Result {
 		fmt.Fprintln(os.Stderr, "open report:", err)
 		os.Exit(1)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var results []sources.Result
 	if err := json.NewDecoder(f).Decode(&results); err != nil {
 		fmt.Fprintln(os.Stderr, "decode report:", err)
