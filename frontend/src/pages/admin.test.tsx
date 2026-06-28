@@ -210,4 +210,16 @@ describe("Analytics", () => {
     expect(await screen.findByText("Signals over time (30 days)")).toBeInTheDocument();
     expect(screen.getAllByText("No data.").length).toBeGreaterThan(0);
   });
+  it("tolerates an older backend that omits new analytics keys", async () => {
+    // Version skew: a backend predating the enrichment fields returns no
+    // signalsBySentiment/geoScope/topIndustries. The page must not crash.
+    apiMock.analytics.mockResolvedValue({
+      signalsBySeverity: [], signalsByStatus: [], signalsByEventType: [], signalsByCountry: [],
+      signalsOverTime: [], topSources: [],
+      deliveryStats: { total: 0, sent: 0, pending: 0, retrying: 0, failed: 0, deadLettered: 0 },
+      ingestionStats: { rawItems: 0, parsed: 0, duplicates: 0, failed: 0, articles: 0 },
+    } as never);
+    renderWithProviders(<Analytics />);
+    expect(await screen.findByText("By sentiment")).toBeInTheDocument();
+  });
 });

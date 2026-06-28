@@ -65,18 +65,18 @@ export function Analytics() {
                 )}
               </Panel>
               <Panel title="By sentiment">
-                {a.signalsBySentiment.length === 0 ? <Text c="dimmed" size="sm">No data.</Text> : (
+                {(a.signalsBySentiment ?? []).length === 0 ? <Text c="dimmed" size="sm">No data.</Text> : (
                   <DonutChart h={220} withLabels
-                    data={a.signalsBySentiment.map((b, i) => ({ name: b.key, value: b.count, color: DONUT[i % DONUT.length] }))} />
+                    data={(a.signalsBySentiment ?? []).map((b, i) => ({ name: b.key, value: b.count, color: DONUT[i % DONUT.length] }))} />
                 )}
               </Panel>
               <Panel title="By geographic scope">
-                {a.signalsByGeoScope.length === 0 ? <Text c="dimmed" size="sm">No data.</Text> : (
+                {(a.signalsByGeoScope ?? []).length === 0 ? <Text c="dimmed" size="sm">No data.</Text> : (
                   <BarChart h={220} data={a.signalsByGeoScope} dataKey="key" series={[{ name: "count", color: "cyan.6" }]} />
                 )}
               </Panel>
               <Panel title="Top industries">
-                {a.topIndustries.length === 0 ? <Text c="dimmed" size="sm">No data.</Text> : (
+                {(a.topIndustries ?? []).length === 0 ? <Text c="dimmed" size="sm">No data.</Text> : (
                   <BarChart h={260} data={a.topIndustries} dataKey="key" orientation="vertical" series={[{ name: "count", color: "lime.6" }]} />
                 )}
               </Panel>
