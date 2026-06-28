@@ -17,5 +17,20 @@ services:
       timeout: 5s
       retries: 10
 
+  backend:
+    build: ./backend
+    container_name: worldsignal-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://worldsignal:worldsignal@postgres:5432/worldsignal?sslmode=disable
+      ROLE: all
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-change-me-in-prod}
+    ports:
+      - "4000:4000"
+
 volumes:
   worldsignal_pg:

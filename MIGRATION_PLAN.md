@@ -36,14 +36,14 @@ surface for human review.
 
 ## Global exit criteria (the goal)
 
-- [ ] This plan exists and every item in Phases 0–4 is `[x]`.
-- [ ] Go backend builds and lints clean.
-- [ ] All parity tests pass (reads byte-parity; mutations/REST row-parity; pipeline shadow-run identical, LLM disabled).
-- [ ] Go coverage ≥ 95% excluding generated code.
-- [ ] Frontend test suite ≥ 95% coverage; frontend typecheck clean.
-- [ ] Postgres-backed queue and dead-letter tests pass.
-- [ ] End-to-end browser tests green against the Go backend.
-- [ ] pg-boss removed; legacy TypeScript backend directory deleted.
+- [x] This plan exists and every item in Phases 0–4 is `[x]`.
+- [x] Go backend builds and lints clean (`go build`, `go vet`, `gofmt` all clean).
+- [x] All parity tests pass (reads byte-parity; mutations/REST row-parity; pipeline shadow-run identical, LLM disabled) — verified pre-cutover; suite now self-skips since the TS reference was deleted.
+- [x] Go coverage **95.1%** (excluding the `cmd/server` entrypoint and the `dbtest`/`parity` test harnesses; no generated code).
+- [x] Frontend test suite ≥ 95% coverage (100% lines); frontend typecheck clean.
+- [x] Postgres-backed queue and dead-letter tests pass.
+- [x] End-to-end browser tests green against the Go backend.
+- [x] pg-boss removed; legacy TypeScript backend directory deleted.
 
 ---
 
@@ -113,8 +113,10 @@ surface for human review.
 - [x] 4.5 Go coverage **95.0%** (≥95%, excluding `cmd/server` entrypoint + `dbtest`/`parity` test harnesses) via `go test ./... -p 1 -count=1 -coverpkg=<app>`. Build + `go vet` clean; `gofmt` clean.
 
 > **Findings (Phase 4 backend):** DB-backed test packages must run with `-p 1` (they share one Postgres test DB; parallel packages collide). Coverage uses `-coverpkg` so cross-package (`parity`) exercise is attributed. Remaining uncovered lines are unreachable defensive branches (crypto/rand failure, per-row Scan errors after a successful query).
-- [ ] 4.6 Frontend test harness (Vitest + RTL + coverage); tests for api.ts, badges, all views, App; **≥ 95% coverage**; `tsc` typecheck clean.
-- [ ] 4.7 End-to-end browser tests (Playwright) green against the **Go** backend + frontend, seeded DB.
-- [ ] 4.8 Point docker-compose / run scripts at the Go backend; update README.
-- [ ] 4.9 Remove pg-boss (dependency + all references) from the repo.
-- [ ] 4.10 Delete the legacy TypeScript backend directory (`backend/`); rename `backend-go/` → `backend/`; final full-suite green.
+- [x] 4.6 Frontend test harness (Vitest + RTL + coverage); tests for api.ts, badges, all views, App. Coverage **100% lines / 99% branches / 96.9% funcs** (≥95%); `tsc --noEmit` typecheck clean.
+- [x] 4.7 End-to-end browser tests (Playwright/Chromium) green against the **Go** backend (api role, LLM off) + Vite frontend over a seeded `worldsignal_e2e` DB — 5/5 specs pass.
+- [x] 4.8 docker-compose gains a Go `backend` service (+ `backend/Dockerfile`); README rewritten for the Go stack + env/test docs.
+- [x] 4.9 pg-boss removed — the dependency and all usages went with the legacy backend; no `pg-boss` import/dependency remains (only a historical code comment).
+- [x] 4.10 Legacy TypeScript backend deleted; `backend-go/` renamed to `backend/` (Prisma schema preserved at `backend/schema/`); differential parity suite skips cleanly when the TS reference is absent; full Go + frontend + e2e suites green.
+
+> **Findings (Phase 4 cutover):** Deleting the legacy backend removes the parity suite's reference, so it self-skips post-cutover (its passing results live in git history + this file). That also removed the cross-package coverage it contributed, so Go-only unit tests were added for the send/match/enrich success paths and DB error branches (table-hiding fault injection) to keep coverage ≥95% **without** the TS backend. Canonical test commands: backend `go test ./... -p 1` (DB-backed; must be serialized); frontend `npm test`, `npm run typecheck`, `npm run test:e2e`.

@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
-    "test:e2e": "(cd ../backend-go && go build -o /tmp/ws-go ./cmd/server) && playwright test"
+    "test:e2e": "(cd ../backend && go build -o /tmp/ws-go ./cmd/server) && playwright test"
   },
   "dependencies": {
     "react": "^18.3.1",
