@@ -56,6 +56,8 @@ func TestEntityReadResolvers(t *testing.T) {
 	checks := []struct{ name, query, contains string }{
 		{"source", `{"query":"query($id:ID!){source(id:$id){id name country crawlFrequency parserType}}","variables":{"id":"src1"}}`, `"name":"Src One"`},
 		{"signalCount", `{"query":"{signalCount(filter:{status:\"CONFIRMED\"})}"}`, `"signalCount":1`},
+		{"signalCount_allfilters", `{"query":"{signalCount(filter:{status:\"CONFIRMED\",minConfidence:0.5,search:\"Quake\",tags:[\"DISASTER.EARTHQUAKE\"]})}"}`, `"signalCount":1`},
+		{"subscription_missing", `{"query":"query($id:ID!){subscription(id:$id){id}}","variables":{"id":"nope"}}`, `"subscription":null`},
 		{"articles", `{"query":"{articles(limit:10){items{id title sourceName signalCount} total}}"}`, `"total":1`},
 		{"article", `{"query":"query($id:ID!){article(id:$id){id title body signals{id title relationType}}}","variables":{"id":"a1"}}`, `"relationType":"PRIMARY"`},
 		{"rawItems", `{"query":"{rawItems(status:\"PARSED\"){items{id status sourceName} total}}"}`, `"status":"PARSED"`},
@@ -121,6 +123,9 @@ func TestEntityMutations(t *testing.T) {
 	if b := gql(t, base, tok, `{"query":"mutation($id:ID!){deleteSubscription(id:$id)}","variables":{"id":"sub1"}}`); !strings.Contains(b, `"deleteSubscription":true`) {
 		t.Fatalf("deleteSubscription: %s", b)
 	}
+	if b := gql(t, base, tok, `{"query":"mutation($id:ID!){deleteSubscriber(id:$id)}","variables":{"id":"__default__"}}`); !strings.Contains(b, `"deleteSubscriber":true`) {
+		t.Fatalf("deleteSubscriber: %s", b)
+	}
 	if b := gql(t, base, tok, `{"query":"mutation($id:ID!){deleteSource(id:$id)}","variables":{"id":"src1"}}`); !strings.Contains(b, `"deleteSource":true`) {
 		t.Fatalf("deleteSource: %s", b)
 	}
@@ -138,12 +143,16 @@ func TestEntityAuthz(t *testing.T) {
 	if b := gql(t, ht, viewerTok, `{"query":"{analytics}"}`); !strings.Contains(b, "signalsBySeverity") {
 		t.Fatalf("viewer analytics: %s", b)
 	}
-	// Viewer cannot write a source or retry deliveries.
+	// Viewer cannot perform any write mutation.
 	for _, op := range []string{
 		`{"query":"mutation($id:ID!){deleteSource(id:$id)}","variables":{"id":"src1"}}`,
+		`{"query":"mutation($id:ID!,$i:UpdateSourceInput!){updateSource(id:$id,input:$i){id}}","variables":{"id":"src1","i":{"name":"x"}}}`,
 		`{"query":"mutation($id:ID!){retryDelivery(id:$id)}","variables":{"id":"d1"}}`,
 		`{"query":"mutation($id:ID!){retryJob(id:$id)}","variables":{"id":"j1"}}`,
 		`{"query":"mutation($n:String!){createSubscriber(name:$n){id}}","variables":{"n":"x"}}`,
+		`{"query":"mutation($id:ID!){deleteSubscriber(id:$id)}","variables":{"id":"__default__"}}`,
+		`{"query":"mutation($id:ID!){deleteSubscription(id:$id)}","variables":{"id":"sub1"}}`,
+		`{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateSubscription(id:$id,input:$i){id}}","variables":{"id":"sub1","i":{"name":"x"}}}`,
 	} {
 		if b := gql(t, ht, viewerTok, op); !strings.Contains(b, "forbidden") {
 			t.Fatalf("viewer should be forbidden: op=%s got=%s", op, b)
@@ -152,6 +161,28 @@ func TestEntityAuthz(t *testing.T) {
 	// Editor can retry a delivery + a job (deliveries:retry, jobs:manage).
 	if b := gql(t, ht, editorTok, `{"query":"mutation($id:ID!){retryJob(id:$id)}","variables":{"id":"j1"}}`); !strings.Contains(b, `"retryJob":true`) {
 		t.Fatalf("editor retryJob: %s", b)
+	}
+}
+
+// TestEntityUnauthenticated covers the authz-fail branch of every read resolver.
+func TestEntityUnauthenticated(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	seedEntities(t, d)
+	ht := newServerWith(t, d, &recordEnqueuer{})
+	for _, op := range []string{
+		`{"query":"{stats}"}`, `{"query":"{analytics}"}`, `{"query":"{jobCounts{key count}}"}`,
+		`{"query":"{jobs{total}}"}`, `{"query":"{signalCount}"}`, `{"query":"{taxonomyStats{code}}"}`,
+		`{"query":"{articles{total}}"}`, `{"query":"{rawItems{total}}"}`, `{"query":"{deliveries{total}}"}`,
+		`{"query":"{subscribers{id}}"}`, `{"query":"query($id:ID!){source(id:$id){id}}","variables":{"id":"src1"}}`,
+		`{"query":"query($id:ID!){article(id:$id){id}}","variables":{"id":"a1"}}`,
+		`{"query":"query($id:ID!){rawItem(id:$id){id}}","variables":{"id":"r1"}}`,
+		`{"query":"query($id:ID!){delivery(id:$id){id}}","variables":{"id":"d1"}}`,
+		`{"query":"query($id:ID!){subscription(id:$id){id}}","variables":{"id":"sub1"}}`,
+	} {
+		if b := gql(t, ht, "", op); !strings.Contains(b, "unauthenticated") {
+			t.Fatalf("unauthenticated should be rejected: op=%s got=%s", op, b)
+		}
 	}
 }
 
@@ -177,11 +208,12 @@ func TestEntityResolverDBErrors(t *testing.T) {
 		ops   []string
 	}{
 		{"Article", []string{`{"query":"{articles{total}}"}`, `{"query":"query($id:ID!){article(id:$id){id}}","variables":{"id":"a1"}}`}},
-		{"RawItem", []string{`{"query":"{rawItems{total}}"}`, `{"query":"query($id:ID!){rawItem(id:$id){id}}","variables":{"id":"r1"}}`}},
-		{"DeliveryEvent", []string{`{"query":"{deliveries{total}}"}`, `{"query":"query($id:ID!){delivery(id:$id){id}}","variables":{"id":"d1"}}`, `{"query":"mutation($id:ID!){retryDelivery(id:$id)}","variables":{"id":"d1"}}`}},
-		{"Source", []string{`{"query":"query($id:ID!){source(id:$id){id}}","variables":{"id":"src1"}}`, `{"query":"mutation($id:ID!,$i:UpdateSourceInput!){updateSource(id:$id,input:$i){id}}","variables":{"id":"src1","i":{"name":"x"}}}`, `{"query":"mutation($id:ID!){deleteSource(id:$id)}","variables":{"id":"src1"}}`}},
+		{"RawItem", []string{`{"query":"{rawItems{total}}"}`, `{"query":"query($id:ID!){rawItem(id:$id){id}}","variables":{"id":"r1"}}`, `{"query":"{analytics}"}`}},
+		{"DeliveryEvent", []string{`{"query":"{deliveries{total}}"}`, `{"query":"query($id:ID!){delivery(id:$id){id}}","variables":{"id":"d1"}}`, `{"query":"mutation($id:ID!){retryDelivery(id:$id)}","variables":{"id":"d1"}}`, `{"query":"{analytics}"}`}},
+		{"Source", []string{`{"query":"{sources{id}}"}`, `{"query":"query($id:ID!){source(id:$id){id}}","variables":{"id":"src1"}}`, `{"query":"mutation($id:ID!,$i:UpdateSourceInput!){updateSource(id:$id,input:$i){id}}","variables":{"id":"src1","i":{"name":"x"}}}`, `{"query":"mutation($id:ID!){deleteSource(id:$id)}","variables":{"id":"src1"}}`, `{"query":"{analytics}"}`}},
 		{"Signal", []string{`{"query":"{signalCount}"}`, `{"query":"{analytics}"}`}},
-		{"Subscriber", []string{`{"query":"{subscribers{id}}"}`}},
+		{"Subscription", []string{`{"query":"{subscriptions{id}}"}`, `{"query":"query($id:ID!){subscription(id:$id){id}}","variables":{"id":"sub1"}}`, `{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateSubscription(id:$id,input:$i){id}}","variables":{"id":"sub1","i":{"name":"x"}}}`, `{"query":"mutation($id:ID!){deleteSubscription(id:$id)}","variables":{"id":"sub1"}}`}},
+		{"Subscriber", []string{`{"query":"{subscribers{id}}"}`, `{"query":"mutation{createSubscriber(name:\"x\"){id}}"}`, `{"query":"mutation($id:ID!){deleteSubscriber(id:$id)}","variables":{"id":"__default__"}}`}},
 		{"TaxonomyTag", []string{`{"query":"{taxonomyStats{code count}}"}`}},
 		{"ws_jobs", []string{`{"query":"{jobs{total}}"}`, `{"query":"{jobCounts{key count}}"}`, `{"query":"mutation($id:ID!){retryJob(id:$id)}","variables":{"id":"j1"}}`}},
 	}

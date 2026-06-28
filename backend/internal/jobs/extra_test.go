@@ -156,3 +156,26 @@ func TestQueueStartStopIdempotent(t *testing.T) {
 	q.Stop()
 	q.Stop() // no panic
 }
+
+func TestWorkersEnqueueSendDelivery(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	q := jobs.New(d.Pool)
+	if err := q.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Pool.Exec(context.Background(), `TRUNCATE TABLE ws_jobs`); err != nil {
+		t.Fatal(err)
+	}
+	w := jobs.NewWorkers(q, d, llm.NewOpenAIGateway("", ""), "secret")
+	if err := w.EnqueueSendDelivery("del-1"); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := d.Pool.QueryRow(context.Background(), `SELECT count(*) FROM ws_jobs WHERE queue=$1`, jobs.QSendDelivery).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("expected 1 send-delivery job, got %d", n)
+	}
+}
