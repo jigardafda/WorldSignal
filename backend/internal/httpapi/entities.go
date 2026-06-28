@@ -161,7 +161,11 @@ func (s *Server) mutDeleteSource(ctx context.Context, args map[string]any) (any,
 	if err := authz(ctx, auth.PermSourcesWrite); err != nil {
 		return nil, err
 	}
-	ok, err := s.DB.DeleteSource(ctx, strVal(args["id"]))
+	id := strVal(args["id"])
+	ok, err := s.DB.DeleteSource(ctx, id)
+	if err == nil && ok {
+		s.audit(ctx, "SOURCE_DELETED", "source", id, nil)
+	}
 	return ok, err
 }
 

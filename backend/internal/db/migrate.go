@@ -103,7 +103,28 @@ CREATE TABLE IF NOT EXISTS "LLMKey" (
   "createdAt"     timestamptz NOT NULL DEFAULT now(),
   "updatedAt"     timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS "LLMKey_provider_active_idx" ON "LLMKey"("provider","isActive");`
+CREATE INDEX IF NOT EXISTS "LLMKey_provider_active_idx" ON "LLMKey"("provider","isActive");
+
+CREATE TABLE IF NOT EXISTS "AuditLog" (
+  "id"         text PRIMARY KEY,
+  "actorId"    text,
+  "actorEmail" text,
+  "actorRole"  text,
+  "action"     text NOT NULL,
+  "targetType" text,
+  "targetId"   text,
+  "metadata"   jsonb,
+  "createdAt"  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "AuditLog_createdAt_idx" ON "AuditLog"("createdAt" DESC);
+CREATE INDEX IF NOT EXISTS "AuditLog_actor_idx" ON "AuditLog"("actorId");
+CREATE INDEX IF NOT EXISTS "AuditLog_action_idx" ON "AuditLog"("action");
+
+-- Backfill indexes for list sort columns the Prisma schema didn't cover.
+CREATE INDEX IF NOT EXISTS "DeliveryEvent_createdAt_idx" ON "DeliveryEvent"("createdAt" DESC);
+CREATE INDEX IF NOT EXISTS "Subscription_createdAt_idx"  ON "Subscription"("createdAt" DESC);
+CREATE INDEX IF NOT EXISTS "Article_fetchedAt_idx"       ON "Article"("fetchedAt" DESC);
+CREATE INDEX IF NOT EXISTS "RawItem_fetchedAt_idx"       ON "RawItem"("fetchedAt" DESC);`
 
 // MigrateContent ensures the extended source-metadata columns and the
 // SourceValidationLog table exist. Safe to run repeatedly.

@@ -35,6 +35,7 @@ func (s *Server) mutRevalidateSource(ctx context.Context, args map[string]any) (
 	if err := s.DB.RecordValidation(ctx, src.ID, cuid.New(), out); err != nil {
 		return nil, err
 	}
+	s.audit(ctx, "SOURCE_REVALIDATED", "source", src.ID, map[string]any{"ok": r.OK, "status": out.HealthScore})
 
 	updated, err := s.DB.GetSource(ctx, id)
 	if err != nil || updated == nil {

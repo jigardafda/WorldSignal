@@ -89,6 +89,7 @@ func (s *Server) mutCreateSource(ctx context.Context, args map[string]any) (any,
 	if err != nil {
 		return nil, err
 	}
+	s.audit(ctx, "SOURCE_CREATED", "source", src.ID, map[string]any{"name": src.Name, "url": src.URL})
 	return sourceToGqlMap(src), nil
 }
 

@@ -52,6 +52,7 @@ func (s *Server) registerLLMResolvers(q, m map[string]gql.FieldResolver) {
 	q["llmKeys"] = s.resolveLLMKeys
 	q["llmStatus"] = s.resolveLLMStatus
 	q["llmModels"] = s.resolveLLMModels
+	q["auditLogs"] = s.resolveAuditLogs
 	m["createLLMKey"] = s.mutCreateLLMKey
 	m["setActiveLLMKey"] = s.mutSetActiveLLMKey
 	m["testLLMKey"] = s.mutTestLLMKey
@@ -156,6 +157,7 @@ func (s *Server) mutCreateLLMKey(ctx context.Context, args map[string]any) (any,
 	status, testErr := testProviderKey(ctx, provider, rawKey)
 	_ = s.DB.UpdateLLMKeyStatus(ctx, k.ID, status, testErr)
 	s.invalidateLLMCache()
+	s.audit(ctx, "LLM_KEY_CREATED", "llmKey", k.ID, map[string]any{"label": label, "provider": provider, "status": status})
 	updated, err := s.DB.GetLLMKey(ctx, k.ID)
 	if err != nil || updated == nil {
 		return llmKeyToMap(k), nil
@@ -172,6 +174,7 @@ func (s *Server) mutSetActiveLLMKey(ctx context.Context, args map[string]any) (a
 		return nil, err
 	}
 	s.invalidateLLMCache()
+	s.audit(ctx, "LLM_KEY_ACTIVATED", "llmKey", k.ID, map[string]any{"label": k.Label})
 	return llmKeyToMap(k), nil
 }
 
@@ -202,11 +205,15 @@ func (s *Server) mutDeleteLLMKey(ctx context.Context, args map[string]any) (any,
 	if err := authz(ctx, auth.PermSettingsManage); err != nil {
 		return nil, err
 	}
-	ok, err := s.DB.DeleteLLMKey(ctx, strVal(args["id"]))
+	id := strVal(args["id"])
+	ok, err := s.DB.DeleteLLMKey(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	s.invalidateLLMCache()
+	if ok {
+		s.audit(ctx, "LLM_KEY_DELETED", "llmKey", id, nil)
+	}
 	return ok, nil
 }
 

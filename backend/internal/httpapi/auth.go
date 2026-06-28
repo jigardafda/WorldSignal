@@ -80,6 +80,7 @@ func (s *Server) mutLogin(ctx context.Context, args map[string]any) (any, error)
 		return nil, err
 	}
 	if u == nil || u.Status != "ACTIVE" || !auth.CheckPassword(u.PasswordHash, password) {
+		s.auditAnon(ctx, "LOGIN_FAILED", email, nil)
 		return nil, errInvalidCredentials
 	}
 	token, err := auth.GenerateToken()
@@ -89,6 +90,7 @@ func (s *Server) mutLogin(ctx context.Context, args map[string]any) (any, error)
 	if err := s.DB.CreateSession(ctx, u.ID, token, time.Now().Add(s.sessionTTL())); err != nil {
 		return nil, err
 	}
+	s.auditAnon(ctx, "LOGIN", u.Email, map[string]any{"userId": u.ID, "role": u.Role})
 	return map[string]any{"token": token, "user": userToMap(u)}, nil
 }
 
@@ -100,6 +102,7 @@ func (s *Server) mutLogout(ctx context.Context, _ map[string]any) (any, error) {
 	if err := s.DB.DeleteSession(ctx, id.Token); err != nil {
 		return nil, err
 	}
+	s.audit(ctx, "LOGOUT", "", "", nil)
 	return true, nil
 }
 

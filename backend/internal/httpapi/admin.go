@@ -63,6 +63,7 @@ func (s *Server) mutCreateUser(ctx context.Context, args map[string]any) (any, e
 	if err != nil {
 		return nil, err
 	}
+	s.audit(ctx, "USER_CREATED", "user", u.ID, map[string]any{"email": email, "role": role})
 	return userToMap(u), nil
 }
 
@@ -92,6 +93,7 @@ func (s *Server) mutUpdateUser(ctx context.Context, args map[string]any) (any, e
 	if err != nil || u == nil {
 		return nil, err
 	}
+	s.audit(ctx, "USER_UPDATED", "user", id, map[string]any{"role": p.Role, "status": p.Status})
 	return userToMap(u), nil
 }
 
@@ -106,6 +108,9 @@ func (s *Server) mutDeleteUser(ctx context.Context, args map[string]any) (any, e
 	ok, err := s.DB.DeleteUser(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	if ok {
+		s.audit(ctx, "USER_DELETED", "user", id, nil)
 	}
 	return ok, nil
 }
@@ -134,6 +139,7 @@ func (s *Server) mutChangePassword(ctx context.Context, args map[string]any) (an
 	if err := s.DB.UpdatePassword(ctx, u.ID, hash); err != nil {
 		return nil, err
 	}
+	s.audit(ctx, "PASSWORD_CHANGED", "user", u.ID, nil)
 	return true, nil
 }
 
@@ -192,6 +198,7 @@ func (s *Server) mutCreateTeam(ctx context.Context, args map[string]any) (any, e
 	if err != nil {
 		return nil, err
 	}
+	s.audit(ctx, "TEAM_CREATED", "team", t.ID, map[string]any{"name": name})
 	return teamToMap(t), nil
 }
 
@@ -203,6 +210,9 @@ func (s *Server) mutDeleteTeam(ctx context.Context, args map[string]any) (any, e
 	ok, err := s.DB.DeleteTeam(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	if ok {
+		s.audit(ctx, "TEAM_DELETED", "team", id, nil)
 	}
 	return ok, nil
 }
@@ -223,6 +233,7 @@ func (s *Server) mutAddTeamMember(ctx context.Context, args map[string]any) (any
 	if err := s.DB.AddTeamMember(ctx, teamID, userID, role); err != nil {
 		return nil, err
 	}
+	s.audit(ctx, "TEAM_MEMBER_ADDED", "team", teamID, map[string]any{"userId": userID, "role": role})
 	return true, nil
 }
 
@@ -235,6 +246,9 @@ func (s *Server) mutRemoveTeamMember(ctx context.Context, args map[string]any) (
 	ok, err := s.DB.RemoveTeamMember(ctx, teamID, userID)
 	if err != nil {
 		return nil, err
+	}
+	if ok {
+		s.audit(ctx, "TEAM_MEMBER_REMOVED", "team", teamID, map[string]any{"userId": userID})
 	}
 	return ok, nil
 }
