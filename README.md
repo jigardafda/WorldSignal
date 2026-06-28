@@ -43,6 +43,14 @@ WorldSignal/
 
 ## Quick start
 
+**Fastest (local):** put secrets in `backend/.env.local` (git-ignored; see
+[CONFIGURATION.md](docs/CONFIGURATION.md)) and run `./dev.sh` — it builds the Go
+backend (auto-runs auth + content migrations) and starts the Vite dev server.
+Backend on `:4000`, UI on `:5173`. Default admin: `admin@worldsignal.local` /
+`admin12345` (change it).
+
+Manual steps:
+
 ```bash
 # 1. Start Postgres
 docker compose up -d postgres
@@ -87,13 +95,24 @@ summarizer + keyword taxonomy classifier so the pipeline still produces Signals.
 
 ## What's implemented
 
-- Source Registry (RSS/Atom) with priority + crawl frequency
-- Postgres-backed queue + scheduler driving fetch / normalize / dedupe / enrich / deliver
-- Raw evidence store → normalized Article → canonical **Signal**
-- Exact dedupe (canonical URL, content hash) + token-similarity clustering
-- Closed **WorldSignal Taxonomy** (LLM constrained to it, or keyword fallback)
-- Webhook delivery (HMAC-signed, retry/backoff + dead-letter) + polling API
-- GraphQL + REST query APIs, React admin console
+- **Auth & RBAC** — bearer sessions, bcrypt, ADMIN/EDITOR/VIEWER permission matrix;
+  admin console for users, teams, account.
+- **Global source catalog** — 1,000+ validated, richly-tagged feeds across countries,
+  regions, industries and languages; per-source validation history + a Coverage dashboard.
+- Source Registry (RSS/Atom) with priority + crawl frequency, server-side filtering & paging.
+- Postgres-backed queue + scheduler driving fetch / normalize / dedupe / enrich / deliver.
+- Raw evidence store → normalized Article → canonical **Signal**; dedupe + clustering.
+- Closed **WorldSignal Taxonomy** (LLM constrained to it, or keyword fallback).
+- **LLM key management** — system key from env + admin-managed keys (encrypted at rest,
+  validated against OpenAI, live model dropdown); dynamic gateway with heuristic fallback.
+- **Audit log** — security-relevant actions recorded and browsable (admin).
+- Webhook delivery (HMAC-signed, retry/backoff + dead-letter) + polling API.
+- GraphQL + REST query APIs, responsive React admin console.
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) · [Database](docs/DATABASE.md)
+- [Configuration & Environment](docs/CONFIGURATION.md) · [Deployment](docs/DEPLOYMENT.md) · [Runbook](docs/RUNBOOK.md)
 
 ## Testing
 
@@ -106,6 +125,10 @@ go test ./... -p 1 -coverpkg=$(go list ./... | grep -vE '/cmd/server|/internal/d
 # Frontend
 cd frontend
 npm test           # Vitest unit/component suite
-npm run typecheck  # tsc --noEmit
+npm run typecheck  # tsc --noEmit (zero TS errors)
+npm run lint       # ESLint (zero warnings)
+npm run build      # production build (zero warnings)
 npm run test:e2e   # Playwright against the Go backend (worldsignal_e2e DB)
 ```
+
+Coverage gate is ≥95% on both the Go backend and the frontend (Vitest).

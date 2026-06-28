@@ -25,6 +25,7 @@ import { Users } from "./pages/Users";
 import { Teams } from "./pages/Teams";
 import { Account } from "./pages/Account";
 import { Settings } from "./pages/Settings";
+import { AuditLog } from "./pages/AuditLog";
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/teams" element={<Teams />} />
         <Route path="/account" element={<Account />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/audit" element={<AuditLog />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

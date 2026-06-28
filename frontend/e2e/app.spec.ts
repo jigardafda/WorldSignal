@@ -111,6 +111,20 @@ test.describe("authenticated console", () => {
     await expect(page.getByText(ADMIN_EMAIL)).toBeVisible();
   });
 
+  test("settings shows LLM status and the add-key flow", async ({ page }) => {
+    await page.getByRole("link", { name: "Settings" }).click();
+    await expect(page.getByRole("heading", { name: "Settings", level: 2 })).toBeVisible();
+    await expect(page.getByTestId("llm-status")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add OpenAI key" })).toBeVisible();
+  });
+
+  test("audit log records the login and is browsable", async ({ page }) => {
+    await page.getByRole("link", { name: "Audit Log" }).click();
+    await expect(page.getByRole("heading", { name: "Audit Log", level: 2 })).toBeVisible();
+    // The beforeEach login produced a LOGIN audit entry.
+    await expect(page.getByText("LOGIN").first()).toBeVisible();
+  });
+
   test("account page reflects the signed-in admin", async ({ page }) => {
     await page.getByTestId("user-menu").click();
     await page.getByRole("menuitem", { name: "Account" }).click();

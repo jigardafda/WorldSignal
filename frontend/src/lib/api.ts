@@ -72,6 +72,12 @@ export interface LLMStatus {
   hasSystemKey: boolean; activeLabel: string | null;
 }
 export interface LLMTestResult { ok: boolean; status: string; error?: string | null }
+export interface AuditLog {
+  id: string; actorId: string | null; actorEmail: string | null; actorRole: string | null;
+  action: string; targetType: string | null; targetId: string | null;
+  metadata: unknown; createdAt: string;
+}
+export interface AuditFilter { actor?: string; action?: string; targetType?: string; search?: string }
 export interface RawItemRow {
   id: string; sourceId: string; sourceName: string; sourceGuid: string | null;
   rawUrl: string | null; rawTitle: string | null; status: string;
@@ -244,6 +250,12 @@ export const api = {
     gql<{ testLLMKey: LLMTestResult }>(`mutation($id:ID!){testLLMKey(id:$id){ok status error}}`, { id }).then((d) => d.testLLMKey),
   deleteLLMKey: (id: string) =>
     gql<{ deleteLLMKey: boolean }>(`mutation($id:ID!){deleteLLMKey(id:$id)}`, { id }).then((d) => d.deleteLLMKey),
+
+  // audit log (settings:manage)
+  auditLogs: (filter: AuditFilter = {}, limit = 50, offset = 0) => {
+    const args = sourceArgs(filter as Record<string, string>, { limit, offset });
+    return gql<{ auditLogs: Page<AuditLog> }>(`{auditLogs${args}{items{id actorEmail actorRole action targetType targetId metadata createdAt} total}}`).then((d) => d.auditLogs);
+  },
 };
 
 const LLM_KEY_FIELDS = `id provider label keyLast4 model isActive status lastTestedAt lastError createdBy createdAt updatedAt`;

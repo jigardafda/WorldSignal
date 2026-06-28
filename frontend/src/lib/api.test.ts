@@ -27,6 +27,7 @@ const RESP: Record<string, unknown> = {
   subscribers: [{ id: "sb" }], createSubscriber: { id: "sb" }, deleteSubscriber: true,
   taxonomy: [{ code: "C" }], taxonomyStats: [{ key: "C", count: 1 }],
   jobs: { items: [], total: 0 }, jobCounts: [{ key: "k", count: 1 }], retryJob: true,
+  auditLogs: { items: [], total: 0 },
 };
 
 beforeEach(() => {
@@ -80,6 +81,7 @@ describe("api wrappers", () => {
     expect(await api.setActiveLLMKey("k")).toEqual(RESP.setActiveLLMKey);
     expect(await api.testLLMKey("k")).toEqual(RESP.testLLMKey);
     expect(await api.deleteLLMKey("k")).toBe(true);
+    expect(await api.auditLogs({ search: "x" }, 50, 0)).toEqual(RESP.auditLogs);
 
     expect(await api.articles({})).toEqual(RESP.articles);
     expect(await api.article("a")).toEqual(RESP.article);
