@@ -45,7 +45,6 @@ func DefaultConfig() ValidatorConfig {
 type Validator struct {
 	cfg    ValidatorConfig
 	client *http.Client
-	parser *gofeed.Parser
 	now    func() time.Time
 }
 
@@ -66,7 +65,6 @@ func NewValidator(cfg ValidatorConfig) *Validator {
 	return &Validator{
 		cfg:    cfg,
 		client: &http.Client{Timeout: cfg.Timeout, Transport: tr},
-		parser: gofeed.NewParser(),
 		now:    time.Now,
 	}
 }
@@ -126,7 +124,9 @@ func (v *Validator) validateOne(ctx context.Context, c Candidate) Result {
 		return r
 	}
 
-	feed, err := v.parser.Parse(resp.Body)
+	// gofeed.Parser is not safe for concurrent use, and ValidateAll runs many
+	// validations in parallel — use a fresh parser per call.
+	feed, err := gofeed.NewParser().Parse(resp.Body)
 	if err != nil {
 		r.Error = "parse failed: " + err.Error()
 		return r

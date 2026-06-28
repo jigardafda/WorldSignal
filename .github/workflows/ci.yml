@@ -77,9 +77,9 @@ jobs:
         with:
           go-version-file: backend/go.mod
           cache: false
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v7
         with:
-          version: latest # v2 — required for the Go 1.26 toolchain
+          version: latest # newest v2 (built with Go >= the module's 1.25 target)
           working-directory: backend
           args: --timeout=5m
 
