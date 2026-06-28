@@ -17,7 +17,7 @@ const RESP: Record<string, unknown> = {
   sources: [{ id: "s" }], source: { id: "s" }, createSource: { id: "s" }, updateSource: { id: "s" },
   deleteSource: true, setSourceEnabled: { id: "s" }, triggerFetch: true,
   sourceCount: 7, sourceCoverage: { byRegion: [] }, revalidateSource: { id: "s" },
-  llmKeys: [{ id: "k" }], llmStatus: { enabled: true }, createLLMKey: { id: "k" },
+  llmKeys: [{ id: "k" }], llmStatus: { enabled: true }, llmModels: ["gpt-4o"], createLLMKey: { id: "k" },
   setActiveLLMKey: { id: "k" }, testLLMKey: { ok: true }, deleteLLMKey: true,
   articles: { items: [], total: 0 }, article: { id: "a" },
   rawItems: { items: [], total: 0 }, rawItem: { id: "r" },
@@ -75,6 +75,7 @@ describe("api wrappers", () => {
 
     expect(await api.llmKeys()).toEqual(RESP.llmKeys);
     expect(await api.llmStatus()).toEqual(RESP.llmStatus);
+    expect(await api.llmModels()).toEqual(RESP.llmModels);
     expect(await api.createLLMKey({ label: "L", key: "sk-x" })).toEqual(RESP.createLLMKey);
     expect(await api.setActiveLLMKey("k")).toEqual(RESP.setActiveLLMKey);
     expect(await api.testLLMKey("k")).toEqual(RESP.testLLMKey);

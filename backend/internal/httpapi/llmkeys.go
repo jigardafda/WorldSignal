@@ -2,8 +2,10 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -49,6 +51,7 @@ func (s *Server) invalidateLLMCache() {
 func (s *Server) registerLLMResolvers(q, m map[string]gql.FieldResolver) {
 	q["llmKeys"] = s.resolveLLMKeys
 	q["llmStatus"] = s.resolveLLMStatus
+	q["llmModels"] = s.resolveLLMModels
 	m["createLLMKey"] = s.mutCreateLLMKey
 	m["setActiveLLMKey"] = s.mutSetActiveLLMKey
 	m["testLLMKey"] = s.mutTestLLMKey
@@ -221,8 +224,85 @@ func testProviderKey(ctx context.Context, provider, key string) (string, *string
 	}
 }
 
-// openAIModelsURL is the validation endpoint; overridable in tests.
+// openAIModelsURL is the models/validation endpoint; overridable in tests.
 var openAIModelsURL = "https://api.openai.com/v1/models"
+
+// resolveLLMModels lists chat-capable models from the provider, using the
+// effective key. Returns [] when no key is configured so the UI degrades
+// gracefully (e.g. before the first key is added on a fresh install).
+func (s *Server) resolveLLMModels(ctx context.Context, args map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSettingsManage); err != nil {
+		return nil, err
+	}
+	// Prefer a key the admin is testing/just supplied; else the effective key.
+	key := strings.TrimSpace(strVal(args["key"]))
+	if key == "" {
+		key, _ = s.ResolveLLMKey(ctx)
+	}
+	if key == "" {
+		return []any{}, nil
+	}
+	models, err := listOpenAIModels(ctx, key)
+	if err != nil {
+		return []any{}, nil // surface as "no models" rather than a hard error
+	}
+	out := make([]any, len(models))
+	for i, m := range models {
+		out[i] = m
+	}
+	return out, nil
+}
+
+// listOpenAIModels fetches model ids and keeps only chat-completion-capable ones,
+// newest-looking first (reverse lexical, which puts gpt-4.x / o-series on top).
+func listOpenAIModels(ctx context.Context, key string) ([]string, error) {
+	cctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(cctx, http.MethodGet, openAIModelsURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+key)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("provider returned HTTP %d", resp.StatusCode)
+	}
+	var parsed struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, err
+	}
+	var ids []string
+	for _, m := range parsed.Data {
+		if isChatModel(m.ID) {
+			ids = append(ids, m.ID)
+		}
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(ids)))
+	return ids, nil
+}
+
+// isChatModel keeps chat/completions families and drops embeddings, audio,
+// image, moderation and realtime variants that can't drive enrichment.
+func isChatModel(id string) bool {
+	switch {
+	case strings.Contains(id, "embedding"), strings.Contains(id, "whisper"),
+		strings.Contains(id, "tts"), strings.Contains(id, "dall-e"),
+		strings.Contains(id, "audio"), strings.Contains(id, "realtime"),
+		strings.Contains(id, "moderation"), strings.Contains(id, "image"),
+		strings.Contains(id, "transcribe"), strings.Contains(id, "search"):
+		return false
+	}
+	return strings.HasPrefix(id, "gpt-") || strings.HasPrefix(id, "chatgpt") ||
+		strings.HasPrefix(id, "o1") || strings.HasPrefix(id, "o3") || strings.HasPrefix(id, "o4")
+}
 
 func testOpenAIKey(ctx context.Context, key string) (string, *string) {
 	cctx, cancel := context.WithTimeout(ctx, 15*time.Second)

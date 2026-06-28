@@ -1,17 +1,22 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
 
 const { apiMock } = vi.hoisted(() => ({
   apiMock: {
-    llmStatus: vi.fn(), llmKeys: vi.fn(), createLLMKey: vi.fn(),
+    llmStatus: vi.fn(), llmKeys: vi.fn(), llmModels: vi.fn(), createLLMKey: vi.fn(),
     setActiveLLMKey: vi.fn(), testLLMKey: vi.fn(), deleteLLMKey: vi.fn(),
   },
 }));
 vi.mock("../lib/api", () => ({ api: apiMock }));
 
 import { Settings } from "./Settings";
+
+beforeEach(() => {
+  // Model options come from the provider; default to a non-empty live list.
+  apiMock.llmModels.mockResolvedValue(["gpt-4o", "gpt-4o-mini", "o3-mini"]);
+});
 
 const status = (o = {}) => ({ provider: "OPENAI", enabled: true, source: "ENV", model: "gpt-4o-mini", hasSystemKey: true, activeLabel: null, ...o });
 const key = (o = {}) => ({ id: "k1", provider: "OPENAI", label: "Prod", keyLast4: "7890", model: "gpt-4o", isActive: false, status: "VALID", lastTestedAt: "2026-01-01T00:00:00Z", lastError: null, createdBy: "admin", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", ...o });
@@ -48,6 +53,21 @@ describe("Settings (LLM keys)", () => {
     await userEvent.type(screen.getByTestId("llm-key"), "sk-test-1234567890");
     await userEvent.click(screen.getByRole("button", { name: /Add & validate/ }));
     await waitFor(() => expect(apiMock.createLLMKey).toHaveBeenCalledWith(expect.objectContaining({ label: "Prod", key: "sk-test-1234567890" })));
+  });
+
+  it("lets you pick a model from the dropdown", async () => {
+    apiMock.llmStatus.mockResolvedValue(status());
+    apiMock.llmKeys.mockResolvedValue([]);
+    apiMock.createLLMKey.mockResolvedValue(key({ model: "gpt-4o" }));
+    renderWithProviders(<Settings />);
+    await screen.findByText("Admin-managed keys");
+    await userEvent.click(screen.getByRole("button", { name: "Add OpenAI key" }));
+    await userEvent.type(await screen.findByTestId("llm-label"), "Prod");
+    await userEvent.type(screen.getByTestId("llm-key"), "sk-test-1234567890");
+    await userEvent.click(screen.getByTestId("llm-model"));
+    await userEvent.click(await screen.findByRole("option", { name: "gpt-4o" }));
+    await userEvent.click(screen.getByRole("button", { name: /Add & validate/ }));
+    await waitFor(() => expect(apiMock.createLLMKey).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-4o" })));
   });
 
   it("blocks adding a key with a too-short value", async () => {

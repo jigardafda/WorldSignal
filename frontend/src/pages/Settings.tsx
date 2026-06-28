@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Group, Modal, Paper, PasswordInput, Stack, Text, TextInput } from "@mantine/core";
+import { Alert, Badge, Button, Group, Modal, Paper, PasswordInput, Select, Stack, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
@@ -16,6 +16,9 @@ import { fmtDate } from "../lib/format";
 export function Settings() {
   const status = useAsync<LLMStatus>(() => api.llmStatus(), []);
   const keys = useAsync<LLMKey[]>(() => api.llmKeys(), []);
+  // Model options are fetched live from the provider (via the effective key) —
+  // never hardcoded, so the list always reflects what the account can use.
+  const models = useAsync<string[]>(() => api.llmModels(), []);
   const [opened, { open, close }] = useDisclosure(false);
   const [busy, setBusy] = useState(false);
 
@@ -137,7 +140,17 @@ export function Settings() {
           <Stack>
             <TextInput label="Label" placeholder="Production OpenAI" required {...form.getInputProps("label")} data-testid="llm-label" />
             <PasswordInput label="API key" placeholder="sk-…" required {...form.getInputProps("key")} data-testid="llm-key" />
-            <TextInput label="Model (optional)" placeholder="gpt-4o-mini" {...form.getInputProps("model")} data-testid="llm-model" />
+            <Select
+              label="Model (optional)"
+              placeholder={models.loading ? "Loading models…" : (models.data && models.data.length ? "Inherit system default" : "No models — add a valid key first")}
+              data={models.data ?? []}
+              disabled={!models.data || models.data.length === 0}
+              searchable
+              clearable
+              nothingFoundMessage="No matching model"
+              {...form.getInputProps("model")}
+              data-testid="llm-model"
+            />
             <Text size="xs" c="dimmed">The key is encrypted at rest and validated against OpenAI on save. Stored keys are never shown again — only the last 4 characters.</Text>
             <Group justify="flex-end">
               <Button variant="default" onClick={close}>Cancel</Button>

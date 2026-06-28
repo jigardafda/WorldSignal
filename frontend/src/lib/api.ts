@@ -235,6 +235,7 @@ export const api = {
     gql<{ llmKeys: LLMKey[] }>(`{llmKeys{${LLM_KEY_FIELDS}}}`).then((d) => d.llmKeys),
   llmStatus: () =>
     gql<{ llmStatus: LLMStatus }>(`{llmStatus{provider enabled source model hasSystemKey activeLabel}}`).then((d) => d.llmStatus),
+  llmModels: () => gql<{ llmModels: string[] }>(`{llmModels}`).then((d) => d.llmModels),
   createLLMKey: (input: { provider?: string; label: string; key: string; model?: string }) =>
     gql<{ createLLMKey: LLMKey }>(`mutation($i:CreateLLMKeyInput!){createLLMKey(input:$i){${LLM_KEY_FIELDS}}}`, { i: input }).then((d) => d.createLLMKey),
   setActiveLLMKey: (id: string) =>

@@ -158,6 +158,79 @@ func TestLLMStatusNoneAndModelFallback(t *testing.T) {
 	}
 }
 
+func TestResolveLLMModels(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	// Server returns a mixed model list; only chat models should survive.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "Bearer " {
+			w.WriteHeader(401)
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":[
+			{"id":"gpt-4o"},{"id":"gpt-4o-mini"},{"id":"o3-mini"},{"id":"chatgpt-4o-latest"},
+			{"id":"text-embedding-3-small"},{"id":"whisper-1"},{"id":"dall-e-3"},{"id":"tts-1"},
+			{"id":"gpt-4o-realtime-preview"},{"id":"omni-moderation-latest"}
+		]}`))
+	}))
+	defer srv.Close()
+	old := openAIModelsURL
+	openAIModelsURL = srv.URL
+	defer func() { openAIModelsURL = old }()
+
+	ctx := adminCtx(t, d, auth.RoleAdmin)
+	s := &Server{DB: d, SigningSecret: "secret", OpenAIAPIKey: "env-key"}
+
+	res, err := s.resolveLLMModels(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := res.([]any)
+	// Embeddings/whisper/dall-e/tts/realtime/moderation filtered out → 4 chat models.
+	if len(got) != 4 {
+		t.Fatalf("expected 4 chat models, got %v", got)
+	}
+	// Reverse-sorted: "o3-mini" sorts after "gpt-*" and "chatgpt-*" lexically.
+	if got[0] != "o3-mini" {
+		t.Fatalf("expected reverse-sorted with o3-mini first, got %v", got)
+	}
+
+	// Explicit key arg path.
+	if r, _ := s.resolveLLMModels(ctx, map[string]any{"key": "sk-explicit"}); len(r.([]any)) != 4 {
+		t.Fatalf("explicit-key models: %v", r)
+	}
+
+	// No key anywhere → empty list (graceful).
+	noKey := &Server{DB: d, SigningSecret: "secret"}
+	if r, _ := noKey.resolveLLMModels(ctx, nil); len(r.([]any)) != 0 {
+		t.Fatalf("no-key should yield empty list, got %v", r)
+	}
+
+	// Provider error → empty list (not a hard failure).
+	openAIModelsURL = "http://127.0.0.1:0/models"
+	if r, _ := s.resolveLLMModels(ctx, nil); len(r.([]any)) != 0 {
+		t.Fatalf("provider error should yield empty list, got %v", r)
+	}
+
+	// Forbidden for non-admin.
+	if _, err := s.resolveLLMModels(adminCtx(t, d, auth.RoleEditor), nil); err == nil {
+		t.Fatal("editor should be forbidden from llmModels")
+	}
+}
+
+func TestIsChatModel(t *testing.T) {
+	for _, id := range []string{"gpt-4o", "chatgpt-4o-latest", "o1", "o3-mini", "o4-mini"} {
+		if !isChatModel(id) {
+			t.Fatalf("%s should be a chat model", id)
+		}
+	}
+	for _, id := range []string{"text-embedding-3-large", "whisper-1", "dall-e-3", "tts-1", "gpt-4o-audio-preview", "babbage-002"} {
+		if isChatModel(id) {
+			t.Fatalf("%s should NOT be a chat model", id)
+		}
+	}
+}
+
 func TestTestProviderKeyBranches(t *testing.T) {
 	// Unsupported provider.
 	if status, msg := testProviderKey(context.Background(), "ANTHROPIC", "k"); status != "INVALID" || msg == nil || !strings.Contains(*msg, "unsupported provider") {
