@@ -8,3 +8,9 @@ build/
 coverage/
 backend/prisma/*.db
 .vite/
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/.last-run.json
