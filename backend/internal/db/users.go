@@ -84,7 +84,9 @@ func (d *DB) GetUserByID(ctx context.Context, id string) (*User, error) {
 
 // ListUsers returns all users ordered by creation time.
 func (d *DB) ListUsers(ctx context.Context) ([]*User, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT `+userCols+` FROM "User" ORDER BY "createdAt" ASC, "email" ASC`)
+	// Bounded admin list: a hard cap guards against unbounded result sets.
+	// High-cardinality lists (signals/articles/sources/…) use limit/offset/total.
+	rows, err := d.Pool.Query(ctx, `SELECT `+userCols+` FROM "User" ORDER BY "createdAt" ASC, "email" ASC LIMIT 500`)
 	if err != nil {
 		return nil, err
 	}

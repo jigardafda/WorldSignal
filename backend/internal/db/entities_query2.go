@@ -340,7 +340,7 @@ func (d *DB) ListSubscribers(ctx context.Context) ([]Subscriber, error) {
 	rows, err := d.Pool.Query(ctx,
 		`SELECT s."id",s."name",s."status",s."createdAt",
 		 (SELECT count(*) FROM "Subscription" sub WHERE sub."subscriberId"=s."id")
-		 FROM "Subscriber" s ORDER BY s."createdAt" ASC`)
+		 FROM "Subscriber" s ORDER BY s."createdAt" ASC LIMIT 500`)
 	if err != nil {
 		return nil, err
 	}

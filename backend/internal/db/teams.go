@@ -42,7 +42,7 @@ func (d *DB) ListTeams(ctx context.Context) ([]*Team, error) {
 	rows, err := d.Pool.Query(ctx,
 		`SELECT t."id",t."name",t."createdAt", count(m."userId")
 		 FROM "Team" t LEFT JOIN "TeamMember" m ON m."teamId"=t."id"
-		 GROUP BY t."id" ORDER BY t."createdAt" ASC`)
+		 GROUP BY t."id" ORDER BY t."createdAt" ASC LIMIT 500`)
 	if err != nil {
 		return nil, err
 	}

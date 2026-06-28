@@ -43,7 +43,7 @@ func scanLLMKey(row pgx.Row) (*LLMKey, error) {
 
 // ListLLMKeys returns all keys, active first then newest.
 func (d *DB) ListLLMKeys(ctx context.Context) ([]*LLMKey, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT `+llmKeyColumns+` FROM "LLMKey" ORDER BY "isActive" DESC, "createdAt" DESC`)
+	rows, err := d.Pool.Query(ctx, `SELECT `+llmKeyColumns+` FROM "LLMKey" ORDER BY "isActive" DESC, "createdAt" DESC LIMIT 500`)
 	if err != nil {
 		return nil, err
 	}

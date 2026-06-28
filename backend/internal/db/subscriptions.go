@@ -34,7 +34,7 @@ const subscriptionCols = `"id","subscriberId","name","channel","filter","config"
 // ListSubscriptions returns subscriptions ordered by createdAt desc, with the
 // subscriber and delivery count loaded (matching the REST include).
 func (d *DB) ListSubscriptions(ctx context.Context) ([]*Subscription, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT `+subscriptionCols+` FROM "Subscription" ORDER BY "createdAt" DESC`)
+	rows, err := d.Pool.Query(ctx, `SELECT `+subscriptionCols+` FROM "Subscription" ORDER BY "createdAt" DESC LIMIT 500`)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (d *DB) ListSubscriptions(ctx context.Context) ([]*Subscription, error) {
 // ListSubscriptionsBasic returns subscriptions ordered by createdAt desc without
 // the subscriber/_count includes (used by the GraphQL subscriptions query).
 func (d *DB) ListSubscriptionsBasic(ctx context.Context) ([]*Subscription, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT `+subscriptionCols+` FROM "Subscription" ORDER BY "createdAt" DESC`)
+	rows, err := d.Pool.Query(ctx, `SELECT `+subscriptionCols+` FROM "Subscription" ORDER BY "createdAt" DESC LIMIT 500`)
 	if err != nil {
 		return nil, err
 	}
