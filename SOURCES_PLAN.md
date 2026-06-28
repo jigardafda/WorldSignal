@@ -26,25 +26,28 @@ candidate pool well above 1,000 so the validated survivors clear the bar.
 
 ## Phases
 
-- [ ] **S0 Schema & data model** — idempotent content migration adding rich metadata to
+**Status: COMPLETE.** 1,095 validated sources seeded (83 countries, 47 languages, 60
+industries; health avg 98). Backend 95.0% / frontend 98.5% coverage; 14 e2e green.
+
+- [x] **S0 Schema & data model** — idempotent content migration adding rich metadata to
       `Source` (websiteUrl, languages[], geographicScope, industry, subcategory, publisher,
       orgType, sourceType, officialFeed, tags[], healthScore, validationStatus,
       lastValidatedAt, lastValidationError, avgResponseMs, metadata jsonb) + new
       `SourceValidationLog` table. Wire into boot + dbtest. Backfill existing rows. Update
       prisma doc.
-- [ ] **S1 Validator + discovery engine** (`internal/sources` + `cmd/sourcetool`) —
+- [x] **S1 Validator + discovery engine** (`internal/sources` + `cmd/sourcetool`) —
       candidate model, curated dataset, Google-News matrix generator, concurrent validator
       (HTTP + gofeed parse + freshness + redirect/dup checks + healthScore), upsert of
       passing rows + validation-log writes. CLI: `validate` (report) / `seed` (insert).
-- [ ] **S2 Backend exposure** — extend Source DB struct/queries + new filters
+- [x] **S2 Backend exposure** — extend Source DB struct/queries + new filters
       (language/region/scope/industry/orgType/tags/validation/health); GraphQL fields,
       validation-log query, `revalidateSource` mutation, coverage aggregates.
-- [ ] **S3 Frontend** — Sources list columns+filters, Source detail full metadata +
+- [x] **S3 Frontend** — Sources list columns+filters, Source detail full metadata +
       validation history + revalidate, a Coverage analytics page (by country/region/
       language/industry/scope).
-- [ ] **S4 Run at scale** — execute validator on full candidate pool; insert 1,000+
+- [x] **S4 Run at scale** — execute validator on full candidate pool; insert 1,000+
       passing; verify coverage breadth.
-- [ ] **S5 Quality gates** — backend & frontend coverage ≥95%, e2e, vet/typecheck clean.
+- [x] **S5 Quality gates** — backend & frontend coverage ≥95%, e2e, vet/typecheck clean.
 
 ## Exit criteria
 - ≥1,000 sources in DB, all `validationStatus=VALID`, each with a `lastValidatedAt` and a

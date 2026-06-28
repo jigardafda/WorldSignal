@@ -76,6 +76,20 @@ test.describe("authenticated console", () => {
     await expect(page.getByText("E2E Feed")).toBeVisible();
   });
 
+  test("source detail shows metadata and validation history", async ({ page }) => {
+    await page.getByRole("link", { name: "Sources" }).click();
+    await page.getByText("BBC World").click();
+    await expect(page.getByText("Validation & health")).toBeVisible();
+    await expect(page.getByText("Validation history")).toBeVisible();
+  });
+
+  test("coverage page renders the global breakdown", async ({ page }) => {
+    await page.getByRole("link", { name: "Coverage" }).click();
+    await expect(page.getByRole("heading", { name: "Source Coverage", level: 2 })).toBeVisible();
+    await expect(page.getByText("Total sources")).toBeVisible();
+    await expect(page.getByText("By region")).toBeVisible();
+  });
+
   test("taxonomy renders the closed vocabulary with counts", async ({ page }) => {
     await page.getByRole("link", { name: "Taxonomy" }).click();
     await expect(page.getByRole("heading", { name: "Taxonomy", level: 2 })).toBeVisible();
