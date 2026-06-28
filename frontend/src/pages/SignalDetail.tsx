@@ -1,4 +1,5 @@
-import { Anchor, Badge, Button, Card, Grid, Group, List, Paper, Stack, Text, Title } from "@mantine/core";
+import { Badge, Button, Card, Grid, Group, List, Paper, Stack, Text, Title } from "@mantine/core";
+import { ExtLink } from "../components/ExtLink";
 import { IconArrowLeft } from "@tabler/icons-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, type Signal } from "../lib/api";
@@ -44,7 +45,7 @@ export function SignalDetail() {
                     <List spacing="xs" mt="xs">
                       {s.sources.map((src, i) => (
                         <List.Item key={i}>
-                          {src.url ? <Anchor href={src.url} target="_blank" rel="noreferrer">{src.publisher}</Anchor> : src.publisher}
+                          <ExtLink url={src.url}>{src.publisher}</ExtLink>
                           {src.publishedAt && <Text span c="dimmed" size="xs"> · {fmtDate(src.publishedAt)}</Text>}
                         </List.Item>
                       ))}

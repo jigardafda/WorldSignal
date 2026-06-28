@@ -45,10 +45,10 @@ validation / loading / empty / error states.
 
 ## Phase D — Frontend pages (list / detail / analytics / management)
 
-- [ ] D1 Dashboard  - [ ] D2 Signals  - [ ] D3 Sources  - [ ] D4 Articles
-- [ ] D5 Raw items  - [ ] D6 Subscriptions + Subscribers  - [ ] D7 Deliveries
-- [ ] D8 Taxonomy  - [ ] D9 Jobs/queue  - [ ] D10 Admin (Users/Teams/Roles/account)
-- [ ] D11 Analytics
+- [x] D1 Dashboard  - [x] D2 Signals  - [x] D3 Sources  - [x] D4 Articles
+- [x] D5 Raw items  - [x] D6 Subscriptions + Subscribers  - [x] D7 Deliveries
+- [x] D8 Taxonomy  - [x] D9 Jobs/queue  - [x] D10 Admin (Users/Teams/Roles/account)
+- [x] D11 Analytics
 
 ## Phase E — Quality gates
 

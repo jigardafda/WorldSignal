@@ -8,6 +8,21 @@ import { Dashboard } from "./pages/Dashboard";
 import { Signals } from "./pages/Signals";
 import { SignalDetail } from "./pages/SignalDetail";
 import { Analytics } from "./pages/Analytics";
+import { Sources } from "./pages/Sources";
+import { SourceDetail } from "./pages/SourceDetail";
+import { Articles } from "./pages/Articles";
+import { ArticleDetail } from "./pages/ArticleDetail";
+import { RawItems } from "./pages/RawItems";
+import { RawItemDetail } from "./pages/RawItemDetail";
+import { Deliveries } from "./pages/Deliveries";
+import { DeliveryDetail } from "./pages/DeliveryDetail";
+import { Subscriptions } from "./pages/Subscriptions";
+import { Subscribers } from "./pages/Subscribers";
+import { Taxonomy } from "./pages/Taxonomy";
+import { Jobs } from "./pages/Jobs";
+import { Users } from "./pages/Users";
+import { Teams } from "./pages/Teams";
+import { Account } from "./pages/Account";
 
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -26,6 +41,21 @@ export default function App() {
         <Route path="/signals" element={<Signals />} />
         <Route path="/signals/:id" element={<SignalDetail />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route path="/sources" element={<Sources />} />
+        <Route path="/sources/:id" element={<SourceDetail />} />
+        <Route path="/articles" element={<Articles />} />
+        <Route path="/articles/:id" element={<ArticleDetail />} />
+        <Route path="/raw-items" element={<RawItems />} />
+        <Route path="/raw-items/:id" element={<RawItemDetail />} />
+        <Route path="/deliveries" element={<Deliveries />} />
+        <Route path="/deliveries/:id" element={<DeliveryDetail />} />
+        <Route path="/subscriptions" element={<Subscriptions />} />
+        <Route path="/subscribers" element={<Subscribers />} />
+        <Route path="/taxonomy" element={<Taxonomy />} />
+        <Route path="/jobs" element={<Jobs />} />
+        <Route path="/users" element={<Users />} />
+        <Route path="/teams" element={<Teams />} />
+        <Route path="/account" element={<Account />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
