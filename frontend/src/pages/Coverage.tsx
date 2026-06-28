@@ -53,7 +53,7 @@ export function Coverage() {
 
               <SimpleGrid cols={{ base: 1, md: 2 }}>
                 <Panel title="By region">
-                  <BarChart h={280} data={c.byRegion} dataKey="key" orientation="vertical" series={[{ name: "count", color: "blue.6" }]} yAxisProps={{ width: 120 }} />
+                  <BarChart h={barHeight(c.byRegion.length)} data={c.byRegion} dataKey="key" orientation="vertical" series={[{ name: "count", color: "blue.6" }]} yAxisProps={{ width: 120, interval: 0 }} />
                 </Panel>
                 <Panel title="By geographic scope">
                   <DonutChart h={280} withLabels data={c.byScope.map((b, i) => ({ name: b.key, value: b.count, color: DONUT[i % DONUT.length] }))} />
@@ -62,17 +62,17 @@ export function Coverage() {
                   <DonutChart h={280} withLabels data={c.byOrgType.filter((b) => b.key !== "(none)").map((b, i) => ({ name: b.key, value: b.count, color: DONUT[i % DONUT.length] }))} />
                 </Panel>
                 <Panel title="By source type">
-                  <BarChart h={280} data={c.bySourceType.filter((b) => b.key !== "(none)")} dataKey="key" orientation="vertical" series={[{ name: "count", color: "grape.6" }]} yAxisProps={{ width: 150 }} />
+                  <BarChart h={barHeight(c.bySourceType.filter((b) => b.key !== "(none)").length)} data={c.bySourceType.filter((b) => b.key !== "(none)")} dataKey="key" orientation="vertical" series={[{ name: "count", color: "grape.6" }]} yAxisProps={{ width: 150, interval: 0 }} />
                 </Panel>
               </SimpleGrid>
 
               {/* Full-width with height scaled to the number of bars so every
                   language/industry is visible (no truncation). */}
               <Panel title={`Languages (${c.byLanguage.length})`}>
-                <BarChart h={barHeight(c.byLanguage.length)} data={c.byLanguage} dataKey="key" orientation="vertical" series={[{ name: "count", color: "teal.6" }]} yAxisProps={{ width: 80 }} />
+                <BarChart h={barHeight(c.byLanguage.length)} data={c.byLanguage} dataKey="key" orientation="vertical" series={[{ name: "count", color: "teal.6" }]} yAxisProps={{ width: 80, interval: 0 }} />
               </Panel>
               <Panel title={`Industries (${industries(c).length})`}>
-                <BarChart h={barHeight(industries(c).length)} data={industries(c)} dataKey="key" orientation="vertical" series={[{ name: "count", color: "orange.6" }]} yAxisProps={{ width: 170 }} />
+                <BarChart h={barHeight(industries(c).length)} data={industries(c)} dataKey="key" orientation="vertical" series={[{ name: "count", color: "orange.6" }]} yAxisProps={{ width: 170, interval: 0 }} />
               </Panel>
 
               <Panel title="Countries by source count">
