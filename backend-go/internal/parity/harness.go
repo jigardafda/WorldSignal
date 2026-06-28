@@ -65,6 +65,27 @@ func StartTS(port int, dbURL string) (*Server, error) {
 	return start(cmd, port)
 }
 
+// RunTSStage runs a single legacy pipeline stage via scripts/stage.ts and
+// returns its stdout (the stage result as JSON). The LLM is disabled.
+func RunTSStage(stage, argJSON, dbURL, signingSecret string) ([]byte, error) {
+	cmd := exec.Command("node", "--import", "tsx", "scripts/stage.ts")
+	cmd.Dir = filepath.Join(RepoRoot(), "backend")
+	cmd.Env = append(os.Environ(),
+		"DATABASE_URL="+dbURL,
+		"OPENAI_API_KEY=",
+		"WEBHOOK_SIGNING_SECRET="+signingSecret,
+		"STAGE="+stage,
+		"ARG="+argJSON,
+	)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("TS stage %s failed: %w\nstderr: %s", stage, err, stderr.String())
+	}
+	return out, nil
+}
+
 // StartGo launches the compiled Go backend (api role) on the given port.
 func StartGo(binary string, port int, dbURL string) (*Server, error) {
 	cmd := exec.Command(binary)

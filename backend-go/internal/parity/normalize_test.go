@@ -12,6 +12,8 @@ var volatileKeys = map[string]bool{
 	"lastFetchedAt": true, "lastSuccessAt": true, "lastFailureAt": true,
 	"firstSeenAt": true, "lastSeenAt": true, "publishedAt": true,
 	"deliveredAt": true, "failedAt": true, "addedAt": true, "fetchedAt": true,
+	// Delivery envelope fields that embed non-deterministic ids/timestamps.
+	"created_at": true, "signal_id": true, "event_id": true, "last_seen_at": true,
 }
 
 // normalizeJSON parses JSON, blanks volatile keys recursively, and re-marshals

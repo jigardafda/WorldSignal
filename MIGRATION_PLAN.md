@@ -92,15 +92,17 @@ surface for human review.
 
 ## Phase 3 — Pipeline stages (shadow-run, LLM disabled)
 
-- [ ] 3.1 `ingestion/rss` parity (DiscoveredItem extraction, field fallbacks, HTML strip) against fixture feeds — no network.
-- [ ] 3.2 `fetchSource` (RawItem creation, (sourceId,sourceGuid) dedupe, source success/failure bookkeeping).
-- [ ] 3.3 `normalize` (canonical URL, contentHash, tokenSet, exact dedupe by hash/url, RawItem status transitions, summary slice).
-- [ ] 3.4 `cluster` (72h window, top-300, Jaccard ≥ 0.5 join as SUPPORTING + increment/lastSeenAt, else new Signal PRIMARY; idempotent on relink).
-- [ ] 3.5 `llm/enrich` heuristic path (keyword scoring, severity regex, firstSentences summary, taxonomy-constrained tags, FALLBACK_CODE).
-- [ ] 3.6 `enrichSignal` (representative pick, blended confidence 0.4/0.3/0.3, status by distinct sources, tag upsert, metadata) — LLM disabled.
-- [ ] 3.7 `deliver.matchSubscriptions` (filter match: minConfidence, minSeverity rank, countries, tag prefix; envelope; unique (sub,signal)).
-- [ ] 3.8 `deliver.sendDelivery` (POLLING immediate SENT; WEBHOOK POST + HMAC headers; success→SENT; fail→RETRYING/DEAD_LETTERED; signature parity) against a stub webhook server.
-- [ ] 3.9 Full-pipeline shadow run: fixture → fetch→normalize→cluster→enrich→match→send, TS vs Go persisted-row diff identical.
+- [x] 3.1 `ingestion/rss` parity (DiscoveredItem extraction, field fallbacks, HTML strip) against a fixture feed — no network. (gofeed; rawPayload is parser-internal and excluded.)
+- [x] 3.2 `fetchSource` (RawItem creation, (sourceId,sourceGuid) dedupe, source success/failure bookkeeping).
+- [x] 3.3 `normalize` (canonical URL, contentHash, tokenSet, exact dedupe by hash/url, RawItem status transitions, summary slice).
+- [x] 3.4 `cluster` (72h window, top-300, Jaccard ≥ 0.5 join as SUPPORTING + increment/lastSeenAt, else new Signal PRIMARY; idempotent on relink).
+- [x] 3.5 `llm/enrich` heuristic path (keyword scoring, severity regex, firstSentences summary, taxonomy-constrained tags, FALLBACK_CODE). Stable sort matches JS.
+- [x] 3.6 `enrichSignal` (representative pick, blended confidence 0.4/0.3/0.3, status by distinct sources, tag upsert, metadata) — LLM disabled.
+- [x] 3.7 `deliver.matchSubscriptions` (filter match: minConfidence, minSeverity rank, countries, tag prefix; envelope; unique (sub,signal)).
+- [x] 3.8 `deliver.sendDelivery` (POLLING immediate SENT; WEBHOOK POST + HMAC headers; success→SENT; fail→RETRYING/DEAD_LETTERED; **HMAC signature byte-parity** verified via a stub webhook).
+- [x] 3.9 Full-pipeline shadow run: fixture feed → fetch→normalize→cluster→enrich→match→send, TS vs Go persisted-row diff identical across all 6 tables.
+
+> **Findings (Phase 3):** Shadow-run via a TS stage-runner CLI (`backend/scripts/stage.ts`) + Go stages, diffing `row_to_json` snapshots with volatile fields (ids/timestamps/`rawPayload`/envelope `created_at`,`event_id`,`signal_id`,`last_seen_at`) normalized. `RawItem.rawPayload` (rss-parser's parsed object) is parser-internal provenance and intentionally not stored/compared. Webhook body parity confirmed via `json.Compact` of stored jsonb == JS `JSON.stringify`, yielding identical HMAC signatures.
 
 ## Phase 4 — Queue, workers, frontend, e2e, cleanup
 
