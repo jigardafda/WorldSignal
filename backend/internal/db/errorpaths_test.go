@@ -183,6 +183,38 @@ func TestCreateRawItemConflict(t *testing.T) {
 	}
 }
 
+func TestListSignalsAllFilters(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	dbtest.SeedTaxonomy(t, d)
+	ctx := context.Background()
+	ex := func(q string, a ...any) {
+		if _, err := d.Pool.Exec(ctx, q, a...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ex(`INSERT INTO "Signal" ("id","title","summary","status","severity","confidence","country","sourceCount","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','Quake hits','A quake.','CONFIRMED','HIGH',0.8,'US',1,'2026-01-02T00:00:00Z','2026-01-02T00:00:00Z',now())`)
+	ex(`INSERT INTO "SignalTag" ("signalId","tagId","confidence") SELECT 'sg',"id",0.9 FROM "TaxonomyTag" WHERE "code"='DISASTER.EARTHQUAKE'`)
+
+	country, status, search := "US", "CONFIRMED", "quake"
+	minConf := 0.5
+	since := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	out, err := d.ListSignals(ctx, db.SignalFilter{
+		Country: &country, Status: &status, MinConfidence: &minConf,
+		Since: &since, Search: &search, Tags: []string{"DISASTER.EARTHQUAKE"},
+		Limit: 500, Offset: 0, // Limit>200 exercises the cap
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 1 || out[0].ID != "sg" {
+		t.Fatalf("expected the matching signal, got %d rows", len(out))
+	}
+	if len(out[0].Tags) != 1 {
+		t.Fatalf("aggregate tags wrong: %d", len(out[0].Tags))
+	}
+}
+
 func TestArticleIDByRawItemMissing(t *testing.T) {
 	d := dbtest.Connect(t)
 	dbtest.Reset(t, d)
