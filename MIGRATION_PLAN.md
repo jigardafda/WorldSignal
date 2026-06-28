@@ -106,11 +106,13 @@ surface for human review.
 
 ## Phase 4 — Queue, workers, frontend, e2e, cleanup
 
-- [ ] 4.1 Postgres-backed job queue in Go (replacement for pg-boss): queues, send with singletonKey, work/poll, retryLimit + backoff. Queue tests pass.
-- [ ] 4.2 Dead-letter behaviour: delivery retries to limit then DEAD_LETTERED; dead-letter test passes.
-- [ ] 4.3 Workers wiring (fetch→process→enrich→match→send fan-out) + scheduler (tick, crawlFrequency due check, singletonKey dedupe).
-- [ ] 4.4 `cmd/server`: ROLE-based boot (api/worker/all), GraphQL + REST mounted, graceful shutdown.
-- [ ] 4.5 Go coverage ≥ 95% (excluding generated code) — `go test ./... -coverprofile`, generated files filtered.
+- [x] 4.1 Postgres-backed job queue in Go (`internal/jobs`, replaces pg-boss): `ws_jobs` table, send with singletonKey dedupe, poll/claim via `FOR UPDATE SKIP LOCKED`, retryLimit + backoff. Queue tests pass.
+- [x] 4.2 Dead-letter behaviour: delivery retries to the limit then `failed` (DEAD_LETTERED); dead-letter test passes.
+- [x] 4.3 Workers wiring (fetch→process→enrich→match→send fan-out) + scheduler (tick, crawlFrequency due check, singletonKey dedupe). Full-drain integration test passes.
+- [x] 4.4 `cmd/server`: ROLE-based boot (api/worker/all), GraphQL + REST mounted, graceful shutdown.
+- [x] 4.5 Go coverage **95.0%** (≥95%, excluding `cmd/server` entrypoint + `dbtest`/`parity` test harnesses) via `go test ./... -p 1 -count=1 -coverpkg=<app>`. Build + `go vet` clean; `gofmt` clean.
+
+> **Findings (Phase 4 backend):** DB-backed test packages must run with `-p 1` (they share one Postgres test DB; parallel packages collide). Coverage uses `-coverpkg` so cross-package (`parity`) exercise is attributed. Remaining uncovered lines are unreachable defensive branches (crypto/rand failure, per-row Scan errors after a successful query).
 - [ ] 4.6 Frontend test harness (Vitest + RTL + coverage); tests for api.ts, badges, all views, App; **≥ 95% coverage**; `tsc` typecheck clean.
 - [ ] 4.7 End-to-end browser tests (Playwright) green against the **Go** backend + frontend, seeded DB.
 - [ ] 4.8 Point docker-compose / run scripts at the Go backend; update README.

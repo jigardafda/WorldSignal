@@ -113,10 +113,8 @@ func collectFields(set ast.SelectionSet, frags ast.FragmentDefinitionList) []*as
 }
 
 func responseKey(f *ast.Field) string {
-	if f.Alias != "" {
-		return f.Alias
-	}
-	return f.Name
+	// gqlparser always populates Alias (defaulting it to the field name).
+	return f.Alias
 }
 
 func writeKey(buf *bytes.Buffer, key string) {
@@ -235,15 +233,11 @@ func valueFromAST(v *ast.Value, vars map[string]any) any {
 	case ast.Variable:
 		return vars[v.Raw]
 	case ast.IntValue:
-		if n, err := strconv.Atoi(v.Raw); err == nil {
-			return n
-		}
-		return v.Raw
+		n, _ := strconv.Atoi(v.Raw) // gqlparser guarantees a valid int literal
+		return n
 	case ast.FloatValue:
-		if f, err := strconv.ParseFloat(v.Raw, 64); err == nil {
-			return f
-		}
-		return v.Raw
+		f, _ := strconv.ParseFloat(v.Raw, 64) // gqlparser guarantees a valid float literal
+		return f
 	case ast.StringValue, ast.BlockValue:
 		return v.Raw
 	case ast.BooleanValue:

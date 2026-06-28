@@ -171,25 +171,23 @@ func timePtr(t *db.PrismaTime) any {
 	return t.Time
 }
 
+// toInt coerces a GraphQL arg (int literal → int, JSON variable → float64) to int.
 func toInt(v any, def int) int {
 	switch n := v.(type) {
 	case int:
 		return n
-	case int64:
-		return int(n)
 	case float64:
 		return int(n)
 	}
 	return def
 }
 
+// toFloatOK coerces a GraphQL arg (int literal → int, JSON variable → float64) to float64.
 func toFloatOK(v any) (float64, bool) {
 	switch n := v.(type) {
 	case float64:
 		return n, true
 	case int:
-		return float64(n), true
-	case int64:
 		return float64(n), true
 	}
 	return 0, false

@@ -1,0 +1,143 @@
+package jobs
+
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"github.com/worldsignal/backend/internal/db"
+	"github.com/worldsignal/backend/internal/jsonx"
+	"github.com/worldsignal/backend/internal/llm"
+	"github.com/worldsignal/backend/internal/logging"
+	"github.com/worldsignal/backend/internal/pipeline"
+)
+
+// Queue names, mirroring queues.ts.
+const (
+	QFetchSource    = "source.fetch"
+	QProcessArticle = "article.process"
+	QEnrichSignal   = "signal.enrich"
+	QMatchSignal    = "signal.match"
+	QSendDelivery   = "delivery.send"
+)
+
+const deliveryRetryLimit = 5
+
+// Workers wires the pipeline stages onto the queue and exposes enqueue helpers.
+type Workers struct {
+	Q       *Queue
+	DB      *db.DB
+	Gateway llm.Gateway
+	Client  *http.Client
+	Secret  string
+	log     *logging.Logger
+}
+
+// NewWorkers builds the worker set.
+func NewWorkers(q *Queue, d *db.DB, gw llm.Gateway, secret string) *Workers {
+	return &Workers{Q: q, DB: d, Gateway: gw, Client: &http.Client{Timeout: 10 * time.Second}, Secret: secret, log: logging.New("workers")}
+}
+
+// EnqueueFetchSource enqueues a source fetch (deduped per source via singleton).
+func (w *Workers) EnqueueFetchSource(sourceID string) error {
+	return w.Q.Send(context.Background(), QFetchSource, map[string]string{"sourceId": sourceID},
+		SendOptions{SingletonKey: "fetch:" + sourceID})
+}
+
+func (w *Workers) enqueueProcessArticle(ctx context.Context, rawItemID string) error {
+	return w.Q.Send(ctx, QProcessArticle, map[string]string{"rawItemId": rawItemID}, SendOptions{})
+}
+func (w *Workers) enqueueEnrichSignal(ctx context.Context, signalID string) error {
+	return w.Q.Send(ctx, QEnrichSignal, map[string]string{"signalId": signalID}, SendOptions{})
+}
+func (w *Workers) enqueueMatchSignal(ctx context.Context, signalID string) error {
+	return w.Q.Send(ctx, QMatchSignal, map[string]string{"signalId": signalID}, SendOptions{})
+}
+func (w *Workers) enqueueSendDelivery(ctx context.Context, deliveryID string) error {
+	return w.Q.Send(ctx, QSendDelivery, map[string]string{"deliveryId": deliveryID},
+		SendOptions{RetryLimit: deliveryRetryLimit, RetryDelay: 5, RetryBackoff: true})
+}
+
+// Register attaches all pipeline handlers to the queue.
+func (w *Workers) Register() {
+	w.Q.RegisterWorker(QFetchSource, func(ctx context.Context, data []byte, _ bool) error {
+		var j struct {
+			SourceID string `json:"sourceId"`
+		}
+		if err := jsonx.Unmarshal(data, &j); err != nil {
+			return err
+		}
+		rawIDs, err := pipeline.FetchSource(ctx, w.DB, j.SourceID, time.Now())
+		if err != nil {
+			return err
+		}
+		for _, id := range rawIDs {
+			if err := w.enqueueProcessArticle(ctx, id); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	w.Q.RegisterWorker(QProcessArticle, func(ctx context.Context, data []byte, _ bool) error {
+		var j struct {
+			RawItemID string `json:"rawItemId"`
+		}
+		if err := jsonx.Unmarshal(data, &j); err != nil {
+			return err
+		}
+		articleID, err := pipeline.NormalizeRawItem(ctx, w.DB, j.RawItemID)
+		if err != nil || articleID == "" {
+			return err
+		}
+		cluster, err := pipeline.ClusterArticle(ctx, w.DB, articleID, time.Now())
+		if err != nil || cluster == nil {
+			return err
+		}
+		return w.enqueueEnrichSignal(ctx, cluster.SignalID)
+	})
+
+	w.Q.RegisterWorker(QEnrichSignal, func(ctx context.Context, data []byte, _ bool) error {
+		var j struct {
+			SignalID string `json:"signalId"`
+		}
+		if err := jsonx.Unmarshal(data, &j); err != nil {
+			return err
+		}
+		if err := pipeline.EnrichSignal(ctx, w.DB, w.Gateway, j.SignalID, time.Now()); err != nil {
+			return err
+		}
+		return w.enqueueMatchSignal(ctx, j.SignalID)
+	})
+
+	w.Q.RegisterWorker(QMatchSignal, func(ctx context.Context, data []byte, _ bool) error {
+		var j struct {
+			SignalID string `json:"signalId"`
+		}
+		if err := jsonx.Unmarshal(data, &j); err != nil {
+			return err
+		}
+		ids, err := pipeline.MatchSubscriptions(ctx, w.DB, j.SignalID, time.Now())
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			if err := w.enqueueSendDelivery(ctx, id); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	w.Q.RegisterWorker(QSendDelivery, func(ctx context.Context, data []byte, isFinal bool) error {
+		var j struct {
+			DeliveryID string `json:"deliveryId"`
+		}
+		if err := jsonx.Unmarshal(data, &j); err != nil {
+			return err
+		}
+		return pipeline.SendDelivery(ctx, w.DB, w.Client, w.Secret, j.DeliveryID, isFinal, time.Now())
+	})
+
+	w.log.Info("workers registered")
+}
