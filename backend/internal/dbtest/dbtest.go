@@ -6,7 +6,9 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/worldsignal/backend/internal/auth"
 	"github.com/worldsignal/backend/internal/cuid"
 	"github.com/worldsignal/backend/internal/db"
 	"github.com/worldsignal/backend/internal/taxonomy"
@@ -24,17 +26,52 @@ func URL() string {
 var tables = []string{
 	"DeliveryEvent", "Subscription", "Subscriber", "SignalTag", "SignalArticle",
 	"Signal", "Article", "RawItem", "Source", "TaxonomyTag",
+	"Session", "TeamMember", "Team", "User",
 }
 
-// Connect opens a pool to the test DB, skipping the test if it is unreachable.
+// Connect opens a pool to the test DB (ensuring auth tables exist), skipping the
+// test if the database is unreachable.
 func Connect(t *testing.T) *db.DB {
 	t.Helper()
 	d, err := db.Connect(context.Background(), URL())
 	if err != nil {
 		t.Skipf("test database unavailable (%v); set TEST_DATABASE_URL", err)
 	}
+	if err := d.MigrateAuth(context.Background()); err != nil {
+		d.Close()
+		t.Fatalf("migrate auth: %v", err)
+	}
 	t.Cleanup(d.Close)
 	return d
+}
+
+// SeedUser creates a user with the given role and returns it.
+func SeedUser(t *testing.T, d *db.DB, email, role string) *db.User {
+	t.Helper()
+	hash, err := auth.HashPassword("password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := d.CreateUser(context.Background(), email, email, hash, role)
+	if err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	return u
+}
+
+// AuthToken creates a user with the given role plus an active session, returning
+// the bearer token (and the user).
+func AuthToken(t *testing.T, d *db.DB, role string) (string, *db.User) {
+	t.Helper()
+	u := SeedUser(t, d, role+"-"+cuid.New()+"@test.local", role)
+	token, err := auth.GenerateToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.CreateSession(context.Background(), u.ID, token, time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	return token, u
 }
 
 // Reset truncates all application tables and restarts identities.

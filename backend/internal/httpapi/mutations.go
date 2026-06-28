@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/worldsignal/backend/internal/auth"
 	"github.com/worldsignal/backend/internal/db"
 	"github.com/worldsignal/backend/internal/gql"
 	"github.com/worldsignal/backend/internal/jsonx"
@@ -29,6 +30,9 @@ func (s *Server) mutationResolvers() map[string]gql.FieldResolver {
 }
 
 func (s *Server) mutCreateSource(ctx context.Context, args map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSourcesWrite); err != nil {
+		return nil, err
+	}
 	input, _ := args["input"].(map[string]any)
 	if input == nil {
 		return nil, fmt.Errorf("input required")
@@ -65,6 +69,9 @@ func (s *Server) mutCreateSource(ctx context.Context, args map[string]any) (any,
 }
 
 func (s *Server) mutSetSourceEnabled(ctx context.Context, args map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSourcesWrite); err != nil {
+		return nil, err
+	}
 	id, _ := args["id"].(string)
 	enabled, _ := args["enabled"].(bool)
 	src, err := s.DB.SetSourceEnabled(ctx, id, enabled)
@@ -74,7 +81,10 @@ func (s *Server) mutSetSourceEnabled(ctx context.Context, args map[string]any) (
 	return sourceToGqlMap(src), nil
 }
 
-func (s *Server) mutTriggerFetch(_ context.Context, args map[string]any) (any, error) {
+func (s *Server) mutTriggerFetch(ctx context.Context, args map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSourcesWrite); err != nil {
+		return nil, err
+	}
 	id, _ := args["id"].(string)
 	if err := s.Enqueue.EnqueueFetchSource(id); err != nil {
 		return nil, err
@@ -83,6 +93,9 @@ func (s *Server) mutTriggerFetch(_ context.Context, args map[string]any) (any, e
 }
 
 func (s *Server) mutCreateSubscription(ctx context.Context, args map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSubscriptionsWrite); err != nil {
+		return nil, err
+	}
 	input, _ := args["input"].(map[string]any)
 	if input == nil {
 		return nil, fmt.Errorf("input required")

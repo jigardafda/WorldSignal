@@ -4,6 +4,7 @@ package httpapi
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/worldsignal/backend/internal/db"
 	"github.com/worldsignal/backend/internal/jsonx"
@@ -21,6 +22,14 @@ type Server struct {
 	DB            *db.DB
 	Enqueue       Enqueuer
 	SigningSecret string
+	SessionTTL    time.Duration // session lifetime; defaults to 7 days when zero
+}
+
+func (s *Server) sessionTTL() time.Duration {
+	if s.SessionTTL <= 0 {
+		return 7 * 24 * time.Hour
+	}
+	return s.SessionTTL
 }
 
 // Handler returns the root http.Handler with CORS applied.

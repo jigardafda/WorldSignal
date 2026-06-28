@@ -18,6 +18,8 @@ type Config struct {
 	Role                 string
 	WebhookSigningSecret string
 	SchedulerTickMS      int
+	AdminEmail           string
+	AdminPassword        string
 }
 
 // HasOpenAI reports whether an OpenAI key is configured.
@@ -39,6 +41,8 @@ func Load() (Config, error) {
 		OpenAIModel:          getenv("OPENAI_MODEL", "gpt-4o-mini"),
 		Role:                 getenv("ROLE", "all"),
 		WebhookSigningSecret: getenv("WEBHOOK_SIGNING_SECRET", "change-me-in-prod"),
+		AdminEmail:           getenv("ADMIN_EMAIL", "admin@worldsignal.local"),
+		AdminPassword:        getenv("ADMIN_PASSWORD", "admin12345"),
 	}
 
 	if c.DatabaseURL == "" {

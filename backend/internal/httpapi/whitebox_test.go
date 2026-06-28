@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestWriteJSONMarshalError(t *testing.T) {
@@ -22,5 +23,14 @@ func TestJsonRawError(t *testing.T) {
 func TestTimePtrNil(t *testing.T) {
 	if timePtr(nil) != nil {
 		t.Fatal("nil PrismaTime should map to nil")
+	}
+}
+
+func TestSessionTTLDefault(t *testing.T) {
+	if (&Server{}).sessionTTL() != 7*24*time.Hour {
+		t.Fatal("zero TTL should default to 7 days")
+	}
+	if (&Server{SessionTTL: time.Minute}).sessionTTL() != time.Minute {
+		t.Fatal("explicit TTL should be honored")
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/worldsignal/backend/internal/auth"
 	"github.com/worldsignal/backend/internal/db"
 	"github.com/worldsignal/backend/internal/gql"
 	"github.com/worldsignal/backend/internal/jsonx"
@@ -36,22 +37,31 @@ func (s *Server) handleGraphQL(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	out := gql.Execute(r.Context(), s.root(), req)
+	ctx := s.contextWithIdentity(r)
+	out := gql.Execute(ctx, s.root(), req)
 	writeRaw(w, http.StatusOK, out)
 }
 
 func (s *Server) root() gql.Root {
-	return gql.Root{
-		Query: map[string]gql.FieldResolver{
-			"signals":       s.resolveSignals,
-			"signal":        s.resolveSignal,
-			"sources":       s.resolveSources,
-			"subscriptions": s.resolveSubscriptions,
-			"taxonomy":      func(context.Context, map[string]any) (any, error) { return taxonomy.Taxonomy, nil },
-			"stats":         s.resolveStats,
-		},
-		Mutation: s.mutationResolvers(),
+	q := map[string]gql.FieldResolver{
+		"signals":       s.resolveSignals,
+		"signal":        s.resolveSignal,
+		"sources":       s.resolveSources,
+		"subscriptions": s.resolveSubscriptions,
+		"taxonomy":      s.resolveTaxonomy,
+		"stats":         s.resolveStats,
 	}
+	m := s.mutationResolvers()
+	s.registerAuthResolvers(q, m)   // login/logout/me + admin (users/teams)
+	s.registerEntityResolvers(q, m) // Phase B: articles, rawItems, deliveries, jobs, analytics, …
+	return gql.Root{Query: q, Mutation: m}
+}
+
+func (s *Server) resolveTaxonomy(ctx context.Context, _ map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSignalsRead); err != nil {
+		return nil, err
+	}
+	return taxonomy.Taxonomy, nil
 }
 
 // --- query resolvers ---
@@ -76,6 +86,9 @@ func signalToMap(a *db.SignalAggregate) map[string]any {
 }
 
 func (s *Server) resolveSignals(ctx context.Context, args map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSignalsRead); err != nil {
+		return nil, err
+	}
 	f := db.SignalFilter{Limit: toInt(args["limit"], 50), Offset: toInt(args["offset"], 0)}
 	if filter, ok := args["filter"].(map[string]any); ok {
 		if v, ok := filter["country"].(string); ok {
@@ -110,6 +123,9 @@ func (s *Server) resolveSignals(ctx context.Context, args map[string]any) (any, 
 }
 
 func (s *Server) resolveSignal(ctx context.Context, args map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSignalsRead); err != nil {
+		return nil, err
+	}
 	id, _ := args["id"].(string)
 	a, err := s.DB.GetSignal(ctx, id)
 	if err != nil {
@@ -122,6 +138,9 @@ func (s *Server) resolveSignal(ctx context.Context, args map[string]any) (any, e
 }
 
 func (s *Server) resolveSources(ctx context.Context, _ map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSourcesRead); err != nil {
+		return nil, err
+	}
 	rows, err := s.DB.ListSources(ctx)
 	if err != nil {
 		return nil, err
@@ -134,6 +153,9 @@ func (s *Server) resolveSources(ctx context.Context, _ map[string]any) (any, err
 }
 
 func (s *Server) resolveSubscriptions(ctx context.Context, _ map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSubscriptionsRead); err != nil {
+		return nil, err
+	}
 	rows, err := s.DB.ListSubscriptionsBasic(ctx)
 	if err != nil {
 		return nil, err
@@ -149,6 +171,9 @@ func (s *Server) resolveSubscriptions(ctx context.Context, _ map[string]any) (an
 }
 
 func (s *Server) resolveStats(ctx context.Context, _ map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermAnalyticsRead); err != nil {
+		return nil, err
+	}
 	st, err := s.DB.GetStats(ctx)
 	if err != nil {
 		return nil, err

@@ -42,6 +42,16 @@ func run() error {
 
 	log.Info(fmt.Sprintf("starting WorldSignal (role=%s, llm=%s)", cfg.Role, llmMode(cfg)))
 
+	// Auth/RBAC tables + a default admin (first boot only).
+	if err := database.MigrateAuth(ctx); err != nil {
+		return err
+	}
+	if created, err := httpapi.SeedDefaultAdmin(ctx, database, cfg.AdminEmail, cfg.AdminPassword); err != nil {
+		return err
+	} else if created {
+		log.Info(fmt.Sprintf("seeded default admin %s (change the password!)", cfg.AdminEmail))
+	}
+
 	gateway := llm.NewOpenAIGateway(cfg.OpenAIAPIKey, cfg.OpenAIModel)
 	queue := jobs.New(database.Pool)
 	workers := jobs.NewWorkers(queue, database, gateway, cfg.WebhookSigningSecret)

@@ -104,6 +104,112 @@ func TestDBErrorPaths(t *testing.T) {
 	mustErr("MarkSourceFetchFailure", d.MarkSourceFetchFailure(ctx, "x", now))
 }
 
+func TestAuthDBErrorPaths(t *testing.T) {
+	d := closed(t)
+	ctx := context.Background()
+	now := time.Now()
+	mustErr := func(name string, err error) {
+		if err == nil {
+			t.Fatalf("%s: expected error on closed pool", name)
+		}
+	}
+	_, err := d.CountUsers(ctx)
+	mustErr("CountUsers", err)
+	_, err = d.CreateUser(ctx, "e@x", "n", "h", "VIEWER")
+	mustErr("CreateUser", err)
+	_, err = d.GetUserByEmail(ctx, "e@x")
+	mustErr("GetUserByEmail", err)
+	_, err = d.GetUserByID(ctx, "id")
+	mustErr("GetUserByID", err)
+	_, err = d.ListUsers(ctx)
+	mustErr("ListUsers", err)
+	_, err = d.UpdateUser(ctx, "id", db.UserPatch{})
+	mustErr("UpdateUser", err)
+	mustErr("UpdatePassword", d.UpdatePassword(ctx, "id", "h"))
+	_, err = d.DeleteUser(ctx, "id")
+	mustErr("DeleteUser", err)
+	mustErr("CreateSession", d.CreateSession(ctx, "u", "t", now))
+	_, err = d.UserForToken(ctx, "t")
+	mustErr("UserForToken", err)
+	mustErr("DeleteSession", d.DeleteSession(ctx, "t"))
+	_, err = d.CreateTeam(ctx, "n")
+	mustErr("CreateTeam", err)
+	_, err = d.ListTeams(ctx)
+	mustErr("ListTeams", err)
+	_, err = d.GetTeam(ctx, "id")
+	mustErr("GetTeam", err)
+	_, err = d.DeleteTeam(ctx, "id")
+	mustErr("DeleteTeam", err)
+	mustErr("AddTeamMember", d.AddTeamMember(ctx, "t", "u", "MEMBER"))
+	_, err = d.RemoveTeamMember(ctx, "t", "u")
+	mustErr("RemoveTeamMember", err)
+	_, err = d.ListTeamMembers(ctx, "t")
+	mustErr("ListTeamMembers", err)
+}
+
+func TestUserTeamHappyEdges(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	ctx := context.Background()
+	// nil lookups.
+	if u, err := d.GetUserByEmail(ctx, "missing@x"); err != nil || u != nil {
+		t.Fatalf("missing email: %v %v", u, err)
+	}
+	if u, err := d.GetUserByID(ctx, "missing"); err != nil || u != nil {
+		t.Fatalf("missing id: %v %v", u, err)
+	}
+	if u, err := d.UserForToken(ctx, "missing"); err != nil || u != nil {
+		t.Fatalf("missing token: %v %v", u, err)
+	}
+	if u, err := d.UpdateUser(ctx, "missing", db.UserPatch{}); err != nil || u != nil {
+		t.Fatalf("update missing: %v %v", u, err)
+	}
+	if ok, err := d.DeleteUser(ctx, "missing"); err != nil || ok {
+		t.Fatalf("delete missing: %v %v", ok, err)
+	}
+	if tm, err := d.GetTeam(ctx, "missing"); err != nil || tm != nil {
+		t.Fatalf("team missing: %v %v", tm, err)
+	}
+	if ok, err := d.DeleteTeam(ctx, "missing"); err != nil || ok {
+		t.Fatalf("delete team missing: %v %v", ok, err)
+	}
+	if ok, err := d.RemoveTeamMember(ctx, "t", "u"); err != nil || ok {
+		t.Fatalf("remove member missing: %v %v", ok, err)
+	}
+	// duplicate email.
+	if _, err := d.CreateUser(ctx, "dup@x", "n", "h", "VIEWER"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.CreateUser(ctx, "dup@x", "n", "h", "VIEWER"); err != db.ErrDuplicateEmail {
+		t.Fatalf("dup email want ErrDuplicateEmail, got %v", err)
+	}
+	// teams + members happy path + AddTeamMember upsert role.
+	tm, err := d.CreateTeam(ctx, "T")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, _ := d.CreateUser(ctx, "tm@x", "n", "h", "VIEWER")
+	if err := d.AddTeamMember(ctx, tm.ID, u.ID, "MEMBER"); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.AddTeamMember(ctx, tm.ID, u.ID, "OWNER"); err != nil { // upsert
+		t.Fatal(err)
+	}
+	members, err := d.ListTeamMembers(ctx, tm.ID)
+	if err != nil || len(members) != 1 || members[0].Role != "OWNER" {
+		t.Fatalf("members: %+v %v", members, err)
+	}
+	teams, err := d.ListTeams(ctx)
+	if err != nil || len(teams) != 1 || teams[0].MemberCount != 1 {
+		t.Fatalf("teams: %+v %v", teams, err)
+	}
+	if u2, err := d.UpdateUser(ctx, u.ID, db.UserPatch{Name: strPtr("Renamed")}); err != nil || u2.Name != "Renamed" {
+		t.Fatalf("update name: %v %v", u2, err)
+	}
+}
+
+func strPtr(s string) *string { return &s }
+
 func TestTagIDsByCodesEmpty(t *testing.T) {
 	d := dbtest.Connect(t)
 	m, err := d.TagIDsByCodes(context.Background(), nil)

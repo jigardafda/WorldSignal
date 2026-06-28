@@ -46,9 +46,33 @@ func seed(t *testing.T, d *db.DB) {
 	ex(`INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload","createdAt") VALUES ('d1','sub','sg','POLLING','SENT','{"event_id":"e"}',now())`)
 }
 
+// bearer, when set, is attached as the Authorization header by get/postGQL.
+var bearer string
+
 func get(t *testing.T, base, path string) (int, string) {
 	t.Helper()
-	resp, err := http.Get(base + path)
+	req, _ := http.NewRequest("GET", base+path, nil)
+	if bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+bearer)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(b)
+}
+
+// postGQL POSTs a GraphQL body with the current bearer token.
+func postGQL(t *testing.T, base, body string) (int, string) {
+	t.Helper()
+	req, _ := http.NewRequest("POST", base+"/graphql", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+bearer)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,6 +114,12 @@ func TestGraphQLOverHTTP(t *testing.T) {
 	seed(t, d)
 	ht, enq := newServer(t, d)
 
+	tok, _ := dbtest.AuthToken(t, d, "ADMIN")
+	bearer = tok
+	defer func() { bearer = "" }()
+
+	post := func(b string) (int, string) { return postGQL(t, ht.URL, b) }
+
 	// GET with variables.
 	st, body := get(t, ht.URL, `/graphql?query=`+url(`query($f:SignalFilter){signals(filter:$f){id}}`)+`&variables=`+url(`{"f":{"minConfidence":0.1}}`))
 	if st != 200 || !strings.Contains(body, `"id":"sg"`) {
@@ -101,16 +131,7 @@ func TestGraphQLOverHTTP(t *testing.T) {
 		t.Fatalf("graphql GET bad variables: %d %s", st, b)
 	}
 
-	// POST query.
-	post := func(b string) (int, string) {
-		resp, err := http.Post(ht.URL+"/graphql", "application/json", strings.NewReader(b))
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		return resp.StatusCode, string(body)
-	}
+	// POST query (authenticated via the bearer token set above).
 	if _, b := post(`{"query":"{ stats }"}`); !strings.Contains(b, `"sources":1`) {
 		t.Fatalf("graphql POST stats: %s", b)
 	}
@@ -230,11 +251,11 @@ func TestTriggerFetchEnqueueError(t *testing.T) {
 	srv := &httpapi.Server{DB: d, Enqueue: failEnqueuer{}, SigningSecret: "s"}
 	ht := httptest.NewServer(srv.Handler())
 	defer ht.Close()
-	resp, _ := http.Post(ht.URL+"/graphql", "application/json",
-		strings.NewReader(`{"query":"mutation($id:ID!){triggerFetch(id:$id)}","variables":{"id":"s1"}}`))
-	b, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if !strings.Contains(string(b), `"errors"`) {
+	tok, _ := dbtest.AuthToken(t, d, "EDITOR")
+	bearer = tok
+	defer func() { bearer = "" }()
+	_, b := postGQL(t, ht.URL, `{"query":"mutation($id:ID!){triggerFetch(id:$id)}","variables":{"id":"s1"}}`)
+	if !strings.Contains(b, `"errors"`) {
 		t.Fatalf("enqueue error should surface: %s", b)
 	}
 }
