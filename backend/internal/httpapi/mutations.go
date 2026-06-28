@@ -17,7 +17,31 @@ func sourceToGqlMap(src *db.Source) map[string]any {
 		"country": src.Country, "priority": src.Priority, "credibility": src.Credibility,
 		"enabled": src.Enabled, "lastSuccessAt": timePtr(src.LastSuccessAt),
 		"lastFailureAt": timePtr(src.LastFailureAt), "failureCount": src.FailureCount,
+		// Rich metadata surfaced in the list view.
+		"region": src.Region, "language": src.Language, "languages": strList(src.Languages),
+		"geographicScope": src.GeographicScope, "industry": src.Industry,
+		"category": src.Category, "publisher": src.Publisher, "orgType": src.OrgType,
+		"sourceType": src.SourceType, "officialFeed": src.OfficialFeed,
+		"healthScore": intPtr(src.HealthScore), "validationStatus": src.ValidationStatus,
+		"tags": strList(src.Tags), "lastValidatedAt": timePtr(src.LastValidatedAt),
 	}
+}
+
+// strList renders a (possibly nil) []string as a non-nil []any for GraphQL.
+func strList(in []string) []any {
+	out := make([]any, len(in))
+	for i, v := range in {
+		out[i] = v
+	}
+	return out
+}
+
+// intPtr renders a *int as a value or nil.
+func intPtr(p *int) any {
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 func (s *Server) mutationResolvers() map[string]gql.FieldResolver {

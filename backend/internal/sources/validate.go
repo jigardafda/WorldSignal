@@ -91,6 +91,12 @@ func (v *Validator) ValidateAll(ctx context.Context, cands []Candidate) []Result
 	return results
 }
 
+// ValidateCandidate validates a single candidate (used for on-demand
+// revalidation of an existing source).
+func (v *Validator) ValidateCandidate(ctx context.Context, c Candidate) Result {
+	return v.validateOne(ctx, c)
+}
+
 // validateOne performs the full validation of a single candidate.
 func (v *Validator) validateOne(ctx context.Context, c Candidate) Result {
 	r := Result{Candidate: c}

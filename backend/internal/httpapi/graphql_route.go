@@ -44,12 +44,14 @@ func (s *Server) handleGraphQL(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) root() gql.Root {
 	q := map[string]gql.FieldResolver{
-		"signals":       s.resolveSignals,
-		"signal":        s.resolveSignal,
-		"sources":       s.resolveSources,
-		"subscriptions": s.resolveSubscriptions,
-		"taxonomy":      s.resolveTaxonomy,
-		"stats":         s.resolveStats,
+		"signals":        s.resolveSignals,
+		"signal":         s.resolveSignal,
+		"sources":        s.resolveSources,
+		"sourceCount":    s.resolveSourceCount,
+		"sourceCoverage": s.resolveSourceCoverage,
+		"subscriptions":  s.resolveSubscriptions,
+		"taxonomy":       s.resolveTaxonomy,
+		"stats":          s.resolveStats,
 	}
 	m := s.mutationResolvers()
 	s.registerAuthResolvers(q, m)   // login/logout/me + admin (users/teams)
@@ -137,17 +139,58 @@ func (s *Server) resolveSignal(ctx context.Context, args map[string]any) (any, e
 	return signalToMap(a), nil
 }
 
-func (s *Server) resolveSources(ctx context.Context, _ map[string]any) (any, error) {
+// sourceFilter reads the source list/count filter args.
+func sourceFilter(args map[string]any) db.SourceFilter {
+	f := db.SourceFilter{Limit: toInt(args["limit"], 100), Offset: toInt(args["offset"], 0)}
+	f.Search = strArg(args, "search")
+	f.Country = strArg(args, "country")
+	f.Region = strArg(args, "region")
+	f.Language = strArg(args, "language")
+	f.Scope = strArg(args, "scope")
+	f.Industry = strArg(args, "industry")
+	f.OrgType = strArg(args, "orgType")
+	f.SourceType = strArg(args, "sourceType")
+	f.ValidationStatus = strArg(args, "validationStatus")
+	f.Tag = strArg(args, "tag")
+	if v, ok := args["enabled"].(bool); ok {
+		f.Enabled = &v
+	}
+	return f
+}
+
+func (s *Server) resolveSources(ctx context.Context, args map[string]any) (any, error) {
 	if err := authz(ctx, auth.PermSourcesRead); err != nil {
 		return nil, err
 	}
-	rows, err := s.DB.ListSources(ctx)
+	rows, _, err := s.DB.ListSourcesFiltered(ctx, sourceFilter(args))
 	if err != nil {
 		return nil, err
 	}
 	out := make([]any, len(rows))
 	for i, src := range rows {
 		out[i] = sourceToGqlMap(src)
+	}
+	return out, nil
+}
+
+func (s *Server) resolveSourceCount(ctx context.Context, args map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSourcesRead); err != nil {
+		return nil, err
+	}
+	return s.DB.CountSources(ctx, sourceFilter(args))
+}
+
+func (s *Server) resolveSourceCoverage(ctx context.Context, _ map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSourcesRead); err != nil {
+		return nil, err
+	}
+	cov, err := s.DB.SourceCoverage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]any{}
+	for k, bs := range cov {
+		out[k] = buckets(bs)
 	}
 	return out, nil
 }

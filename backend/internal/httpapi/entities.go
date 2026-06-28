@@ -41,6 +41,7 @@ func (s *Server) registerEntityResolvers(q, m map[string]gql.FieldResolver) {
 
 	m["updateSource"] = s.mutUpdateSource
 	m["deleteSource"] = s.mutDeleteSource
+	m["revalidateSource"] = s.mutRevalidateSource
 	m["updateSubscription"] = s.mutUpdateSubscription
 	m["deleteSubscription"] = s.mutDeleteSubscription
 	m["createSubscriber"] = s.mutCreateSubscriber
@@ -76,12 +77,17 @@ func buckets(bs []db.Bucket) []any {
 
 func sourceDetailMap(src *db.Source) map[string]any {
 	m := sourceToGqlMap(src)
-	m["region"] = src.Region
-	m["language"] = src.Language
-	m["category"] = src.Category
 	m["crawlFrequency"] = src.CrawlFrequency
 	m["parserType"] = src.ParserType
 	m["config"] = src.Config
+	m["subcategory"] = src.Subcategory
+	m["websiteUrl"] = src.WebsiteURL
+	m["contentType"] = src.ContentType
+	m["updateFrequency"] = src.UpdateFrequency
+	m["biasRating"] = src.BiasRating
+	m["avgResponseMs"] = intPtr(src.AvgResponseMs)
+	m["lastValidationError"] = src.LastValidationError
+	m["metadata"] = src.Metadata
 	m["lastFetchedAt"] = timePtr(src.LastFetchedAt)
 	m["createdAt"] = src.CreatedAt.Time
 	m["updatedAt"] = src.UpdatedAt.Time
@@ -96,7 +102,26 @@ func (s *Server) resolveSource(ctx context.Context, args map[string]any) (any, e
 	if err != nil || src == nil {
 		return nil, err
 	}
-	return sourceDetailMap(src), nil
+	m := sourceDetailMap(src)
+	logs, err := s.DB.ListValidationLogs(ctx, src.ID, 50)
+	if err != nil {
+		return nil, err
+	}
+	m["validationLogs"] = validationLogMaps(logs)
+	return m, nil
+}
+
+func validationLogMaps(logs []db.ValidationLog) []any {
+	out := make([]any, len(logs))
+	for i, l := range logs {
+		out[i] = map[string]any{
+			"id": l.ID, "checkedAt": l.CheckedAt.Time, "ok": l.OK,
+			"httpStatus": intPtr(l.HTTPStatus), "responseMs": intPtr(l.ResponseMs),
+			"itemCount": intPtr(l.ItemCount), "newestItemAt": timePtr(l.NewestItemAt),
+			"redirectedTo": l.RedirectedTo, "error": l.Error,
+		}
+	}
+	return out
 }
 
 func (s *Server) mutUpdateSource(ctx context.Context, args map[string]any) (any, error) {
