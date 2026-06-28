@@ -26,6 +26,13 @@ linters:
       checks: ["all", "-QF1002", "-QF1008", "-ST1003"]
     misspell:
       locale: US
+      # British spellings kept deliberately as normalization aliases in the
+      # attribute dictionary (so British-spelled input maps to canonical codes).
+      ignore-rules:
+        - neighbourhood
+        - favourable
+        - organisation
+        - defence
     revive:
       severity: warning
       rules:
