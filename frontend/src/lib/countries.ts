@@ -35,9 +35,9 @@ export function useCountries(): CountriesState {
   return { list, byCode, loading };
 }
 
-/** Display label: "United States (🇺🇸)". */
+/** Display label with the flag first: "🇺🇸 United States". */
 export function countryLabel(c: Country): string {
-  return `${c.name} (${c.flag})`;
+  return `${c.flag} ${c.name}`;
 }
 
 /** Render a country code as "🇺🇸 United States", or the raw code/"—" if unknown. */

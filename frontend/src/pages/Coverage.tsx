@@ -83,7 +83,7 @@ export function Coverage() {
                   getKey={(b) => b.key}
                   emptyMessage="No countries."
                   columns={[
-                    { key: "key", header: "Country", render: (b) => { const c = byCode[b.key]; return c ? `${c.name} (${c.flag})` : b.key; } },
+                    { key: "key", header: "Country", render: (b) => { const c = byCode[b.key]; return c ? `${c.flag} ${c.name}` : b.key; } },
                     { key: "count", header: "Sources", render: (b) => b.count },
                   ]}
                 />

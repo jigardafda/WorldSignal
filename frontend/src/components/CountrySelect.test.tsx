@@ -19,7 +19,7 @@ afterEach(() => vi.clearAllMocks());
 
 describe("countries lib", () => {
   it("formats labels and displays", () => {
-    expect(countryLabel(COUNTRIES[0])).toBe("United States (🇺🇸)");
+    expect(countryLabel(COUNTRIES[0])).toBe("🇺🇸 United States");
     const byCode = { US: COUNTRIES[0] };
     expect(countryDisplay("US", byCode)).toBe("🇺🇸 United States");
     expect(countryDisplay("ZZ", byCode)).toBe("ZZ"); // unknown → raw code
@@ -34,7 +34,7 @@ describe("CountrySelect", () => {
     // Options come from api.countries (full name + flag in brackets).
     await waitFor(() => expect(apiMock.countries).toHaveBeenCalled());
     await userEvent.click(screen.getByTestId("cs"));
-    await userEvent.click(await screen.findByText("United Kingdom (🇬🇧)"));
+    await userEvent.click(await screen.findByText("🇬🇧 United Kingdom"));
     await waitFor(() => expect(onChange).toHaveBeenCalledWith("GB", expect.anything()));
   });
 
