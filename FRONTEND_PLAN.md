@@ -38,10 +38,10 @@ validation / loading / empty / error states.
 
 ## Phase C — Frontend foundation (Mantine + router + auth)
 
-- [ ] C1 Mantine + react-router; AppShell, theme, nav, notifications.
-- [ ] C2 Typed GraphQL client w/ auth header + error normalization; auth context + storage.
-- [ ] C3 Login page; protected routes; user menu + account; role-gated nav.
-- [ ] C4 Shared UI: DataTable, DetailCard, StatCard, charts, Loading/Empty/Error, dialogs.
+- [x] C1 Mantine + react-router; AppShell, theme, nav, notifications.
+- [x] C2 Typed GraphQL client w/ auth header + error normalization; auth context + storage.
+- [x] C3 Login page; protected routes; user menu; role-gated nav. (Account page in D10.)
+- [x] C4 Shared UI: DataTable, DetailCard, StatCard, charts, Loading/Empty/Error, dialogs.
 
 ## Phase D — Frontend pages (list / detail / analytics / management)
 
