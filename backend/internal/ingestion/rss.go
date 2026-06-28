@@ -28,7 +28,14 @@ type DiscoveredItem struct {
 const userAgent = "WorldSignalBot/0.1 (+https://worldsignal.example/bot)"
 
 // FetchRSSSource fetches and parses a feed. Mirrors fetchRssSource in rss.ts.
+// Outbound requests are paced per host (see HostGate) so bulk aggregators like
+// Google News are not rate-limited (HTTP 503) into cooldown.
 func FetchRSSSource(ctx context.Context, url string) ([]DiscoveredItem, error) {
+	// Pace before opening the timeout window so waiting doesn't consume it.
+	if err := fetchGate.Wait(ctx, url); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
