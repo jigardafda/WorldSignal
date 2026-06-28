@@ -6,6 +6,7 @@ import { AsyncBoundary } from "../components/States";
 import { PageHeader } from "../components/PageHeader";
 import { StatCard } from "../components/StatCard";
 import { DataTable } from "../components/DataTable";
+import { useCountries } from "../lib/countries";
 
 const DONUT = ["blue", "teal", "grape", "orange", "red", "cyan", "lime", "violet", "indigo", "pink"];
 
@@ -34,6 +35,7 @@ function industries(c: SourceCoverage): Bucket[] {
 
 export function Coverage() {
   const state = useAsync<SourceCoverage>(() => api.sourceCoverage(), []);
+  const { byCode } = useCountries();
   return (
     <>
       <PageHeader title="Source Coverage" subtitle="Global breadth of the validated source registry" />
@@ -81,7 +83,7 @@ export function Coverage() {
                   getKey={(b) => b.key}
                   emptyMessage="No countries."
                   columns={[
-                    { key: "key", header: "Country", render: (b) => b.key },
+                    { key: "key", header: "Country", render: (b) => { const c = byCode[b.key]; return c ? `${c.name} (${c.flag})` : b.key; } },
                     { key: "count", header: "Sources", render: (b) => b.count },
                   ]}
                 />
