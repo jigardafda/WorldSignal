@@ -30,23 +30,42 @@ type restSource struct {
 	Relation    string         `json:"relation"`
 }
 
-// restSignal mirrors serializeSignal() in routes.ts (field order preserved).
+// restAttr mirrors a stored dictionary attribute value.
+type restAttr struct {
+	Key        string   `json:"key"`
+	ValueCode  string   `json:"valueCode"`
+	ValueText  string   `json:"valueText"`
+	ValueNum   *float64 `json:"valueNum"`
+	Confidence float64  `json:"confidence"`
+}
+
+// restSignal mirrors serializeSignal() in routes.ts (field order preserved),
+// extended with the deep-enrichment attributes.
 type restSignal struct {
-	ID           string        `json:"id"`
-	Title        string        `json:"title"`
-	Summary      string        `json:"summary"`
-	WhatHappened *string       `json:"whatHappened"`
-	WhyItMatters *string       `json:"whyItMatters"`
-	Status       string        `json:"status"`
-	Severity     string        `json:"severity"`
-	Confidence   float64       `json:"confidence"`
-	EventType    *string       `json:"eventType"`
-	Country      *string       `json:"country"`
-	SourceCount  int           `json:"sourceCount"`
-	FirstSeenAt  db.PrismaTime `json:"firstSeenAt"`
-	LastSeenAt   db.PrismaTime `json:"lastSeenAt"`
-	Tags         []restTag     `json:"tags"`
-	Sources      []restSource  `json:"sources"`
+	ID             string        `json:"id"`
+	Title          string        `json:"title"`
+	Summary        string        `json:"summary"`
+	WhatHappened   *string       `json:"whatHappened"`
+	WhyItMatters   *string       `json:"whyItMatters"`
+	Status         string        `json:"status"`
+	Severity       string        `json:"severity"`
+	Confidence     float64       `json:"confidence"`
+	EventType      *string       `json:"eventType"`
+	Country        *string       `json:"country"`
+	Region         *string       `json:"region"`
+	City           *string       `json:"city"`
+	Locality       *string       `json:"locality"`
+	GeoScope       *string       `json:"geoScope"`
+	Sentiment      *string       `json:"sentiment"`
+	SentimentScore *float64      `json:"sentimentScore"`
+	Influence      *string       `json:"influence"`
+	Relevance      *float64      `json:"relevance"`
+	SourceCount    int           `json:"sourceCount"`
+	FirstSeenAt    db.PrismaTime `json:"firstSeenAt"`
+	LastSeenAt     db.PrismaTime `json:"lastSeenAt"`
+	Tags           []restTag     `json:"tags"`
+	Sources        []restSource  `json:"sources"`
+	Attributes     []restAttr    `json:"attributes"`
 }
 
 func serializeRESTSignal(a *db.SignalAggregate) restSignal {
@@ -63,13 +82,20 @@ func serializeRESTSignal(a *db.SignalAggregate) restSignal {
 			Relation:    src.Relation,
 		}
 	}
+	attrs := make([]restAttr, len(a.Attributes))
+	for i, at := range a.Attributes {
+		attrs[i] = restAttr{Key: at.Key, ValueCode: at.ValueCode, ValueText: at.ValueText, ValueNum: at.ValueNum, Confidence: at.Confidence}
+	}
 	return restSignal{
 		ID: a.ID, Title: a.Title, Summary: a.Summary,
 		WhatHappened: a.WhatHappened, WhyItMatters: a.WhyItMatters,
 		Status: a.Status, Severity: a.Severity, Confidence: a.Confidence,
-		EventType: a.EventType, Country: a.Country, SourceCount: a.SourceCount,
+		EventType: a.EventType, Country: a.Country,
+		Region: a.Region, City: a.City, Locality: a.Locality, GeoScope: a.GeoScope,
+		Sentiment: a.Sentiment, SentimentScore: a.SentimentScore, Influence: a.Influence, Relevance: a.Relevance,
+		SourceCount: a.SourceCount,
 		FirstSeenAt: db.NewTime(a.FirstSeenAt), LastSeenAt: db.NewTime(a.LastSeenAt),
-		Tags: tags, Sources: sources,
+		Tags: tags, Sources: sources, Attributes: attrs,
 	}
 }
 
@@ -94,6 +120,26 @@ func (s *Server) listSignals(w http.ResponseWriter, r *http.Request) {
 	}
 	if v := q.Get("search"); v != "" {
 		f.Search = &v
+	}
+	if v := q.Get("region"); v != "" {
+		f.Region = &v
+	}
+	if v := q.Get("geoScope"); v != "" {
+		f.GeoScope = &v
+	}
+	if v := q.Get("sentiment"); v != "" {
+		f.Sentiment = &v
+	}
+	if v := q.Get("influence"); v != "" {
+		f.Influence = &v
+	}
+	if v := q.Get("industry"); v != "" {
+		f.Industry = &v
+	}
+	if v := q.Get("minRelevance"); v != "" {
+		if n, err := strconv.ParseFloat(v, 64); err == nil {
+			f.MinRelevance = &n
+		}
 	}
 	if v := q.Get("tags"); v != "" {
 		f.Tags = strings.Split(v, ",")

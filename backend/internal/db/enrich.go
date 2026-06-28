@@ -13,6 +13,7 @@ type EnrichLink struct {
 	Title        string
 	Body         *string
 	Summary      *string
+	CanonicalURL *string
 	SourceID     string
 	Credibility  float64
 	SourceName   string
@@ -36,7 +37,7 @@ func (d *DB) LoadSignalForEnrich(ctx context.Context, signalID string) (*SignalF
 		return nil, err
 	}
 	rows, err := d.Pool.Query(ctx,
-		`SELECT sa."relationType", a."title", a."body", a."summary", a."sourceId", src."credibility", src."name"
+		`SELECT sa."relationType", a."title", a."body", a."summary", a."canonicalUrl", a."sourceId", src."credibility", src."name"
 		 FROM "SignalArticle" sa
 		 JOIN "Article" a ON a."id"=sa."articleId"
 		 JOIN "Source" src ON src."id"=a."sourceId"
@@ -47,7 +48,7 @@ func (d *DB) LoadSignalForEnrich(ctx context.Context, signalID string) (*SignalF
 	defer rows.Close()
 	for rows.Next() {
 		var l EnrichLink
-		if err := rows.Scan(&l.RelationType, &l.Title, &l.Body, &l.Summary, &l.SourceID, &l.Credibility, &l.SourceName); err != nil {
+		if err := rows.Scan(&l.RelationType, &l.Title, &l.Body, &l.Summary, &l.CanonicalURL, &l.SourceID, &l.Credibility, &l.SourceName); err != nil {
 			return nil, err
 		}
 		s.Links = append(s.Links, l)
@@ -82,7 +83,10 @@ func (d *DB) TagIDsByCodes(ctx context.Context, codes []string) (map[string]stri
 	return out, rows.Err()
 }
 
-// EnrichmentUpdate carries the enrichment results to persist.
+// EnrichmentUpdate carries the enrichment results to persist. The geo/sentiment/
+// influence/relevance pointers are applied with COALESCE semantics: a nil value
+// leaves the existing column untouched (so a later enrichment that fails to
+// detect, say, a country never erases one a prior pass found).
 type EnrichmentUpdate struct {
 	Title        string
 	Summary      string
@@ -95,11 +99,33 @@ type EnrichmentUpdate struct {
 	PublishedAt  time.Time
 	Metadata     map[string]any
 	Tags         []TagAssignment
+
+	// Deep-enrichment attributes (all optional; nil = keep existing).
+	Country        *string
+	Region         *string
+	City           *string
+	Locality       *string
+	GeoScope       *string
+	Sentiment      *string
+	SentimentScore *float64
+	Influence      *string
+	Relevance      *float64
+	// Attributes fully replaces the signal's SignalAttribute rows.
+	Attributes []SignalAttr
 }
 
 // TagAssignment is a resolved tag id with confidence.
 type TagAssignment struct {
 	TagID      string
+	Confidence float64
+}
+
+// SignalAttr is one normalized dictionary attribute value for a signal.
+type SignalAttr struct {
+	Key        string
+	ValueCode  string
+	ValueText  string
+	ValueNum   *float64
 	Confidence float64
 }
 
@@ -118,9 +144,16 @@ func (d *DB) ApplyEnrichment(ctx context.Context, signalID string, u EnrichmentU
 	if _, err := tx.Exec(ctx,
 		`UPDATE "Signal" SET "title"=$2,"summary"=$3,"whatHappened"=$4,"whyItMatters"=$5,
 		 "severity"=$6::"Severity","confidence"=$7,"status"=$8::"SignalStatus","eventType"=$9,
-		 "publishedAt"=$10,"metadata"=$11,"updatedAt"=now() WHERE "id"=$1`,
+		 "publishedAt"=$10,"metadata"=$11,
+		 "country"=COALESCE($12,"country"),"region"=COALESCE($13,"region"),
+		 "city"=COALESCE($14,"city"),"locality"=COALESCE($15,"locality"),
+		 "geoScope"=COALESCE($16,"geoScope"),"sentiment"=COALESCE($17,"sentiment"),
+		 "sentimentScore"=COALESCE($18,"sentimentScore"),"influence"=COALESCE($19,"influence"),
+		 "relevance"=COALESCE($20,"relevance"),"updatedAt"=now() WHERE "id"=$1`,
 		signalID, u.Title, u.Summary, u.WhatHappened, u.WhyItMatters, u.Severity, u.Confidence,
-		u.Status, u.EventType, u.PublishedAt, meta); err != nil {
+		u.Status, u.EventType, u.PublishedAt, meta,
+		u.Country, u.Region, u.City, u.Locality, u.GeoScope, u.Sentiment, u.SentimentScore,
+		u.Influence, u.Relevance); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM "SignalTag" WHERE "signalId"=$1`, signalID); err != nil {
@@ -130,6 +163,17 @@ func (d *DB) ApplyEnrichment(ctx context.Context, signalID string, u EnrichmentU
 		if _, err := tx.Exec(ctx,
 			`INSERT INTO "SignalTag" ("signalId","tagId","confidence") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
 			signalID, tg.TagID, tg.Confidence); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM "SignalAttribute" WHERE "signalId"=$1`, signalID); err != nil {
+		return err
+	}
+	for _, a := range u.Attributes {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO "SignalAttribute" ("signalId","key","valueCode","valueText","valueNum","confidence")
+			 VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
+			signalID, a.Key, a.ValueCode, a.ValueText, a.ValueNum, a.Confidence); err != nil {
 			return err
 		}
 	}

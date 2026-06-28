@@ -56,7 +56,7 @@ func TestStagePostQueryErrors(t *testing.T) {
 		mk(`INSERT INTO "Article" ("id","sourceId","title","body") VALUES ('a','s','T','earthquake struck')`)
 		mk(`INSERT INTO "SignalArticle" ("signalId","articleId","relationType") VALUES ('sg','a','PRIMARY')`)
 		defer hide(t, d, "TaxonomyTag")()
-		if err := EnrichSignal(ctx, d, gw, "sg", now); err == nil {
+		if err := EnrichSignal(ctx, d, gw, nil, "sg", now); err == nil {
 			t.Fatal("expected tagIDs error")
 		}
 	})
@@ -101,7 +101,7 @@ func TestStagePostQueryErrors(t *testing.T) {
 		mk(`INSERT INTO "Article" ("id","sourceId","title","body") VALUES ('a','s','T','earthquake struck')`)
 		mk(`INSERT INTO "SignalArticle" ("signalId","articleId","relationType") VALUES ('sg','a','PRIMARY')`)
 		defer hide(t, d, "SignalTag")()
-		if err := EnrichSignal(ctx, d, gw, "sg", now); err == nil {
+		if err := EnrichSignal(ctx, d, gw, nil, "sg", now); err == nil {
 			t.Fatal("expected applyEnrichment error")
 		}
 	})

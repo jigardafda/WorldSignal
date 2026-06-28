@@ -120,7 +120,22 @@ CREATE TABLE public."Signal" (
     "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     "updatedAt" timestamp(3) without time zone NOT NULL,
     "sourceCount" integer DEFAULT 1 NOT NULL,
-    metadata jsonb
+    metadata jsonb,
+    city text,
+    locality text,
+    "geoScope" text,
+    sentiment text,
+    "sentimentScore" double precision,
+    influence text,
+    relevance double precision
+);
+CREATE TABLE public."SignalAttribute" (
+    "signalId" text NOT NULL,
+    key text NOT NULL,
+    "valueCode" text DEFAULT ''::text NOT NULL,
+    "valueText" text DEFAULT ''::text NOT NULL,
+    "valueNum" double precision,
+    confidence double precision DEFAULT 1 NOT NULL
 );
 CREATE TABLE public."SignalArticle" (
     "signalId" text NOT NULL,
@@ -207,6 +222,8 @@ ALTER TABLE ONLY public."DeliveryEvent"
     ADD CONSTRAINT "DeliveryEvent_pkey" PRIMARY KEY (id);
 ALTER TABLE ONLY public."RawItem"
     ADD CONSTRAINT "RawItem_pkey" PRIMARY KEY (id);
+ALTER TABLE ONLY public."SignalAttribute"
+    ADD CONSTRAINT "SignalAttribute_pkey" PRIMARY KEY ("signalId", key, "valueCode", "valueText");
 ALTER TABLE ONLY public."SignalArticle"
     ADD CONSTRAINT "SignalArticle_pkey" PRIMARY KEY ("signalId", "articleId");
 ALTER TABLE ONLY public."SignalTag"
@@ -239,6 +256,12 @@ CREATE INDEX "SignalArticle_articleId_idx" ON public."SignalArticle" USING btree
 CREATE INDEX "SignalTag_tagId_idx" ON public."SignalTag" USING btree ("tagId");
 CREATE INDEX "Signal_confidence_idx" ON public."Signal" USING btree (confidence);
 CREATE INDEX "Signal_country_idx" ON public."Signal" USING btree (country);
+CREATE INDEX "Signal_region_idx" ON public."Signal" USING btree (region);
+CREATE INDEX "Signal_geoScope_idx" ON public."Signal" USING btree ("geoScope");
+CREATE INDEX "Signal_sentiment_idx" ON public."Signal" USING btree (sentiment);
+CREATE INDEX "Signal_influence_idx" ON public."Signal" USING btree (influence);
+CREATE INDEX "SignalAttribute_key_value_idx" ON public."SignalAttribute" USING btree (key, "valueCode");
+CREATE INDEX "SignalAttribute_signal_idx" ON public."SignalAttribute" USING btree ("signalId");
 CREATE INDEX "Signal_lastSeenAt_idx" ON public."Signal" USING btree ("lastSeenAt");
 CREATE INDEX "Signal_severity_idx" ON public."Signal" USING btree (severity);
 CREATE INDEX "Signal_status_idx" ON public."Signal" USING btree (status);
@@ -265,6 +288,8 @@ ALTER TABLE ONLY public."DeliveryEvent"
     ADD CONSTRAINT "DeliveryEvent_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES public."Subscription"(id) ON UPDATE CASCADE ON DELETE CASCADE;
 ALTER TABLE ONLY public."RawItem"
     ADD CONSTRAINT "RawItem_sourceId_fkey" FOREIGN KEY ("sourceId") REFERENCES public."Source"(id) ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE ONLY public."SignalAttribute"
+    ADD CONSTRAINT "SignalAttribute_signalId_fkey" FOREIGN KEY ("signalId") REFERENCES public."Signal"(id) ON UPDATE CASCADE ON DELETE CASCADE;
 ALTER TABLE ONLY public."SignalArticle"
     ADD CONSTRAINT "SignalArticle_articleId_fkey" FOREIGN KEY ("articleId") REFERENCES public."Article"(id) ON UPDATE CASCADE ON DELETE CASCADE;
 ALTER TABLE ONLY public."SignalArticle"

@@ -19,8 +19,14 @@ const signal = (over = {}) => ({
   id: "sg", title: "Quake", summary: "s", whatHappened: "wh", whyItMatters: "why",
   status: "CONFIRMED", severity: "HIGH", confidence: 0.8, eventType: "DISASTER.EARTHQUAKE",
   country: "US", sourceCount: 3, firstSeenAt: "2026-01-01T00:00:00Z", lastSeenAt: "2026-01-01T00:00:00Z",
+  region: "California", city: "Los Angeles", locality: null, geoScope: "LOCAL",
+  sentiment: "NEGATIVE", sentimentScore: -0.6, influence: "HIGH", relevance: 0.9,
   tags: [{ code: "DISASTER.EARTHQUAKE", confidence: 0.9 }],
   sources: [{ publisher: "BBC", url: "https://bbc.example/a", publishedAt: "2026-01-01T00:00:00Z" }],
+  attributes: [
+    { key: "industry", valueCode: "CYBERSECURITY", valueText: "", valueNum: null, confidence: 1 },
+    { key: "entity", valueCode: "ORGANIZATION", valueText: "Acme Corp", valueNum: null, confidence: 0.8 },
+  ],
   ...over,
 });
 
@@ -79,11 +85,24 @@ describe("SignalDetail", () => {
     renderWithProviders(<SignalDetail />, { route: "/signals/x", path: "/signals/:id" });
     expect(await screen.findByText("Signal not found.")).toBeInTheDocument();
   });
+  it("renders deep-enrichment attributes", async () => {
+    apiMock.signal.mockResolvedValue(signal());
+    renderWithProviders(<SignalDetail />, { route: "/signals/sg", path: "/signals/:id" });
+    expect(await screen.findByText("Quake")).toBeInTheDocument();
+    expect(screen.getByTestId("signal-geo")).toHaveTextContent("Los Angeles, California");
+    expect(screen.getByTestId("signal-assessment")).toHaveTextContent("Sentiment: NEGATIVE");
+    expect(screen.getByTestId("signal-assessment")).toHaveTextContent("Influence: HIGH");
+    expect(screen.getByTestId("signal-assessment")).toHaveTextContent("Relevance: 90%");
+    expect(screen.getByTestId("signal-industries")).toHaveTextContent("CYBERSECURITY");
+    expect(screen.getByTestId("signal-entities")).toHaveTextContent("Acme Corp");
+  });
   it("renders empty tags/sources and omits optional sections", async () => {
-    apiMock.signal.mockResolvedValue(signal({ tags: [], sources: [], whatHappened: null, whyItMatters: null, eventType: null, country: null }));
+    apiMock.signal.mockResolvedValue(signal({ tags: [], sources: [], whatHappened: null, whyItMatters: null, eventType: null, country: null, sentiment: null, influence: null, relevance: null, region: null, city: null, locality: null, geoScope: null, attributes: [] }));
     renderWithProviders(<SignalDetail />, { route: "/signals/sg", path: "/signals/:id" });
     expect(await screen.findByText("No linked sources.")).toBeInTheDocument();
     expect(screen.getByText("No tags.")).toBeInTheDocument();
+    expect(screen.getByText("Not yet assessed.")).toBeInTheDocument();
+    expect(screen.queryByTestId("signal-industries")).toBeNull();
     expect(screen.queryByText("Why it matters")).toBeNull();
   });
 });

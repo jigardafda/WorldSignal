@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/worldsignal/backend/internal/attributes"
 	"github.com/worldsignal/backend/internal/auth"
 	"github.com/worldsignal/backend/internal/db"
 	"github.com/worldsignal/backend/internal/gql"
@@ -44,15 +45,16 @@ func (s *Server) handleGraphQL(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) root() gql.Root {
 	q := map[string]gql.FieldResolver{
-		"signals":        s.resolveSignals,
-		"signal":         s.resolveSignal,
-		"sources":        s.resolveSources,
-		"sourceCount":    s.resolveSourceCount,
-		"sourceCoverage": s.resolveSourceCoverage,
-		"subscriptions":  s.resolveSubscriptions,
-		"taxonomy":       s.resolveTaxonomy,
-		"stats":          s.resolveStats,
-		"countries":      s.resolveCountries,
+		"signals":             s.resolveSignals,
+		"signal":              s.resolveSignal,
+		"sources":             s.resolveSources,
+		"sourceCount":         s.resolveSourceCount,
+		"sourceCoverage":      s.resolveSourceCoverage,
+		"subscriptions":       s.resolveSubscriptions,
+		"taxonomy":            s.resolveTaxonomy,
+		"stats":               s.resolveStats,
+		"countries":           s.resolveCountries,
+		"attributeDictionary": s.resolveAttributeDictionary,
 	}
 	m := s.mutationResolvers()
 	s.registerAuthResolvers(q, m)   // login/logout/me + admin (users/teams)
@@ -68,7 +70,40 @@ func (s *Server) resolveTaxonomy(ctx context.Context, _ map[string]any) (any, er
 	return taxonomy.Taxonomy, nil
 }
 
+// resolveAttributeDictionary exposes the closed attribute dictionary so clients
+// can render consistent filters, labels and value lists.
+func (s *Server) resolveAttributeDictionary(ctx context.Context, _ map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSignalsRead); err != nil {
+		return nil, err
+	}
+	defs := attributes.Definitions()
+	out := make([]any, len(defs))
+	for i, d := range defs {
+		vals := make([]any, len(d.Values()))
+		for j, v := range d.Values() {
+			vals[j] = map[string]any{"code": v.Code, "label": v.Label}
+		}
+		out[i] = map[string]any{
+			"key": d.Key, "label": d.Label, "kind": string(d.Kind),
+			"description": d.Description, "indexed": d.Indexed, "values": vals,
+		}
+	}
+	return out, nil
+}
+
 // --- query resolvers ---
+
+// attributeMaps serializes the normalized dictionary attributes of a signal.
+func attributeMaps(attrs []db.SignalAttrRow) []any {
+	out := make([]any, len(attrs))
+	for i, a := range attrs {
+		out[i] = map[string]any{
+			"key": a.Key, "valueCode": a.ValueCode, "valueText": a.ValueText,
+			"valueNum": a.ValueNum, "confidence": a.Confidence,
+		}
+	}
+	return out
+}
 
 func signalToMap(a *db.SignalAggregate) map[string]any {
 	tags := make([]any, len(a.Tags))
@@ -86,6 +121,11 @@ func signalToMap(a *db.SignalAggregate) map[string]any {
 		"eventType": a.EventType, "country": a.Country, "sourceCount": a.SourceCount,
 		"firstSeenAt": a.FirstSeenAt, "lastSeenAt": a.LastSeenAt,
 		"tags": tags, "sources": sources,
+		// Deep-enrichment attributes.
+		"region": a.Region, "city": a.City, "locality": a.Locality, "geoScope": a.GeoScope,
+		"sentiment": a.Sentiment, "sentimentScore": a.SentimentScore,
+		"influence": a.Influence, "relevance": a.Relevance,
+		"attributes": attributeMaps(a.Attributes),
 	}
 }
 
@@ -106,6 +146,14 @@ func (s *Server) resolveSignals(ctx context.Context, args map[string]any) (any, 
 		}
 		if mc, ok := toFloatOK(filter["minConfidence"]); ok {
 			f.MinConfidence = &mc
+		}
+		f.Region = strArg(filter, "region")
+		f.GeoScope = strArg(filter, "geoScope")
+		f.Sentiment = strArg(filter, "sentiment")
+		f.Influence = strArg(filter, "influence")
+		f.Industry = strArg(filter, "industry")
+		if mr, ok := toFloatOK(filter["minRelevance"]); ok {
+			f.MinRelevance = &mr
 		}
 		if tags, ok := filter["tags"].([]any); ok {
 			for _, t := range tags {

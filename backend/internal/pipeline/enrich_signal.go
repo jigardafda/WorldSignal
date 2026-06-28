@@ -5,9 +5,16 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/worldsignal/backend/internal/crawl"
 	"github.com/worldsignal/backend/internal/db"
 	"github.com/worldsignal/backend/internal/llm"
 )
+
+// PageCrawler fetches richer context from a source article's web page. The
+// concrete *crawl.Crawler implements it; tests may pass nil to skip crawling.
+type PageCrawler interface {
+	Fetch(ctx context.Context, url string) crawl.Result
+}
 
 func clamp01(n float64) float64 {
 	if n < 0 {
@@ -20,9 +27,14 @@ func clamp01(n float64) float64 {
 }
 
 // EnrichSignal enriches a signal from its representative article + source
-// aggregation. Confidence blends LLM/heuristic confidence, source independence,
-// and average credibility. Mirrors enrichSignal.ts. `now` is injected.
-func EnrichSignal(ctx context.Context, d *db.DB, gw llm.Gateway, signalID string, now time.Time) error {
+// aggregation. Beyond the narrative fields it crawls the representative article's
+// web page (best-effort, via cr) for richer context and extracts the full
+// dictionary-constrained attribute set (geo, sentiment, influence, relevance,
+// industries, categories, entities). Confidence blends LLM/heuristic confidence,
+// source independence, and average credibility. `now` is injected; `cr` may be
+// nil to skip crawling. Re-running on each newly linked article continuously
+// deepens the signal's attributes.
+func EnrichSignal(ctx context.Context, d *db.DB, gw llm.Gateway, cr PageCrawler, signalID string, now time.Time) error {
 	sig, err := d.LoadSignalForEnrich(ctx, signalID)
 	if err != nil || sig == nil {
 		return err
@@ -38,7 +50,22 @@ func EnrichSignal(ctx context.Context, d *db.DB, gw llm.Gateway, signalID string
 	if body == "" {
 		body = rep.Title
 	}
-	enr := llm.EnrichArticle(ctx, gw, llm.EnrichInput{Title: rep.Title, Body: body, Publisher: rep.SourceName})
+
+	// Best-effort crawl of the source page for richer context.
+	pageText := ""
+	if cr != nil && rep.CanonicalURL != nil && *rep.CanonicalURL != "" {
+		if res := cr.Fetch(ctx, *rep.CanonicalURL); res.OK() {
+			pageText = res.Text
+		}
+	}
+
+	// The crawled page (when available) is richer than the feed snippet.
+	enrichBody := body
+	if pageText != "" {
+		enrichBody = pageText
+	}
+	enr := llm.EnrichArticle(ctx, gw, llm.EnrichInput{Title: rep.Title, Body: enrichBody, Publisher: rep.SourceName})
+	attrs := llm.ExtractAttributes(ctx, gw, llm.AttrInput{Title: rep.Title, Body: body, Publisher: rep.SourceName, Context: pageText})
 
 	// Source aggregation.
 	var credSum float64
@@ -93,7 +120,15 @@ func EnrichSignal(ctx context.Context, d *db.DB, gw llm.Gateway, signalID string
 		_ = json.Unmarshal(sig.Metadata, &meta)
 	}
 	meta["enrichmentSource"] = enr.Source
+	meta["attributeSource"] = attrs.Source
 	meta["distinctSources"] = distinctSources
+	if pageText != "" {
+		meta["crawled"] = true
+	}
+
+	// Mirror the taxonomy categories into the unified attribute dictionary so
+	// every dimension is queryable consistently, alongside industries/entities.
+	attrRows := buildAttributeRows(enr.Tags, attrs)
 
 	return d.ApplyEnrichment(ctx, signalID, db.EnrichmentUpdate{
 		Title:        enr.Title,
@@ -107,7 +142,34 @@ func EnrichSignal(ctx context.Context, d *db.DB, gw llm.Gateway, signalID string
 		PublishedAt:  publishedAt,
 		Metadata:     meta,
 		Tags:         tagAssignments,
+
+		Country:        nilIfEmpty(attrs.Country),
+		Region:         nilIfEmpty(attrs.Region),
+		City:           nilIfEmpty(attrs.City),
+		Locality:       nilIfEmpty(attrs.Locality),
+		GeoScope:       nilIfEmpty(attrs.GeoScope),
+		Sentiment:      nilIfEmpty(attrs.Sentiment),
+		SentimentScore: &attrs.SentimentScore,
+		Influence:      nilIfEmpty(attrs.Influence),
+		Relevance:      &attrs.Relevance,
+		Attributes:     attrRows,
 	})
+}
+
+// buildAttributeRows flattens the extracted categories, industries and entities
+// into normalized SignalAttribute rows. Values are already dictionary-valid.
+func buildAttributeRows(tags []llm.TagConf, attrs llm.AttributeResult) []db.SignalAttr {
+	var rows []db.SignalAttr
+	for _, tg := range tags {
+		rows = append(rows, db.SignalAttr{Key: "category", ValueCode: tg.Code, Confidence: tg.Confidence})
+	}
+	for _, ind := range attrs.Industries {
+		rows = append(rows, db.SignalAttr{Key: "industry", ValueCode: ind, Confidence: 1})
+	}
+	for _, e := range attrs.Entities {
+		rows = append(rows, db.SignalAttr{Key: "entity", ValueCode: e.Type, ValueText: e.Name, Confidence: e.Confidence})
+	}
+	return rows
 }
 
 func pickRepresentative(links []db.EnrichLink) db.EnrichLink {

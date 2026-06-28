@@ -27,6 +27,13 @@ export function SignalDetail() {
           s === null ? (
             <EmptyState message="Signal not found." />
           ) : (
+            (() => {
+            const attrs = s.attributes ?? [];
+            const industries = attrs.filter((a) => a.key === "industry");
+            const entities = attrs.filter((a) => a.key === "entity");
+            const geoBits = [s.locality, s.city, s.region].filter(Boolean).join(", ");
+            const pct = (n?: number | null) => (n == null ? null : `${Math.round(n * 100)}%`);
+            return (
             <Grid>
               <Grid.Col span={{ base: 12, md: 8 }}>
                 <Paper withBorder p="lg" radius="md">
@@ -61,11 +68,40 @@ export function SignalDetail() {
                     <Title order={5} mb="xs">Details</Title>
                     <Stack gap={4}>
                       <Text size="sm"><b>Country:</b> {countryDisplay(s.country, byCode)}</Text>
+                      {geoBits && <Text size="sm" data-testid="signal-geo"><b>Location:</b> {geoBits}</Text>}
+                      {s.geoScope && <Text size="sm"><b>Scope:</b> {s.geoScope}</Text>}
                       <Text size="sm"><b>Source count:</b> {s.sourceCount}</Text>
                       <Text size="sm"><b>First seen:</b> {fmtDate(s.firstSeenAt)}</Text>
                       <Text size="sm"><b>Last seen:</b> {fmtDate(s.lastSeenAt)}</Text>
                     </Stack>
                   </Card>
+                  <Card withBorder radius="md">
+                    <Title order={5} mb="xs">Assessment</Title>
+                    <Group gap="xs" data-testid="signal-assessment">
+                      {s.sentiment && <Badge variant="light" color={s.sentiment === "NEGATIVE" ? "red" : s.sentiment === "POSITIVE" ? "green" : "gray"}>Sentiment: {s.sentiment}</Badge>}
+                      {s.influence && <Badge variant="light" color="grape">Influence: {s.influence}</Badge>}
+                      {pct(s.relevance) && <Badge variant="light" color="blue">Relevance: {pct(s.relevance)}</Badge>}
+                    </Group>
+                    {!s.sentiment && !s.influence && s.relevance == null && <Text c="dimmed" size="sm">Not yet assessed.</Text>}
+                  </Card>
+                  {industries.length > 0 && (
+                    <Card withBorder radius="md">
+                      <Title order={5} mb="xs">Industries</Title>
+                      <Group gap="xs" data-testid="signal-industries">
+                        {industries.map((a) => (<Badge key={a.valueCode} variant="outline">{a.valueCode}</Badge>))}
+                      </Group>
+                    </Card>
+                  )}
+                  {entities.length > 0 && (
+                    <Card withBorder radius="md">
+                      <Title order={5} mb="xs">Entities</Title>
+                      <Stack gap={4} data-testid="signal-entities">
+                        {entities.map((a, i) => (
+                          <Text key={i} size="sm">{a.valueText} <Text span c="dimmed" size="xs">· {a.valueCode}</Text></Text>
+                        ))}
+                      </Stack>
+                    </Card>
+                  )}
                   <Card withBorder radius="md">
                     <Title order={5} mb="xs">Tags</Title>
                     {s.tags.length === 0 ? (
@@ -81,6 +117,8 @@ export function SignalDetail() {
                 </Stack>
               </Grid.Col>
             </Grid>
+            );
+            })()
           )
         }
       </AsyncBoundary>

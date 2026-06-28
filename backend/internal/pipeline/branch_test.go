@@ -197,7 +197,7 @@ func TestEnrichSignalNoLinks(t *testing.T) {
 	ctx := context.Background()
 	gw := llm.NewOpenAIGateway("", "")
 	mustExec(t, d, `INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","updatedAt") VALUES ('s','T','S',now(),now(),now())`)
-	if err := EnrichSignal(ctx, d, gw, "s", time.Now()); err != nil {
+	if err := EnrichSignal(ctx, d, gw, nil, "s", time.Now()); err != nil {
 		t.Fatalf("enrich no links should be no-op: %v", err)
 	}
 }
@@ -216,7 +216,7 @@ func TestEnrichSignalSuccess(t *testing.T) {
 	mustExec(t, d, `INSERT INTO "SignalArticle" ("signalId","articleId","relationType","addedAt") VALUES ('sg','a1','PRIMARY',now())`)
 	mustExec(t, d, `INSERT INTO "SignalArticle" ("signalId","articleId","relationType","addedAt") VALUES ('sg','a2','SUPPORTING',now())`)
 
-	if err := EnrichSignal(ctx, d, gw, "sg", time.Now()); err != nil {
+	if err := EnrichSignal(ctx, d, gw, nil, "sg", time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	var status, eventType string
@@ -292,7 +292,7 @@ func TestClosedDBErrors(t *testing.T) {
 	if _, err := ClusterArticle(ctx, d, "x", now); err == nil {
 		t.Fatal("Cluster should error")
 	}
-	if err := EnrichSignal(ctx, d, gw, "x", now); err == nil {
+	if err := EnrichSignal(ctx, d, gw, nil, "x", now); err == nil {
 		t.Fatal("Enrich should error")
 	}
 	if _, err := MatchSubscriptions(ctx, d, "x", now); err == nil {

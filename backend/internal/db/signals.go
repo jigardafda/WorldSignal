@@ -23,6 +23,15 @@ type Signal struct {
 	SourceCount  int
 	FirstSeenAt  time.Time
 	LastSeenAt   time.Time
+	// Deep-enrichment attributes.
+	Region         *string
+	City           *string
+	Locality       *string
+	GeoScope       *string
+	Sentiment      *string
+	SentimentScore *float64
+	Influence      *string
+	Relevance      *float64
 }
 
 // SignalTagRow is a tag attached to a signal.
@@ -40,11 +49,21 @@ type SignalSourceRow struct {
 	Relation    string
 }
 
-// SignalAggregate is a signal with its tags and sources.
+// SignalAttrRow is one stored dictionary attribute value on a signal.
+type SignalAttrRow struct {
+	Key        string
+	ValueCode  string
+	ValueText  string
+	ValueNum   *float64
+	Confidence float64
+}
+
+// SignalAggregate is a signal with its tags, sources and dictionary attributes.
 type SignalAggregate struct {
 	Signal
-	Tags    []SignalTagRow
-	Sources []SignalSourceRow
+	Tags       []SignalTagRow
+	Sources    []SignalSourceRow
+	Attributes []SignalAttrRow
 }
 
 // SignalFilter captures the query filters shared by REST and GraphQL.
@@ -55,17 +74,26 @@ type SignalFilter struct {
 	Since         *time.Time
 	Search        *string
 	Tags          []string
-	Limit         int
-	Offset        int
+	// Deep-enrichment attribute filters.
+	Region       *string
+	GeoScope     *string
+	Sentiment    *string
+	Influence    *string
+	MinRelevance *float64
+	Industry     *string // matches a SignalAttribute industry code
+	Limit        int
+	Offset       int
 }
 
-const signalScalarCols = `"id","title","summary","whatHappened","whyItMatters","status","severity","confidence","eventType","country","sourceCount","firstSeenAt","lastSeenAt"`
+const signalScalarCols = `"id","title","summary","whatHappened","whyItMatters","status","severity","confidence","eventType","country","sourceCount","firstSeenAt","lastSeenAt","region","city","locality","geoScope","sentiment","sentimentScore","influence","relevance"`
 
 func scanSignal(row pgx.Row) (*Signal, error) {
 	var s Signal
 	err := row.Scan(&s.ID, &s.Title, &s.Summary, &s.WhatHappened, &s.WhyItMatters,
 		&s.Status, &s.Severity, &s.Confidence, &s.EventType, &s.Country, &s.SourceCount,
-		&s.FirstSeenAt, &s.LastSeenAt)
+		&s.FirstSeenAt, &s.LastSeenAt,
+		&s.Region, &s.City, &s.Locality, &s.GeoScope, &s.Sentiment, &s.SentimentScore,
+		&s.Influence, &s.Relevance)
 	if err != nil {
 		return nil, err
 	}
@@ -90,6 +118,26 @@ func signalWhere(f SignalFilter) (string, []any) {
 	}
 	if f.MinConfidence != nil {
 		add(`"confidence" >= ?`, *f.MinConfidence)
+	}
+	if f.Region != nil {
+		add(`"region" = ?`, *f.Region)
+	}
+	if f.GeoScope != nil {
+		add(`"geoScope" = ?`, *f.GeoScope)
+	}
+	if f.Sentiment != nil {
+		add(`"sentiment" = ?`, *f.Sentiment)
+	}
+	if f.Influence != nil {
+		add(`"influence" = ?`, *f.Influence)
+	}
+	if f.MinRelevance != nil {
+		add(`"relevance" >= ?`, *f.MinRelevance)
+	}
+	if f.Industry != nil {
+		args = append(args, *f.Industry)
+		p := "$" + itoa(len(args))
+		conds = append(conds, `EXISTS (SELECT 1 FROM "SignalAttribute" sa WHERE sa."signalId"="Signal"."id" AND sa."key"='industry' AND sa."valueCode"=`+p+`)`)
 	}
 	if f.Since != nil {
 		add(`"lastSeenAt" >= ?`, *f.Since)
@@ -184,7 +232,32 @@ func (d *DB) loadAggregate(ctx context.Context, s *Signal) (*SignalAggregate, er
 	if err != nil {
 		return nil, err
 	}
-	return &SignalAggregate{Signal: *s, Tags: tags, Sources: sources}, nil
+	attrs, err := d.SignalAttributes(ctx, s.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &SignalAggregate{Signal: *s, Tags: tags, Sources: sources, Attributes: attrs}, nil
+}
+
+// SignalAttributes loads the stored dictionary attributes for a signal, ordered
+// deterministically by key then value.
+func (d *DB) SignalAttributes(ctx context.Context, signalID string) ([]SignalAttrRow, error) {
+	rows, err := d.Pool.Query(ctx,
+		`SELECT "key","valueCode","valueText","valueNum","confidence"
+		 FROM "SignalAttribute" WHERE "signalId"=$1 ORDER BY "key","valueCode","valueText"`, signalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SignalAttrRow{}
+	for rows.Next() {
+		var r SignalAttrRow
+		if err := rows.Scan(&r.Key, &r.ValueCode, &r.ValueText, &r.ValueNum, &r.Confidence); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 // signalTags loads tags for a signal. Order matches Prisma's relation load

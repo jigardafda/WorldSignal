@@ -127,7 +127,38 @@ CREATE INDEX IF NOT EXISTS "AuditLog_action_idx" ON "AuditLog"("action");
 CREATE INDEX IF NOT EXISTS "DeliveryEvent_createdAt_idx" ON "DeliveryEvent"("createdAt" DESC);
 CREATE INDEX IF NOT EXISTS "Subscription_createdAt_idx"  ON "Subscription"("createdAt" DESC);
 CREATE INDEX IF NOT EXISTS "Article_fetchedAt_idx"       ON "Article"("fetchedAt" DESC);
-CREATE INDEX IF NOT EXISTS "RawItem_fetchedAt_idx"       ON "RawItem"("fetchedAt" DESC);`
+CREATE INDEX IF NOT EXISTS "RawItem_fetchedAt_idx"       ON "RawItem"("fetchedAt" DESC);
+
+-- Deep-enrichment attributes: hot scalar/geo dimensions promoted to Signal
+-- columns for fast filtering; everything else lives in SignalAttribute. Values
+-- are written only after normalization through the internal/attributes dictionary.
+ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "city"           text;
+ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "locality"       text;
+ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "geoScope"       text;
+ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "sentiment"      text;
+ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "sentimentScore" double precision;
+ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "influence"      text;
+ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "relevance"      double precision;
+CREATE INDEX IF NOT EXISTS "Signal_region_idx"    ON "Signal"("region");
+CREATE INDEX IF NOT EXISTS "Signal_geoScope_idx"  ON "Signal"("geoScope");
+CREATE INDEX IF NOT EXISTS "Signal_sentiment_idx" ON "Signal"("sentiment");
+CREATE INDEX IF NOT EXISTS "Signal_influence_idx" ON "Signal"("influence");
+
+-- SignalAttribute is the normalized, extensible store for multi-valued/closed
+-- dictionary attributes (industry, category, entity, …). valueCode holds the
+-- canonical vocabulary code; valueText holds free-text values (e.g. entity name);
+-- valueNum holds scalars. Every (key,valueCode) pair maps to the dictionary.
+CREATE TABLE IF NOT EXISTS "SignalAttribute" (
+  "signalId"   text NOT NULL REFERENCES "Signal"("id") ON DELETE CASCADE,
+  "key"        text NOT NULL,
+  "valueCode"  text NOT NULL DEFAULT '',
+  "valueText"  text NOT NULL DEFAULT '',
+  "valueNum"   double precision,
+  "confidence" double precision NOT NULL DEFAULT 1,
+  PRIMARY KEY ("signalId","key","valueCode","valueText")
+);
+CREATE INDEX IF NOT EXISTS "SignalAttribute_key_value_idx" ON "SignalAttribute"("key","valueCode");
+CREATE INDEX IF NOT EXISTS "SignalAttribute_signal_idx"    ON "SignalAttribute"("signalId");`
 
 // MigrateContent ensures the extended source-metadata columns and the
 // SourceValidationLog table exist. Safe to run repeatedly.

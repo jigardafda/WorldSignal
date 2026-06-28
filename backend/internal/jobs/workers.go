@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/worldsignal/backend/internal/crawl"
 	"github.com/worldsignal/backend/internal/db"
 	"github.com/worldsignal/backend/internal/jsonx"
 	"github.com/worldsignal/backend/internal/llm"
@@ -28,6 +29,7 @@ type Workers struct {
 	Q       *Queue
 	DB      *db.DB
 	Gateway llm.Gateway
+	Crawler pipeline.PageCrawler
 	Client  *http.Client
 	Secret  string
 	log     *logging.Logger
@@ -40,7 +42,8 @@ type Workers struct {
 // NewWorkers builds the worker set with sensible cooldown defaults (overridable).
 func NewWorkers(q *Queue, d *db.DB, gw llm.Gateway, secret string) *Workers {
 	return &Workers{
-		Q: q, DB: d, Gateway: gw, Client: &http.Client{Timeout: 10 * time.Second},
+		Q: q, DB: d, Gateway: gw, Crawler: crawl.New(),
+		Client: &http.Client{Timeout: 10 * time.Second},
 		Secret: secret, log: logging.New("workers"),
 		FailureThreshold: 5, Cooldown: 3 * time.Hour,
 	}
@@ -117,7 +120,7 @@ func (w *Workers) Register() {
 		if err := jsonx.Unmarshal(data, &j); err != nil {
 			return err
 		}
-		if err := pipeline.EnrichSignal(ctx, w.DB, w.Gateway, j.SignalID, time.Now()); err != nil {
+		if err := pipeline.EnrichSignal(ctx, w.DB, w.Gateway, w.Crawler, j.SignalID, time.Now()); err != nil {
 			return err
 		}
 		return w.enqueueMatchSignal(ctx, j.SignalID)
