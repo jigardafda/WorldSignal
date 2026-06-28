@@ -47,7 +47,7 @@ export interface ValidationLog {
 export interface SourceFilter {
   search?: string; country?: string; region?: string; language?: string; scope?: string;
   industry?: string; orgType?: string; sourceType?: string; validationStatus?: string;
-  tag?: string; enabled?: boolean;
+  tag?: string; enabled?: boolean; pollStatus?: string;
 }
 export interface SourceCoverage {
   byRegion: Bucket[]; byScope: Bucket[]; byOrgType: Bucket[]; byValidation: Bucket[];
@@ -120,7 +120,7 @@ export interface Team { id: string; name: string; createdAt: string; memberCount
 export interface TeamMember { userId: string; email: string; name: string; role: string; addedAt: string }
 
 const SIGNAL_FIELDS = `id title summary whatHappened whyItMatters status severity confidence eventType country sourceCount firstSeenAt lastSeenAt tags{code confidence} sources{publisher url publishedAt}`;
-const SOURCE_LIST_FIELDS = `id name type url country region language languages category priority credibility enabled failureCount sourceType officialFeed industry publisher orgType geographicScope healthScore validationStatus tags lastSuccessAt lastFailureAt lastValidatedAt cooldownUntil`;
+const SOURCE_LIST_FIELDS = `id name type url country region language languages category priority credibility enabled failureCount sourceType officialFeed industry publisher orgType geographicScope healthScore validationStatus tags lastSuccessAt lastFailureAt lastValidatedAt lastFetchedAt cooldownUntil`;
 const SOURCE_FIELDS = `${SOURCE_LIST_FIELDS} crawlFrequency parserType subcategory websiteUrl contentType updateFrequency biasRating avgResponseMs lastValidationError lastFetchedAt createdAt updatedAt`;
 const VALIDATION_LOG_FIELDS = `id checkedAt ok httpStatus responseMs itemCount newestItemAt redirectedTo error`;
 

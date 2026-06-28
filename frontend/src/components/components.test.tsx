@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
-import { ConfidenceBar, HealthBadge, SeverityBadge, StatusBadge, ValidationBadge } from "./badges";
+import { ConfidenceBar, HealthBadge, PollBadge, pollStatusOf, SeverityBadge, StatusBadge, ValidationBadge } from "./badges";
 import { AsyncBoundary, EmptyState, ErrorState, LoadingState } from "./States";
 import { StatCard } from "./StatCard";
 import { DataTable } from "./DataTable";
@@ -30,6 +30,20 @@ describe("badges", () => {
     expect(screen.getByText("50")).toBeInTheDocument();
     expect(screen.getByText("20")).toBeInTheDocument();
     expect(screen.getByText("—")).toBeInTheDocument();
+  });
+  it("derives + renders polling status", () => {
+    expect(pollStatusOf({ enabled: false })).toBe("DISABLED");
+    expect(pollStatusOf({ enabled: true, cooldownUntil: new Date(Date.now() + 3600e3).toISOString() })).toBe("COOLDOWN");
+    expect(pollStatusOf({ enabled: true, cooldownUntil: new Date(Date.now() - 3600e3).toISOString() })).toBe("ACTIVE");
+    expect(pollStatusOf({ enabled: true })).toBe("ACTIVE");
+    renderWithProviders(<div>
+      <PollBadge source={{ enabled: true }} />
+      <PollBadge source={{ enabled: true, cooldownUntil: new Date(Date.now() + 3600e3).toISOString() }} />
+      <PollBadge source={{ enabled: false }} />
+    </div>);
+    expect(screen.getByText("Polling")).toBeInTheDocument();
+    expect(screen.getByText("Cooldown")).toBeInTheDocument();
+    expect(screen.getByText("Disabled")).toBeInTheDocument();
   });
   it("renders validation status and the undefined fallback", () => {
     renderWithProviders(<div>

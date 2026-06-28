@@ -108,6 +108,17 @@ describe("Sources", () => {
     await userEvent.click(await screen.findByText("Africa"));
     await waitFor(() => expect(apiMock.sources).toHaveBeenCalledWith(expect.objectContaining({ region: "Africa" }), 25, 0));
   });
+  it("filters by polling status (column + badge rendered)", async () => {
+    apiMock.sources.mockResolvedValue([source()]);
+    apiMock.sourceCount.mockResolvedValue(1);
+    apiMock.sourceCoverage.mockResolvedValue(coverage());
+    renderWithProviders(<Sources />);
+    await screen.findByText("BBC");
+    expect(screen.getAllByText("Polling").length).toBeGreaterThan(0); // column header + active badge
+    await userEvent.click(screen.getByTestId("source-poll"));
+    await userEvent.click(await screen.findByText("In cooldown"));
+    await waitFor(() => expect(apiMock.sources).toHaveBeenCalledWith(expect.objectContaining({ pollStatus: "COOLDOWN" }), 25, 0));
+  });
   it("surfaces an error when create fails", async () => {
     apiMock.sources.mockResolvedValue([source()]);
     apiMock.sourceCount.mockResolvedValue(1);

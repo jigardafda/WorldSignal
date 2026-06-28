@@ -140,6 +140,38 @@ func TestSourceMetaDBErrors(t *testing.T) {
 	}
 }
 
+func TestSourcePollStatusFilter(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	ctx := context.Background()
+	ins := func(id string, enabled bool, cooldown *time.Time) {
+		if _, err := d.Pool.Exec(ctx,
+			`INSERT INTO "Source" ("id","name","url","enabled","crawlFrequency","priority","cooldownUntil","updatedAt")
+			 VALUES ($1,$1,$2,$3,300,2,$4,now())`,
+			id, "https://"+id, enabled, cooldown); err != nil {
+			t.Fatal(err)
+		}
+	}
+	future := time.Now().Add(time.Hour)
+	past := time.Now().Add(-time.Hour)
+	ins("active1", true, nil)     // polling
+	ins("active2", true, &past)   // cooldown elapsed → polling
+	ins("cooling", true, &future) // in cooldown
+	ins("off", false, nil)        // disabled
+
+	cases := map[string]int{"ACTIVE": 2, "COOLDOWN": 1, "DISABLED": 1}
+	for status, want := range cases {
+		s := status
+		n, err := d.CountSources(ctx, db.SourceFilter{PollStatus: &s})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n != want {
+			t.Fatalf("pollStatus=%s expected %d, got %d", status, want, n)
+		}
+	}
+}
+
 func TestListSourcesAndGetSourceNotFound(t *testing.T) {
 	d := dbtest.Connect(t)
 	dbtest.Reset(t, d)

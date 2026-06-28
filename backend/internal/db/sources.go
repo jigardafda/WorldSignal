@@ -54,6 +54,7 @@ type SourceFilter struct {
 	ValidationStatus *string
 	Tag              *string
 	Enabled          *bool
+	PollStatus       *string // ACTIVE | COOLDOWN | DISABLED (derived from enabled + cooldownUntil)
 	Limit            int
 	Offset           int
 }
@@ -99,10 +100,26 @@ func sourceWhere(f SourceFilter) (string, []any) {
 	if f.Enabled != nil {
 		add(`"enabled" = $%d`, *f.Enabled)
 	}
+	// Derived polling status (no bind param needed).
+	switch derefStr(f.PollStatus) {
+	case "ACTIVE":
+		conds = append(conds, `"enabled" = true AND ("cooldownUntil" IS NULL OR "cooldownUntil" <= now())`)
+	case "COOLDOWN":
+		conds = append(conds, `"enabled" = true AND "cooldownUntil" > now()`)
+	case "DISABLED":
+		conds = append(conds, `"enabled" = false`)
+	}
 	if len(conds) == 0 {
 		return "", args
 	}
 	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // ListSources returns all sources ordered by priority asc then name asc

@@ -28,6 +28,21 @@ export function ValidationBadge({ status }: { status?: string }) {
   return <Badge color={VALIDATION_COLORS[status] ?? "gray"} variant="light">{status}</Badge>;
 }
 
+/** Derives a source's polling status from enabled + cooldownUntil. */
+export function pollStatusOf(s: { enabled?: boolean; cooldownUntil?: string | null }): "ACTIVE" | "COOLDOWN" | "DISABLED" {
+  if (s.enabled === false) return "DISABLED";
+  if (s.cooldownUntil && new Date(s.cooldownUntil) > new Date()) return "COOLDOWN";
+  return "ACTIVE";
+}
+
+const POLL_COLORS: Record<string, string> = { ACTIVE: "green", COOLDOWN: "orange", DISABLED: "gray" };
+const POLL_LABELS: Record<string, string> = { ACTIVE: "Polling", COOLDOWN: "Cooldown", DISABLED: "Disabled" };
+
+export function PollBadge({ source }: { source: { enabled?: boolean; cooldownUntil?: string | null } }) {
+  const st = pollStatusOf(source);
+  return <Badge color={POLL_COLORS[st]} variant={st === "ACTIVE" ? "filled" : "light"}>{POLL_LABELS[st]}</Badge>;
+}
+
 export function HealthBadge({ score }: { score?: number | null }) {
   if (score == null) return <Text size="sm" c="dimmed">—</Text>;
   const color = score >= 85 ? "green" : score >= 60 ? "yellow" : score >= 40 ? "orange" : "red";

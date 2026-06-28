@@ -154,6 +154,7 @@ func sourceFilter(args map[string]any) db.SourceFilter {
 	f.SourceType = strArg(args, "sourceType")
 	f.ValidationStatus = strArg(args, "validationStatus")
 	f.Tag = strArg(args, "tag")
+	f.PollStatus = strArg(args, "pollStatus")
 	if v, ok := args["enabled"].(bool); ok {
 		f.Enabled = &v
 	}

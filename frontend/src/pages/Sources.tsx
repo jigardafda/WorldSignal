@@ -14,7 +14,8 @@ import { DataTable } from "../components/DataTable";
 import { ConfirmButton } from "../components/ConfirmButton";
 import { CountrySelect } from "../components/CountrySelect";
 import { useCountries, countryDisplay } from "../lib/countries";
-import { HealthBadge, ValidationBadge } from "../components/badges";
+import { HealthBadge, PollBadge, ValidationBadge } from "../components/badges";
+import { fmtDate } from "../lib/format";
 
 const PAGE_SIZE = 25;
 const REGIONS = ["Europe", "North America", "South America", "Central America", "Caribbean", "Middle East", "Africa", "South Asia", "Southeast Asia", "East Asia", "Central Asia", "Oceania", "Global"];
@@ -22,6 +23,11 @@ const SCOPES = ["GLOBAL", "CONTINENTAL", "REGIONAL", "NATIONAL", "STATE", "CITY"
 const VALIDATION = ["VALID", "INVALID", "PENDING"];
 const ORG_TYPES = ["GOVERNMENT", "PUBLIC", "PRIVATE", "INDEPENDENT"];
 const SOURCE_TYPES = ["RSS", "ATOM", "AGGREGATOR", "GOVERNMENT_FEED", "SECURITY_ADVISORY", "RESEARCH_FEED", "PRESS_RELEASE"];
+const POLL_STATUS = [
+  { value: "ACTIVE", label: "Polling" },
+  { value: "COOLDOWN", label: "In cooldown" },
+  { value: "DISABLED", label: "Disabled" },
+];
 
 function opts(bs?: { key: string; count: number }[]): string[] {
   return (bs ?? []).map((b) => b.key).filter((k) => k && k !== "(none)").sort();
@@ -42,6 +48,7 @@ export function Sources() {
   const [orgType, setOrgType] = useState<string | null>(null);
   const [language, setLanguage] = useState<string | null>(null);
   const [industry, setIndustry] = useState<string | null>(null);
+  const [pollStatus, setPollStatus] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
   const filter: SourceFilter = {};
@@ -53,7 +60,8 @@ export function Sources() {
   if (orgType) filter.orgType = orgType;
   if (language) filter.language = language;
   if (industry) filter.industry = industry;
-  const deps = [search, region, scope, validationStatus, sourceType, orgType, language, industry];
+  if (pollStatus) filter.pollStatus = pollStatus;
+  const deps = [search, region, scope, validationStatus, sourceType, orgType, language, industry, pollStatus];
 
   const list = useAsync<Source[]>(() => api.sources(filter, PAGE_SIZE, (page - 1) * PAGE_SIZE), [...deps, page]);
   const count = useAsync<number>(() => api.sourceCount(filter), deps);
@@ -127,6 +135,7 @@ export function Sources() {
             />
             <Select placeholder="Region" clearable data={REGIONS} value={region} onChange={(v) => { setRegion(v); resetPage(); }} data-testid="source-region" w={150} />
             <Select placeholder="Scope" clearable data={SCOPES} value={scope} onChange={(v) => { setScope(v); resetPage(); }} w={130} />
+            <Select placeholder="Polling" clearable data={POLL_STATUS} value={pollStatus} onChange={(v) => { setPollStatus(v); resetPage(); }} data-testid="source-poll" w={140} />
             <Select placeholder="Validation" clearable data={VALIDATION} value={validationStatus} onChange={(v) => { setValidationStatus(v); resetPage(); }} w={130} />
             <Select placeholder="Type" clearable data={SOURCE_TYPES} value={sourceType} onChange={(v) => { setSourceType(v); resetPage(); }} w={150} />
             <Select placeholder="Org" clearable data={ORG_TYPES} value={orgType} onChange={(v) => { setOrgType(v); resetPage(); }} w={140} />
@@ -149,6 +158,8 @@ export function Sources() {
                   { key: "languages", header: "Lang", render: (r) => (r.languages ?? []).join(", ") || (r.language ?? "—") },
                   { key: "sourceType", header: "Type", render: (r) => r.sourceType ?? r.type },
                   { key: "industry", header: "Industry", render: (r) => r.industry ?? "—" },
+                  { key: "polling", header: "Polling", render: (r) => <PollBadge source={r} /> },
+                  { key: "lastFetchedAt", header: "Last polled", render: (r) => fmtDate(r.lastFetchedAt) },
                   { key: "health", header: "Health", render: (r) => <HealthBadge score={r.healthScore} /> },
                   { key: "validation", header: "Validation", render: (r) => <ValidationBadge status={r.validationStatus} /> },
                   { key: "failureCount", header: "Fails", render: (r) => r.failureCount },
