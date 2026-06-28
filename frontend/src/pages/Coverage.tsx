@@ -22,6 +22,16 @@ function sum(bs: Bucket[]): number {
   return bs.reduce((n, b) => n + b.count, 0);
 }
 
+// barHeight scales a vertical bar chart so every category gets a visible bar.
+function barHeight(n: number): number {
+  return Math.max(240, n * 26 + 40);
+}
+
+// industries returns the named industry buckets (drops the "(none)" bucket).
+function industries(c: SourceCoverage): Bucket[] {
+  return c.byIndustry.filter((b) => b.key !== "(none)");
+}
+
 export function Coverage() {
   const state = useAsync<SourceCoverage>(() => api.sourceCoverage(), []);
   return (
@@ -54,13 +64,16 @@ export function Coverage() {
                 <Panel title="By source type">
                   <BarChart h={280} data={c.bySourceType.filter((b) => b.key !== "(none)")} dataKey="key" orientation="vertical" series={[{ name: "count", color: "grape.6" }]} />
                 </Panel>
-                <Panel title="Top languages">
-                  <BarChart h={320} data={c.byLanguage.slice(0, 20)} dataKey="key" orientation="vertical" series={[{ name: "count", color: "teal.6" }]} />
-                </Panel>
-                <Panel title="Top industries">
-                  <BarChart h={320} data={c.byIndustry.filter((b) => b.key !== "(none)").slice(0, 20)} dataKey="key" orientation="vertical" series={[{ name: "count", color: "orange.6" }]} />
-                </Panel>
               </SimpleGrid>
+
+              {/* Full-width with height scaled to the number of bars so every
+                  language/industry is visible (no truncation). */}
+              <Panel title={`Languages (${c.byLanguage.length})`}>
+                <BarChart h={barHeight(c.byLanguage.length)} data={c.byLanguage} dataKey="key" orientation="vertical" series={[{ name: "count", color: "teal.6" }]} />
+              </Panel>
+              <Panel title={`Industries (${industries(c).length})`}>
+                <BarChart h={barHeight(industries(c).length)} data={industries(c)} dataKey="key" orientation="vertical" series={[{ name: "count", color: "orange.6" }]} />
+              </Panel>
 
               <Panel title="Countries by source count">
                 <DataTable
