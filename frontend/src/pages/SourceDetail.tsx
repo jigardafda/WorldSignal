@@ -114,6 +114,9 @@ function SourceBody({ source, canWrite, reload, navigate }: { source: Source; ca
             <Text size="sm"><b>Last validated:</b> {fmtDate(source.lastValidatedAt)}</Text>
             <Text size="sm"><b>Last success:</b> {fmtDate(source.lastSuccessAt)} · <b>Last failure:</b> {fmtDate(source.lastFailureAt)}</Text>
             <Text size="sm"><b>Failures:</b> {source.failureCount}</Text>
+            {source.cooldownUntil && new Date(source.cooldownUntil) > new Date() && (
+              <Badge color="orange" variant="light" w="fit-content">In cooldown until {fmtDate(source.cooldownUntil)}</Badge>
+            )}
             {source.lastValidationError && <Text size="sm" c="red"><b>Last error:</b> {source.lastValidationError}</Text>}
           </Stack>
         </Card>

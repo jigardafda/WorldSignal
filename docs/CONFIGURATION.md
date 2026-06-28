@@ -15,7 +15,9 @@ missing or `ROLE`/`PORT`/`SCHEDULER_TICK_MS` are invalid.
 | `OPENAI_API_KEY` | no | _(empty)_ | System LLM key. Empty ⇒ heuristic enrichment. Overridden at runtime by an active admin-managed key. |
 | `OPENAI_MODEL` | no | `gpt-4o-mini` | Default chat model for enrichment. |
 | `WEBHOOK_SIGNING_SECRET` | no | `change-me-in-prod` | Signs delivery webhooks **and** derives the AES key that encrypts admin LLM keys at rest. **Set a strong value in production** — changing it invalidates stored LLM keys. |
-| `SCHEDULER_TICK_MS` | no | `30000` | Scheduler poll interval (ms). |
+| `SCHEDULER_TICK_MS` | no | `30000` | Scheduler poll interval (ms). Each tick enqueues all due sources. |
+| `SOURCE_FAILURE_THRESHOLD` | no | `5` | Consecutive fetch failures before a source enters cooldown. |
+| `SOURCE_COOLDOWN_MINUTES` | no | `180` | Cooldown duration; the scheduler skips the source until it elapses, then retries automatically. |
 | `ADMIN_EMAIL` | no | `admin@worldsignal.local` | Seeded on first boot when no users exist. |
 | `ADMIN_PASSWORD` | no | `admin12345` | Seeded admin password — **change immediately in production**. |
 

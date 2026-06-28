@@ -2,11 +2,16 @@ package jobs
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/worldsignal/backend/internal/db"
 	"github.com/worldsignal/backend/internal/logging"
 )
+
+// maxEnqueuePerTick caps how many fetches one tick enqueues so a large backlog
+// drains over a few ticks instead of flooding the queue at once.
+const maxEnqueuePerTick = 2000
 
 // Scheduler enqueues fetches for sources whose crawl interval has elapsed.
 type Scheduler struct {
@@ -23,51 +28,27 @@ func NewScheduler(d *db.DB, w *Workers, tick time.Duration) *Scheduler {
 	return &Scheduler{db: d, workers: w, tick: tick, log: logging.New("scheduler")}
 }
 
-// DueSource is an enabled source eligible for a fetch.
-type dueSource struct {
-	ID             string
-	CrawlFrequency int
-	LastFetchedAt  *time.Time
-}
-
-// Tick enqueues fetches for due sources. Exported for testing.
+// Tick enqueues fetches for all currently-due sources. The due filter runs in
+// SQL (scales to thousands); a single source's enqueue error never aborts the
+// tick. Returns the number enqueued. Exported for testing.
 func (s *Scheduler) Tick(ctx context.Context, now time.Time) (int, error) {
-	rows, err := s.db.Pool.Query(ctx,
-		`SELECT "id","crawlFrequency","lastFetchedAt" FROM "Source" WHERE "enabled"=true ORDER BY "priority" ASC`)
+	ids, err := s.db.ListDueSources(ctx, now, maxEnqueuePerTick)
 	if err != nil {
 		return 0, err
 	}
-	var sources []dueSource
-	for rows.Next() {
-		var d dueSource
-		if err := rows.Scan(&d.ID, &d.CrawlFrequency, &d.LastFetchedAt); err != nil {
-			rows.Close()
-			return 0, err
+	enqueued, errs := 0, 0
+	for _, id := range ids {
+		if err := s.workers.EnqueueFetchSource(id); err != nil {
+			errs++
+			s.log.Error("enqueue fetch failed", err.Error())
+			continue // resilience: keep scheduling the rest
 		}
-		sources = append(sources, d)
+		enqueued++
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return 0, err
+	if len(ids) > 0 || errs > 0 {
+		s.log.Info(fmt.Sprintf("scheduler tick: due=%d enqueued=%d errors=%d", len(ids), enqueued, errs))
 	}
-
-	due := 0
-	for _, src := range sources {
-		var last time.Time
-		if src.LastFetchedAt != nil {
-			last = *src.LastFetchedAt
-		}
-		if now.Sub(last) >= time.Duration(src.CrawlFrequency)*time.Second {
-			if err := s.workers.EnqueueFetchSource(src.ID); err != nil {
-				return due, err
-			}
-			due++
-		}
-	}
-	if due > 0 {
-		s.log.Info("scheduled sources")
-	}
-	return due, nil
+	return enqueued, nil
 }
 
 // Start runs the scheduler loop (kick once, then on the tick interval).

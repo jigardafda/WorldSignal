@@ -66,6 +66,7 @@ ALTER TABLE "Source" ADD COLUMN IF NOT EXISTS "lastValidatedAt"     timestamptz;
 ALTER TABLE "Source" ADD COLUMN IF NOT EXISTS "lastValidationError" text;
 ALTER TABLE "Source" ADD COLUMN IF NOT EXISTS "avgResponseMs"       integer;
 ALTER TABLE "Source" ADD COLUMN IF NOT EXISTS "metadata"            jsonb;
+ALTER TABLE "Source" ADD COLUMN IF NOT EXISTS "cooldownUntil"       timestamptz;
 
 CREATE INDEX IF NOT EXISTS "Source_language_idx"   ON "Source"("language");
 CREATE INDEX IF NOT EXISTS "Source_region_idx"     ON "Source"("region");
@@ -73,6 +74,8 @@ CREATE INDEX IF NOT EXISTS "Source_industry_idx"   ON "Source"("industry");
 CREATE INDEX IF NOT EXISTS "Source_scope_idx"      ON "Source"("geographicScope");
 CREATE INDEX IF NOT EXISTS "Source_validation_idx" ON "Source"("validationStatus");
 CREATE INDEX IF NOT EXISTS "Source_tags_idx"       ON "Source" USING gin ("tags");
+-- Scheduler scans enabled sources by priority; this index backs due-source selection.
+CREATE INDEX IF NOT EXISTS "Source_enabled_cooldown_idx" ON "Source"("enabled","cooldownUntil","priority");
 
 CREATE TABLE IF NOT EXISTS "SourceValidationLog" (
   "id"           text PRIMARY KEY,

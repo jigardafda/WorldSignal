@@ -28,6 +28,33 @@ func TestLoadDefaults(t *testing.T) {
 	if c.HasOpenAI() {
 		t.Fatal("HasOpenAI should be false with empty key")
 	}
+	if c.SourceFailureThreshold != 5 || c.SourceCooldownMinutes != 180 {
+		t.Fatalf("bad cooldown defaults: threshold=%d cooldown=%d", c.SourceFailureThreshold, c.SourceCooldownMinutes)
+	}
+}
+
+func TestLoadSourceFailureConfig(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("SOURCE_FAILURE_THRESHOLD", "10")
+	t.Setenv("SOURCE_COOLDOWN_MINUTES", "60")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.SourceFailureThreshold != 10 || c.SourceCooldownMinutes != 60 {
+		t.Fatalf("overrides not applied: %+v", c)
+	}
+	// Invalid values are rejected.
+	t.Setenv("SOURCE_FAILURE_THRESHOLD", "0")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for SOURCE_FAILURE_THRESHOLD=0")
+	}
+	t.Setenv("SOURCE_FAILURE_THRESHOLD", "5")
+	t.Setenv("SOURCE_COOLDOWN_MINUTES", "nope")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for invalid SOURCE_COOLDOWN_MINUTES")
+	}
 }
 
 func TestLoadRequiresDatabaseURL(t *testing.T) {

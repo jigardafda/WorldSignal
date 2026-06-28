@@ -20,6 +20,9 @@ type Config struct {
 	SchedulerTickMS      int
 	AdminEmail           string
 	AdminPassword        string
+	// Source failure handling.
+	SourceFailureThreshold int // consecutive failures before cooldown
+	SourceCooldownMinutes  int // cooldown duration once threshold is hit
 }
 
 // HasOpenAI reports whether an OpenAI key is configured.
@@ -66,6 +69,18 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("SCHEDULER_TICK_MS must be a number: %w", err)
 	}
 	c.SchedulerTickMS = tick
+
+	ft, err := strconv.Atoi(getenv("SOURCE_FAILURE_THRESHOLD", "5"))
+	if err != nil || ft < 1 {
+		return Config{}, fmt.Errorf("SOURCE_FAILURE_THRESHOLD must be a positive number")
+	}
+	c.SourceFailureThreshold = ft
+
+	cd, err := strconv.Atoi(getenv("SOURCE_COOLDOWN_MINUTES", "180"))
+	if err != nil || cd < 1 {
+		return Config{}, fmt.Errorf("SOURCE_COOLDOWN_MINUTES must be a positive number")
+	}
+	c.SourceCooldownMinutes = cd
 
 	return c, nil
 }

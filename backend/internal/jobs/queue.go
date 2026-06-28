@@ -5,6 +5,8 @@ package jobs
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -48,21 +50,39 @@ type SendOptions struct {
 
 // Queue is the job queue engine.
 type Queue struct {
-	pool      *pgxpool.Pool
-	log       *logging.Logger
-	handlers  map[string]Handler
-	pollEvery time.Duration
-	cancel    context.CancelFunc
-	done      chan struct{}
+	pool        *pgxpool.Pool
+	log         *logging.Logger
+	handlers    map[string]Handler
+	pollEvery   time.Duration
+	concurrency int
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
 }
 
-// New creates a queue over the given pool.
+// New creates a queue over the given pool. Concurrency defaults to 12 parallel
+// workers; processOne uses FOR UPDATE SKIP LOCKED so claims never collide.
 func New(pool *pgxpool.Pool) *Queue {
 	return &Queue{
-		pool:      pool,
-		log:       logging.New("jobs"),
-		handlers:  map[string]Handler{},
-		pollEvery: 200 * time.Millisecond,
+		pool:        pool,
+		log:         logging.New("jobs"),
+		handlers:    map[string]Handler{},
+		pollEvery:   200 * time.Millisecond,
+		concurrency: 12,
+	}
+}
+
+// Tunable (var, not const) so tests can shorten them.
+var (
+	// stuckJobTimeout: a job 'active' longer than this is presumed orphaned.
+	stuckJobTimeout = 5 * time.Minute
+	// stuckReapEvery: how often the reaper scans for orphaned jobs.
+	stuckReapEvery = time.Minute
+)
+
+// SetConcurrency overrides the number of parallel workers (before Start).
+func (q *Queue) SetConcurrency(n int) {
+	if n > 0 {
+		q.concurrency = n
 	}
 }
 
@@ -157,42 +177,93 @@ func (q *Queue) ProcessOneForTest(ctx context.Context, queue string) (bool, erro
 	return q.processOne(ctx, queue)
 }
 
-// Start launches background poll loops for all registered workers.
+// Start launches q.concurrency parallel poll loops. Each loop drains all ready
+// jobs across queues; FOR UPDATE SKIP LOCKED ensures workers claim distinct jobs,
+// so fetches for thousands of sources run in parallel rather than one at a time.
 func (q *Queue) Start(parent context.Context) {
 	ctx, cancel := context.WithCancel(parent)
 	q.cancel = cancel
-	q.done = make(chan struct{})
+	// Snapshot queue names so the loop doesn't race the handlers map.
+	queues := make([]string, 0, len(q.handlers))
+	for queue := range q.handlers {
+		queues = append(queues, queue)
+	}
+	for i := 0; i < q.concurrency; i++ {
+		q.wg.Add(1)
+		go func() {
+			defer q.wg.Done()
+			for {
+				if ctx.Err() != nil {
+					return
+				}
+				// One pass = at most one job PER queue (round-robin), so a slow,
+				// backlogged queue (e.g. LLM enrichment) never starves the others
+				// (e.g. source fetching). Loop immediately while there's work;
+				// sleep only when a full pass found nothing.
+				did := 0
+				for _, queue := range queues {
+					worked, err := q.processOne(ctx, queue)
+					if err != nil {
+						if ctx.Err() == nil {
+							q.log.Error("process failed", err.Error())
+						}
+						continue
+					}
+					if worked {
+						did++
+					}
+				}
+				if did == 0 {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(q.pollEvery):
+					}
+				}
+			}
+		}()
+	}
+	// Reaper: requeue jobs orphaned by a crashed/killed worker (stuck 'active').
+	q.wg.Add(1)
 	go func() {
-		defer close(q.done)
-		ticker := time.NewTicker(q.pollEvery)
+		defer q.wg.Done()
+		ticker := time.NewTicker(stuckReapEvery)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				for queue := range q.handlers {
-					for {
-						worked, err := q.processOne(ctx, queue)
-						if err != nil {
-							q.log.Error("process failed", err.Error())
-							break
-						}
-						if !worked {
-							break
-						}
+				if n, err := q.requeueStuck(ctx, stuckJobTimeout); err != nil {
+					if ctx.Err() == nil {
+						q.log.Error("reaper failed", err.Error())
 					}
+				} else if n > 0 {
+					q.log.Info(fmt.Sprintf("reaper requeued %d orphaned jobs", n))
 				}
 			}
 		}
 	}()
 }
 
-// Stop halts the poll loops.
+// requeueStuck resets jobs that have been 'active' longer than olderThan back to
+// 'created' so a different worker retries them (handles crashed workers).
+func (q *Queue) requeueStuck(ctx context.Context, olderThan time.Duration) (int64, error) {
+	tag, err := q.pool.Exec(ctx,
+		`UPDATE ws_jobs SET state='created', started_at=NULL, last_error='requeued: worker timeout'
+		 WHERE state='active' AND started_at < now() - ($1 || ' seconds')::interval`,
+		itoa(int(olderThan.Seconds())))
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+// Stop halts the poll loops and waits for in-flight workers to finish.
 func (q *Queue) Stop() {
 	if q.cancel != nil {
 		q.cancel()
-		<-q.done
+		q.wg.Wait()
 		q.cancel = nil
 	}
 }

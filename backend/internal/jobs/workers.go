@@ -31,11 +31,19 @@ type Workers struct {
 	Client  *http.Client
 	Secret  string
 	log     *logging.Logger
+	// Source failure handling: after FailureThreshold consecutive fetch
+	// failures, a source is placed in cooldown for Cooldown.
+	FailureThreshold int
+	Cooldown         time.Duration
 }
 
-// NewWorkers builds the worker set.
+// NewWorkers builds the worker set with sensible cooldown defaults (overridable).
 func NewWorkers(q *Queue, d *db.DB, gw llm.Gateway, secret string) *Workers {
-	return &Workers{Q: q, DB: d, Gateway: gw, Client: &http.Client{Timeout: 10 * time.Second}, Secret: secret, log: logging.New("workers")}
+	return &Workers{
+		Q: q, DB: d, Gateway: gw, Client: &http.Client{Timeout: 10 * time.Second},
+		Secret: secret, log: logging.New("workers"),
+		FailureThreshold: 5, Cooldown: 3 * time.Hour,
+	}
 }
 
 // EnqueueFetchSource enqueues a source fetch (deduped per source via singleton).
@@ -72,7 +80,7 @@ func (w *Workers) Register() {
 		if err := jsonx.Unmarshal(data, &j); err != nil {
 			return err
 		}
-		rawIDs, err := pipeline.FetchSource(ctx, w.DB, j.SourceID, time.Now())
+		rawIDs, err := pipeline.FetchSource(ctx, w.DB, j.SourceID, time.Now(), w.FailureThreshold, w.Cooldown)
 		if err != nil {
 			return err
 		}

@@ -47,6 +47,7 @@ model Source {
   lastValidationError String?
   avgResponseMs       Int?
   metadata            Json? // long-tail: keywords, license, copyright, timezone, encoding, rateLimits, auth, discoverySource
+  cooldownUntil       DateTime? // set after repeated fetch failures; scheduler skips until elapsed
 
   lastFetchedAt DateTime?
   lastSuccessAt DateTime?

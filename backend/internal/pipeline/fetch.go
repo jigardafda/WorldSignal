@@ -9,9 +9,10 @@ import (
 )
 
 // FetchSource fetches a source and persists new RawItems (raw evidence is never
-// overwritten). Returns the ids of newly created raw items. Mirrors fetchSource.ts.
-// `now` is injected for determinism.
-func FetchSource(ctx context.Context, d *db.DB, sourceID string, now time.Time) ([]string, error) {
+// overwritten). Returns the ids of newly created raw items. `now` is injected for
+// determinism. On fetch failure the source's failure count is incremented and,
+// once it reaches failureThreshold, it is placed in cooldown for `cooldown`.
+func FetchSource(ctx context.Context, d *db.DB, sourceID string, now time.Time, failureThreshold int, cooldown time.Duration) ([]string, error) {
 	source, err := d.GetSourceForFetch(ctx, sourceID)
 	if err != nil || source == nil || !source.Enabled {
 		return nil, err
@@ -19,7 +20,7 @@ func FetchSource(ctx context.Context, d *db.DB, sourceID string, now time.Time) 
 
 	items, ferr := ingestion.FetchRSSSource(ctx, source.URL)
 	if ferr != nil {
-		if err := d.MarkSourceFetchFailure(ctx, sourceID, now); err != nil {
+		if err := d.MarkSourceFetchFailure(ctx, sourceID, now, failureThreshold, cooldown, ferr.Error()); err != nil {
 			return nil, err
 		}
 		return nil, nil

@@ -38,6 +38,7 @@ type Source struct {
 	LastValidationError *string     `json:"lastValidationError"`
 	AvgResponseMs       *int        `json:"avgResponseMs"`
 	Metadata            RawJSON     `json:"metadata"`
+	CooldownUntil       *PrismaTime `json:"cooldownUntil"`
 
 	LastFetchedAt *PrismaTime `json:"lastFetchedAt"`
 	LastSuccessAt *PrismaTime `json:"lastSuccessAt"`
@@ -49,7 +50,7 @@ type Source struct {
 
 // sourceColumns is the SELECT list in schema order (legacy columns first, then
 // the rich-metadata columns, then fetch tracking + timestamps).
-const sourceColumns = `"id","name","type","url","country","region","language","category","priority","credibility","crawlFrequency","parserType","enabled","config","websiteUrl","languages","geographicScope","industry","subcategory","publisher","orgType","sourceType","officialFeed","contentType","updateFrequency","tags","biasRating","healthScore","validationStatus","lastValidatedAt","lastValidationError","avgResponseMs","metadata","lastFetchedAt","lastSuccessAt","lastFailureAt","failureCount","createdAt","updatedAt"`
+const sourceColumns = `"id","name","type","url","country","region","language","category","priority","credibility","crawlFrequency","parserType","enabled","config","websiteUrl","languages","geographicScope","industry","subcategory","publisher","orgType","sourceType","officialFeed","contentType","updateFrequency","tags","biasRating","healthScore","validationStatus","lastValidatedAt","lastValidationError","avgResponseMs","metadata","cooldownUntil","lastFetchedAt","lastSuccessAt","lastFailureAt","failureCount","createdAt","updatedAt"`
 
 // ValidationLog is one row of a source's validation history.
 type ValidationLog struct {

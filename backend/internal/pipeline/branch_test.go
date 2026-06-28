@@ -74,17 +74,17 @@ func TestFetchSourceEdges(t *testing.T) {
 	now := time.Now()
 
 	// Missing source → no-op.
-	if ids, err := FetchSource(ctx, d, "nope", now); err != nil || ids != nil {
+	if ids, err := FetchSource(ctx, d, "nope", now, 3, time.Hour); err != nil || ids != nil {
 		t.Fatalf("missing source: %v %v", ids, err)
 	}
 	// Disabled source → no-op.
 	mustExec(t, d, `INSERT INTO "Source" ("id","name","url","enabled","updatedAt") VALUES ('off','O','https://off.example',false,now())`)
-	if ids, _ := FetchSource(ctx, d, "off", now); ids != nil {
+	if ids, _ := FetchSource(ctx, d, "off", now, 3, time.Hour); ids != nil {
 		t.Fatal("disabled source should be skipped")
 	}
 	// Fetch failure → failureCount incremented, returns nil.
 	mustExec(t, d, `INSERT INTO "Source" ("id","name","url","enabled","updatedAt") VALUES ('bad','B','http://127.0.0.1:0/',true,now())`)
-	if ids, err := FetchSource(ctx, d, "bad", now); err != nil || ids != nil {
+	if ids, err := FetchSource(ctx, d, "bad", now, 3, time.Hour); err != nil || ids != nil {
 		t.Fatalf("fetch failure: %v %v", ids, err)
 	}
 	var fc int
@@ -267,12 +267,12 @@ func TestFetchSourceDedupSkip(t *testing.T) {
 	defer srv.Close()
 	mustExec(t, d, `INSERT INTO "Source" ("id","name","url","enabled","updatedAt") VALUES ('s','S',$1,true,now())`, srv.URL)
 
-	first, err := FetchSource(ctx, d, "s", time.Now())
+	first, err := FetchSource(ctx, d, "s", time.Now(), 3, time.Hour)
 	if err != nil || len(first) != 1 {
 		t.Fatalf("first fetch: %v %v", first, err)
 	}
 	// Second fetch: the guid already exists → dedup skip branch.
-	second, err := FetchSource(ctx, d, "s", time.Now())
+	second, err := FetchSource(ctx, d, "s", time.Now(), 3, time.Hour)
 	if err != nil || len(second) != 0 {
 		t.Fatalf("second fetch should dedup: %v %v", second, err)
 	}
@@ -283,7 +283,7 @@ func TestClosedDBErrors(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 	gw := llm.NewOpenAIGateway("", "")
-	if _, err := FetchSource(ctx, d, "x", now); err == nil {
+	if _, err := FetchSource(ctx, d, "x", now, 3, time.Hour); err == nil {
 		t.Fatal("FetchSource should error on closed DB")
 	}
 	if _, err := NormalizeRawItem(ctx, d, "x"); err == nil {
@@ -317,7 +317,7 @@ func TestFetchSourceRawItemInsertError(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d.Pool.Exec(ctx, `ALTER TABLE "RawItem__h" RENAME TO "RawItem"`)
-	if _, err := FetchSource(ctx, d, "s", time.Now()); err == nil {
+	if _, err := FetchSource(ctx, d, "s", time.Now(), 3, time.Hour); err == nil {
 		t.Fatal("expected error when RawItem table is hidden")
 	}
 }

@@ -73,6 +73,51 @@ func TestSchedulerStartStopAndClosed(t *testing.T) {
 	}
 }
 
+func TestSchedulerTickEnqueuesDueSources(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	q := jobs.New(d.Pool)
+	if err := q.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	d.Pool.Exec(context.Background(), `DELETE FROM ws_jobs`) // Reset() doesn't truncate ws_jobs
+	// 3 due (never fetched) + 1 disabled + 1 not-due (just fetched, long crawl).
+	for _, id := range []string{"a", "b", "c"} {
+		if _, err := d.Pool.Exec(context.Background(),
+			`INSERT INTO "Source" ("id","name","url","enabled","crawlFrequency","priority","updatedAt") VALUES ($1,$1,$2,true,300,2,now())`,
+			id, "https://"+id+".example"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d.Pool.Exec(context.Background(), `INSERT INTO "Source" ("id","name","url","enabled","crawlFrequency","priority","updatedAt") VALUES ('off','off','https://off',false,300,2,now())`)
+	d.Pool.Exec(context.Background(), `INSERT INTO "Source" ("id","name","url","enabled","crawlFrequency","priority","lastFetchedAt","updatedAt") VALUES ('nd','nd','https://nd',true,3600,2,now(),now())`)
+
+	w := jobs.NewWorkers(q, d, llm.NewOpenAIGateway("", ""), "x")
+	s := jobs.NewScheduler(d, w, time.Minute)
+	n, err := s.Tick(context.Background(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 3 {
+		t.Fatalf("expected 3 due sources enqueued, got %d", n)
+	}
+	var jobCount int
+	if err := d.Pool.QueryRow(context.Background(), `SELECT count(*) FROM ws_jobs WHERE queue='source.fetch' AND state='created'`).Scan(&jobCount); err != nil {
+		t.Fatal(err)
+	}
+	if jobCount != 3 {
+		t.Fatalf("expected 3 queued fetch jobs, got %d", jobCount)
+	}
+	// Re-tick immediately: singleton dedup means no duplicate jobs are created.
+	if n2, _ := s.Tick(context.Background(), time.Now()); n2 != 3 {
+		t.Fatalf("re-tick should still see 3 due, got %d", n2)
+	}
+	d.Pool.QueryRow(context.Background(), `SELECT count(*) FROM ws_jobs WHERE queue='source.fetch'`).Scan(&jobCount)
+	if jobCount != 3 {
+		t.Fatalf("singleton should prevent duplicates; got %d jobs", jobCount)
+	}
+}
+
 func TestSchedulerTickEnqueueError(t *testing.T) {
 	d := dbtest.Connect(t)
 	dbtest.Reset(t, d)
@@ -91,8 +136,14 @@ func TestSchedulerTickEnqueueError(t *testing.T) {
 	defer d.Pool.Exec(context.Background(), `ALTER TABLE ws_jobs__h RENAME TO ws_jobs`)
 	w := jobs.NewWorkers(q, d, llm.NewOpenAIGateway("", ""), "x")
 	s := jobs.NewScheduler(d, w, time.Minute)
-	if _, err := s.Tick(context.Background(), time.Now()); err == nil {
-		t.Fatal("Tick should error when enqueue fails")
+	// Resilience: a per-source enqueue failure must NOT abort the tick. Tick
+	// logs the error, enqueues nothing successfully, and returns no error.
+	n, err := s.Tick(context.Background(), time.Now())
+	if err != nil {
+		t.Fatalf("Tick should not propagate per-source enqueue errors, got %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("expected 0 successful enqueues when the queue is unavailable, got %d", n)
 	}
 }
 

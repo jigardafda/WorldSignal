@@ -65,6 +65,8 @@ func run() error {
 	gateway := llm.NewDynamicGateway(srv.ResolveLLMKey)
 	queue := jobs.New(database.Pool)
 	workers := jobs.NewWorkers(queue, database, gateway, cfg.WebhookSigningSecret)
+	workers.FailureThreshold = cfg.SourceFailureThreshold
+	workers.Cooldown = time.Duration(cfg.SourceCooldownMinutes) * time.Minute
 	srv.Enqueue = workers
 
 	// Ensure the jobs table exists regardless of role (the API exposes a jobs view).

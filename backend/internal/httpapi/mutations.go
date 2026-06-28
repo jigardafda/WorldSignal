@@ -24,6 +24,7 @@ func sourceToGqlMap(src *db.Source) map[string]any {
 		"sourceType": src.SourceType, "officialFeed": src.OfficialFeed,
 		"healthScore": intPtr(src.HealthScore), "validationStatus": src.ValidationStatus,
 		"tags": strList(src.Tags), "lastValidatedAt": timePtr(src.LastValidatedAt),
+		"cooldownUntil": timePtr(src.CooldownUntil),
 	}
 }
 

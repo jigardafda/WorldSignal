@@ -13,7 +13,7 @@ func scanSource(row pgx.Row) (*Source, error) {
 	var s Source
 	var (
 		config, metadata                      []byte
-		lastValidated                         *time.Time
+		lastValidated, cooldownUntil          *time.Time
 		lastFetched, lastSuccess, lastFailure *time.Time
 		createdAt, updatedAt                  time.Time
 	)
@@ -23,7 +23,7 @@ func scanSource(row pgx.Row) (*Source, error) {
 		&s.WebsiteURL, &s.Languages, &s.GeographicScope, &s.Industry, &s.Subcategory, &s.Publisher,
 		&s.OrgType, &s.SourceType, &s.OfficialFeed, &s.ContentType, &s.UpdateFrequency, &s.Tags,
 		&s.BiasRating, &s.HealthScore, &s.ValidationStatus, &lastValidated, &s.LastValidationError,
-		&s.AvgResponseMs, &metadata,
+		&s.AvgResponseMs, &metadata, &cooldownUntil,
 		&lastFetched, &lastSuccess, &lastFailure, &s.FailureCount, &createdAt, &updatedAt,
 	)
 	if err != nil {
@@ -32,6 +32,7 @@ func scanSource(row pgx.Row) (*Source, error) {
 	s.Config = RawJSON(config)
 	s.Metadata = RawJSON(metadata)
 	s.LastValidatedAt = NewTimePtr(lastValidated)
+	s.CooldownUntil = NewTimePtr(cooldownUntil)
 	s.LastFetchedAt = NewTimePtr(lastFetched)
 	s.LastSuccessAt = NewTimePtr(lastSuccess)
 	s.LastFailureAt = NewTimePtr(lastFailure)

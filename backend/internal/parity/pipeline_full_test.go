@@ -30,7 +30,7 @@ func runGoPipeline(t *testing.T, d *db.DB) {
 	ctx := context.Background()
 	now := time.Now()
 	gw := llm.NewOpenAIGateway("", "gpt-4o-mini") // disabled → heuristic
-	rawIDs, err := pipeline.FetchSource(ctx, d, "src_p", now)
+	rawIDs, err := pipeline.FetchSource(ctx, d, "src_p", now, 3, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

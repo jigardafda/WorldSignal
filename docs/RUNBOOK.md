@@ -8,9 +8,30 @@ Common operational tasks and incident playbooks.
 - Quick data check (authenticated): GraphQL `{ stats }`.
 - Boot logs print the role and LLM mode: `starting WorldSignal (role=…, llm=openai|heuristic-fallback)`.
 
-## A source keeps failing
+## Automatic ingestion (scheduler)
 
-Symptoms: a source shows a high **Fails** count / no recent **Last success**.
+Sources are fetched automatically — no manual clicking. The scheduler ticks every
+`SCHEDULER_TICK_MS` (default 30s) and enqueues every **due** source (enabled, not in
+cooldown, and `now - lastFetchedAt ≥ crawlFrequency`). Each tick logs
+`scheduler tick: due=N enqueued=N errors=N`. A single source's enqueue error never
+aborts the tick. Requires a `ROLE=all` or `ROLE=worker` instance running.
+
+The job queue runs 12 parallel workers with **fair round-robin** across queues, so a
+slow, backlogged stage (LLM enrichment) never starves source fetching. Jobs left
+`active` by a crashed/killed worker are **requeued** by a reaper after 5 minutes.
+
+If nothing is fetching: confirm a worker instance is up; check the scheduler tick log;
+check `{ jobCounts }` for a `source.fetch` backlog and the workers draining it.
+
+## A source keeps failing (cooldown)
+
+Sources that fail repeatedly are handled automatically: after
+`SOURCE_FAILURE_THRESHOLD` (default 5) consecutive failures a source enters **cooldown**
+for `SOURCE_COOLDOWN_MINUTES` (default 180). The scheduler skips it until the cooldown
+elapses, then retries; a successful fetch clears the failure count and cooldown. The
+last error and cooldown time are visible on the Source detail page.
+
+To investigate or recover sooner:
 
 1. Open **Sources → the source → Validation history**, or query `source(id){validationLogs}`.
 2. Click **Revalidate** (or `mutation { revalidateSource(id) }`) to re-check live and

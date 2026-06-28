@@ -101,7 +101,7 @@ func TestDBErrorPaths(t *testing.T) {
 	_, err = d.CreateRawItem(ctx, db.NewRawItem{SourceID: "s"})
 	mustErr("CreateRawItem", err)
 	mustErr("MarkSourceFetchSuccess", d.MarkSourceFetchSuccess(ctx, "x", now))
-	mustErr("MarkSourceFetchFailure", d.MarkSourceFetchFailure(ctx, "x", now))
+	mustErr("MarkSourceFetchFailure", d.MarkSourceFetchFailure(ctx, "x", now, 3, time.Hour, "boom"))
 }
 
 func TestAuthDBErrorPaths(t *testing.T) {

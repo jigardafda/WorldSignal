@@ -127,7 +127,7 @@ func TestPipelineFetchParity(t *testing.T) {
 
 	dbtest.Reset(t, d)
 	seedFetchSource(t, d, url)
-	if _, err := pipeline.FetchSource(context.Background(), d, "src_f", time.Now()); err != nil {
+	if _, err := pipeline.FetchSource(context.Background(), d, "src_f", time.Now(), 3, time.Hour); err != nil {
 		t.Fatal(err)
 	}
 	goRaw := snapshot(t, d, rawItemFetchSnap)
