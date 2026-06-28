@@ -12,6 +12,8 @@ import { AsyncBoundary } from "../components/States";
 import { PageHeader } from "../components/PageHeader";
 import { DataTable } from "../components/DataTable";
 import { ConfirmButton } from "../components/ConfirmButton";
+import { CountrySelect } from "../components/CountrySelect";
+import { useCountries, countryDisplay } from "../lib/countries";
 import { HealthBadge, ValidationBadge } from "../components/badges";
 
 const PAGE_SIZE = 25;
@@ -29,6 +31,7 @@ export function Sources() {
   const navigate = useNavigate();
   const { hasPerm } = useAuth();
   const canWrite = hasPerm("sources:write");
+  const { byCode } = useCountries();
 
   const [pendingSearch, setPendingSearch] = useState("");
   const [search, setSearch] = useState("");
@@ -141,7 +144,7 @@ export function Sources() {
                 onRowClick={(r) => navigate(`/sources/${r.id}`)}
                 columns={[
                   { key: "name", header: "Name", render: (r) => r.name },
-                  { key: "country", header: "Country", render: (r) => r.country ?? "—" },
+                  { key: "country", header: "Country", render: (r) => countryDisplay(r.country, byCode) },
                   { key: "region", header: "Region", render: (r) => r.region ?? "—" },
                   { key: "languages", header: "Lang", render: (r) => (r.languages ?? []).join(", ") || (r.language ?? "—") },
                   { key: "sourceType", header: "Type", render: (r) => r.sourceType ?? r.type },
@@ -176,7 +179,7 @@ export function Sources() {
           <Stack>
             <TextInput label="Name" required {...form.getInputProps("name")} data-testid="src-name" />
             <TextInput label="RSS/Atom URL" required {...form.getInputProps("url")} data-testid="src-url" />
-            <TextInput label="Country" placeholder="US" {...form.getInputProps("country")} />
+            <CountrySelect label="Country" value={form.values.country || null} onChange={(v) => form.setFieldValue("country", v ?? "")} data-testid="src-country" />
             <Select label="Type" data={["RSS", "ATOM"]} {...form.getInputProps("type")} />
             <NumberInput label="Priority (0=highest)" min={0} max={5} {...form.getInputProps("priority")} />
             <NumberInput label="Crawl frequency (s)" min={30} {...form.getInputProps("crawlFrequency")} />

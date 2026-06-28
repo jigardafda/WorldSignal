@@ -7,11 +7,13 @@ import { useAsync } from "../lib/useAsync";
 import { AsyncBoundary, EmptyState } from "../components/States";
 import { PageHeader } from "../components/PageHeader";
 import { DataTable } from "../components/DataTable";
+import { useCountries, countryDisplay } from "../lib/countries";
 import { fmtDate } from "../lib/format";
 
 export function ArticleDetail() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const { byCode } = useCountries();
   const state = useAsync<AD | null>(() => api.article(id), [id]);
   return (
     <>
@@ -40,7 +42,7 @@ export function ArticleDetail() {
                 <Stack gap={4}>
                   <Text size="sm"><b>Source:</b> {a.sourceName}</Text>
                   <Text size="sm"><b>Author:</b> {a.author ?? "—"}</Text>
-                  <Text size="sm"><b>Language:</b> {a.language ?? "—"} · <b>Country:</b> {a.country ?? "—"}</Text>
+                  <Text size="sm"><b>Language:</b> {a.language ?? "—"} · <b>Country:</b> {countryDisplay(a.country, byCode)}</Text>
                   <Text size="sm"><b>Published:</b> {fmtDate(a.publishedAt)}</Text>
                   <Text size="sm"><b>Fetched:</b> {fmtDate(a.fetchedAt)}</Text>
                   <Text size="sm"><b>Content hash:</b></Text>

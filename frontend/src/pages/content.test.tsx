@@ -1,15 +1,16 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
 
 const { apiMock } = vi.hoisted(() => ({
   apiMock: {
-    stats: vi.fn(), signals: vi.fn(), signalCount: vi.fn(), signal: vi.fn(),
+    stats: vi.fn(), signals: vi.fn(), signalCount: vi.fn(), signal: vi.fn(), countries: vi.fn(),
   },
 }));
 vi.mock("../lib/api", () => ({ api: apiMock }));
 
+import { _resetCountriesCache } from "../lib/countries";
 import { Dashboard } from "./Dashboard";
 import { Signals } from "./Signals";
 import { SignalDetail } from "./SignalDetail";
@@ -24,6 +25,10 @@ const signal = (over = {}) => ({
 });
 
 afterEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  _resetCountriesCache();
+  apiMock.countries.mockResolvedValue([{ code: "US", name: "United States", flag: "🇺🇸", currency: "USD", capital: "Washington, D.C.", capitalLat: 38.9, capitalLng: -77.04 }]);
+});
 
 describe("Dashboard", () => {
   it("renders KPIs and latest signals", async () => {

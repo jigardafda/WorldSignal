@@ -7,11 +7,13 @@ import { useAsync } from "../lib/useAsync";
 import { AsyncBoundary, EmptyState } from "../components/States";
 import { PageHeader } from "../components/PageHeader";
 import { ConfidenceBar, SeverityBadge, StatusBadge } from "../components/badges";
+import { useCountries, countryDisplay } from "../lib/countries";
 import { fmtDate } from "../lib/format";
 
 export function SignalDetail() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const { byCode } = useCountries();
   const state = useAsync<Signal | null>(() => api.signal(id), [id]);
 
   return (
@@ -58,7 +60,7 @@ export function SignalDetail() {
                   <Card withBorder radius="md">
                     <Title order={5} mb="xs">Details</Title>
                     <Stack gap={4}>
-                      <Text size="sm"><b>Country:</b> {s.country ?? "—"}</Text>
+                      <Text size="sm"><b>Country:</b> {countryDisplay(s.country, byCode)}</Text>
                       <Text size="sm"><b>Source count:</b> {s.sourceCount}</Text>
                       <Text size="sm"><b>First seen:</b> {fmtDate(s.firstSeenAt)}</Text>
                       <Text size="sm"><b>Last seen:</b> {fmtDate(s.lastSeenAt)}</Text>

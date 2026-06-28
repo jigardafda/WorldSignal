@@ -11,6 +11,8 @@ import { AsyncBoundary, EmptyState } from "../components/States";
 import { PageHeader } from "../components/PageHeader";
 import { DataTable } from "../components/DataTable";
 import { ConfirmButton } from "../components/ConfirmButton";
+import { CountrySelect } from "../components/CountrySelect";
+import { useCountries } from "../lib/countries";
 import { HealthBadge, StatusBadge, ValidationBadge } from "../components/badges";
 import { ExtLink } from "../components/ExtLink";
 import { fmtDate, pct } from "../lib/format";
@@ -34,6 +36,8 @@ export function SourceDetail() {
 
 function SourceBody({ source, canWrite, reload, navigate }: { source: Source; canWrite: boolean; reload: () => void; navigate: (to: string) => void }) {
   const [busy, setBusy] = useState(false);
+  const { byCode } = useCountries();
+  const country = source.country ? byCode[source.country] : undefined;
   const form = useForm({
     initialValues: {
       name: source.name, country: source.country ?? "", priority: source.priority,
@@ -91,7 +95,10 @@ function SourceBody({ source, canWrite, reload, navigate }: { source: Source; ca
             {source.websiteUrl && <Text size="sm"><b>Website:</b> <ExtLink url={source.websiteUrl} size="sm">{source.websiteUrl}</ExtLink></Text>}
             <Text size="sm"><b>Publisher:</b> {source.publisher ?? "—"} · <b>Org:</b> {source.orgType ?? "—"}{source.officialFeed ? " · official" : ""}</Text>
             <Text size="sm"><b>Type:</b> {source.sourceType ?? source.type} · <b>Parser:</b> {source.parserType}</Text>
-            <Text size="sm"><b>Scope:</b> {source.geographicScope ?? "—"} · <b>Country:</b> {source.country ?? "—"} · <b>Region:</b> {source.region ?? "—"}</Text>
+            <Text size="sm"><b>Scope:</b> {source.geographicScope ?? "—"} · <b>Country:</b> {country ? `${country.flag} ${country.name}` : (source.country ?? "—")} · <b>Region:</b> {source.region ?? "—"}</Text>
+            {country && (
+              <Text size="sm"><b>Capital:</b> {country.capital} ({country.capitalLat.toFixed(2)}, {country.capitalLng.toFixed(2)}) · <b>Currency:</b> {country.currency}</Text>
+            )}
             <Text size="sm"><b>Languages:</b> {(source.languages ?? []).join(", ") || (source.language ?? "—")}</Text>
             <Text size="sm"><b>Category:</b> {source.category ?? "—"} · <b>Industry:</b> {source.industry ?? "—"}{source.subcategory ? ` · ${source.subcategory}` : ""}</Text>
             <Text size="sm"><b>Priority:</b> P{source.priority} · <b>Credibility:</b> {pct(source.credibility)} · <b>Crawl:</b> {source.crawlFrequency}s</Text>
@@ -118,7 +125,7 @@ function SourceBody({ source, canWrite, reload, navigate }: { source: Source; ca
             <form onSubmit={form.onSubmit(save)}>
               <Stack>
                 <TextInput label="Name" {...form.getInputProps("name")} />
-                <TextInput label="Country" {...form.getInputProps("country")} />
+                <CountrySelect label="Country" value={form.values.country || null} onChange={(v) => form.setFieldValue("country", v ?? "")} data-testid="src-country" />
                 <NumberInput label="Priority" min={0} max={5} {...form.getInputProps("priority")} />
                 <NumberInput label="Credibility" min={0} max={1} step={0.05} decimalScale={2} {...form.getInputProps("credibility")} />
                 <NumberInput label="Crawl frequency (s)" min={30} {...form.getInputProps("crawlFrequency")} />

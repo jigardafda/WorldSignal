@@ -78,6 +78,10 @@ export interface AuditLog {
   metadata: unknown; createdAt: string;
 }
 export interface AuditFilter { actor?: string; action?: string; targetType?: string; search?: string }
+export interface Country {
+  code: string; name: string; flag: string; currency: string;
+  capital: string; capitalLat: number; capitalLng: number;
+}
 export interface RawItemRow {
   id: string; sourceId: string; sourceName: string; sourceGuid: string | null;
   rawUrl: string | null; rawTitle: string | null; status: string;
@@ -225,6 +229,10 @@ export const api = {
   subscribers: () => gql<{ subscribers: Subscriber[] }>(`{subscribers{id name status createdAt subscriptionCount}}`).then((d) => d.subscribers),
   createSubscriber: (name: string) => gql<{ createSubscriber: Subscriber }>(`mutation($n:String!){createSubscriber(name:$n){id name status createdAt subscriptionCount}}`, { n: name }).then((d) => d.createSubscriber),
   deleteSubscriber: (id: string) => gql<{ deleteSubscriber: boolean }>(`mutation($id:ID!){deleteSubscriber(id:$id)}`, { id }).then((d) => d.deleteSubscriber),
+
+  // reference data
+  countries: () =>
+    gql<{ countries: Country[] }>(`{countries{code name flag currency capital capitalLat capitalLng}}`).then((d) => d.countries),
 
   // taxonomy
   taxonomy: () => gql<{ taxonomy: TaxonomyNode[] }>(`{taxonomy}`).then((d) => d.taxonomy),

@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
 
 const { apiMock, authMock } = vi.hoisted(() => ({
@@ -8,6 +8,7 @@ const { apiMock, authMock } = vi.hoisted(() => ({
     sources: vi.fn(), source: vi.fn(), createSource: vi.fn(), updateSource: vi.fn(),
     deleteSource: vi.fn(), triggerFetch: vi.fn(), setSourceEnabled: vi.fn(),
     sourceCount: vi.fn(), sourceCoverage: vi.fn(), revalidateSource: vi.fn(),
+    countries: vi.fn(),
     articles: vi.fn(), article: vi.fn(), rawItems: vi.fn(), rawItem: vi.fn(),
     deliveries: vi.fn(), delivery: vi.fn(), retryDelivery: vi.fn(),
     jobs: vi.fn(), jobCounts: vi.fn(), retryJob: vi.fn(),
@@ -18,6 +19,7 @@ const { apiMock, authMock } = vi.hoisted(() => ({
 vi.mock("../lib/api", () => ({ api: apiMock }));
 vi.mock("../lib/auth", () => ({ useAuth: () => authMock }));
 
+import { _resetCountriesCache } from "../lib/countries";
 import { Sources } from "./Sources";
 import { SourceDetail } from "./SourceDetail";
 import { Coverage } from "./Coverage";
@@ -35,6 +37,10 @@ const source = (o = {}) => ({ id: "s1", name: "BBC", type: "RSS", url: "https://
 const coverage = () => ({ byRegion: [{ key: "Europe", count: 1 }], byScope: [{ key: "GLOBAL", count: 1 }], byOrgType: [{ key: "PUBLIC", count: 1 }], byValidation: [{ key: "VALID", count: 1 }], byIndustry: [{ key: "Finance", count: 1 }], byCountry: [{ key: "GB", count: 1 }], bySourceType: [{ key: "RSS", count: 1 }], byLanguage: [{ key: "en", count: 1 }] });
 
 afterEach(() => { vi.clearAllMocks(); authMock.hasPerm = () => true; });
+beforeEach(() => {
+  _resetCountriesCache();
+  apiMock.countries.mockResolvedValue([{ code: "GB", name: "United Kingdom", flag: "🇬🇧", currency: "GBP", capital: "London", capitalLat: 51.5, capitalLng: -0.12 }]);
+});
 
 describe("Sources", () => {
   it("lists, filters and creates", async () => {

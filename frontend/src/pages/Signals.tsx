@@ -7,6 +7,7 @@ import { AsyncBoundary } from "../components/States";
 import { PageHeader } from "../components/PageHeader";
 import { DataTable } from "../components/DataTable";
 import { ConfidenceBar, SeverityBadge, StatusBadge } from "../components/badges";
+import { useCountries, countryDisplay } from "../lib/countries";
 import { fmtDate } from "../lib/format";
 
 const PAGE_SIZE = 25;
@@ -14,6 +15,7 @@ const STATUSES = ["UNVERIFIED", "DEVELOPING", "CONFIRMED", "DISPUTED", "CORRECTE
 
 export function Signals() {
   const navigate = useNavigate();
+  const { byCode } = useCountries();
   const [search, setSearch] = useState("");
   const [pendingSearch, setPendingSearch] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export function Signals() {
                   { key: "severity", header: "Severity", render: (r) => <SeverityBadge severity={r.severity} /> },
                   { key: "title", header: "Title", render: (r) => r.title },
                   { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
-                  { key: "country", header: "Country", render: (r) => r.country ?? "—" },
+                  { key: "country", header: "Country", render: (r) => countryDisplay(r.country, byCode) },
                   { key: "sourceCount", header: "Sources", render: (r) => r.sourceCount },
                   { key: "confidence", header: "Confidence", render: (r) => <ConfidenceBar value={r.confidence} /> },
                   { key: "lastSeenAt", header: "Last seen", render: (r) => fmtDate(r.lastSeenAt) },

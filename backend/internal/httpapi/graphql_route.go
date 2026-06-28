@@ -52,6 +52,7 @@ func (s *Server) root() gql.Root {
 		"subscriptions":  s.resolveSubscriptions,
 		"taxonomy":       s.resolveTaxonomy,
 		"stats":          s.resolveStats,
+		"countries":      s.resolveCountries,
 	}
 	m := s.mutationResolvers()
 	s.registerAuthResolvers(q, m)   // login/logout/me + admin (users/teams)

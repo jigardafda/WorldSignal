@@ -25,6 +25,7 @@ const RESP: Record<string, unknown> = {
   subscriptions: [{ id: "x" }], subscription: { id: "x" }, createSubscription: { id: "x" },
   updateSubscription: { id: "x" }, deleteSubscription: true,
   subscribers: [{ id: "sb" }], createSubscriber: { id: "sb" }, deleteSubscriber: true,
+  countries: [{ code: "US", name: "United States" }],
   taxonomy: [{ code: "C" }], taxonomyStats: [{ key: "C", count: 1 }],
   jobs: { items: [], total: 0 }, jobCounts: [{ key: "k", count: 1 }], retryJob: true,
   auditLogs: { items: [], total: 0 },
@@ -101,6 +102,7 @@ describe("api wrappers", () => {
     expect(await api.createSubscriber("n")).toEqual(RESP.createSubscriber);
     expect(await api.deleteSubscriber("sb")).toBe(true);
 
+    expect(await api.countries()).toEqual(RESP.countries);
     expect(await api.taxonomy()).toEqual(RESP.taxonomy);
     expect(await api.taxonomyStats()).toEqual(RESP.taxonomyStats);
 
