@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Badge, Group, Select, Text, UnstyledButton } from "@mantine/core";
-import { IconBroadcast } from "@tabler/icons-react";
+import { ActionIcon, Badge, Checkbox, ColorSwatch, Group, Paper, Select, Stack, Text } from "@mantine/core";
+import { IconBroadcast, IconChevronDown, IconChevronUp, IconStack2 } from "@tabler/icons-react";
 import { api } from "../lib/api";
 import { useCountries } from "../lib/countries";
 import { CountrySelect } from "../components/CountrySelect";
@@ -57,6 +57,7 @@ export function LiveDashboard() {
   const [markers, setMarkers] = useState<MarkerRec[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [legendOpen, setLegendOpen] = useState(true);
   const prevIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -121,20 +122,47 @@ export function LiveDashboard() {
           <CountrySelect placeholder="Whole world" value={country} onChange={setCountry} data-testid="live-country" />
         </Group>
       </Group>
-      <Group gap={6} px="md" py="xs" style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }} data-testid="live-legend">
-        {CATEGORIES.map((c) => {
-          const on = enabled.includes(c.code);
-          return (
-            <UnstyledButton key={c.code} onClick={() => toggle(c.code)} data-testid={`layer-${c.code}`} aria-pressed={on}>
-              <Badge variant={on ? "filled" : "outline"} color={c.color} style={{ opacity: on ? 1 : 0.45, cursor: "pointer" }}>
-                {categoryLabel(c.code)} {counts[c.code] ?? 0}
-              </Badge>
-            </UnstyledButton>
-          );
-        })}
-      </Group>
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} />
+        <Paper
+          withBorder
+          shadow="md"
+          radius="md"
+          p="xs"
+          style={{ position: "absolute", top: 12, right: 12, zIndex: 1000, width: 220, maxHeight: "calc(100% - 24px)", overflowY: "auto" }}
+          data-testid="live-legend"
+        >
+          <Group justify="space-between" wrap="nowrap" mb={legendOpen ? 6 : 0}>
+            <Group gap={6} wrap="nowrap">
+              <IconStack2 size={15} />
+              <Text size="xs" fw={700}>Category layers</Text>
+            </Group>
+            <ActionIcon variant="subtle" size="sm" onClick={() => setLegendOpen((o) => !o)} aria-label="Toggle layers" data-testid="legend-toggle">
+              {legendOpen ? <IconChevronUp size={15} /> : <IconChevronDown size={15} />}
+            </ActionIcon>
+          </Group>
+          {legendOpen && (
+            <Stack gap={2}>
+              {CATEGORIES.map((c) => (
+                <Checkbox
+                  key={c.code}
+                  size="xs"
+                  checked={enabled.includes(c.code)}
+                  onChange={() => toggle(c.code)}
+                  color={c.color}
+                  data-testid={`layer-${c.code}`}
+                  label={
+                    <Group gap={6} wrap="nowrap">
+                      <ColorSwatch color={c.color} size={10} />
+                      <Text size="xs">{categoryLabel(c.code)}</Text>
+                      <Text size="xs" c="dimmed">{counts[c.code] ?? 0}</Text>
+                    </Group>
+                  }
+                />
+              ))}
+            </Stack>
+          )}
+        </Paper>
       </div>
       <SignalDrawer signalId={selectedId} onClose={() => setSelectedId(null)} />
     </div>

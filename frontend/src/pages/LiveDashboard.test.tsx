@@ -86,6 +86,17 @@ describe("LiveDashboard", () => {
     await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
   });
 
+  it("collapses the category legend widget", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    await screen.findByTestId("live-legend");
+    expect(screen.getByTestId("layer-POLITICS")).toBeInTheDocument(); // expanded by default
+    fireEvent.click(screen.getByTestId("legend-toggle"));
+    await waitFor(() => expect(screen.queryByTestId("layer-POLITICS")).toBeNull()); // collapsed
+  });
+
   it("requests events within a rolling time window", async () => {
     apiMock.liveSignals.mockResolvedValue([
       { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
@@ -129,8 +140,8 @@ describe("LiveDashboard", () => {
     expect(map).toHaveAttribute("data-zoom", "5");
     // Controls reflect the URL.
     expect((screen.getByTestId("live-window") as HTMLInputElement).value).toBe("Last 30 min");
-    expect(screen.getByTestId("layer-DISASTER")).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByTestId("layer-TECHNOLOGY")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("layer-DISASTER")).not.toBeChecked();
+    expect(screen.getByTestId("layer-TECHNOLOGY")).toBeChecked();
     // The window drives the feed query (~30 min ago).
     const since = Date.parse(apiMock.liveSignals.mock.calls[0][0]);
     expect(Date.now() - since).toBeGreaterThan(25 * 60_000);
