@@ -15,6 +15,7 @@ export interface User {
 export interface SignalTag { code: string; confidence: number }
 export interface SignalSource { publisher: string; url: string | null; publishedAt: string | null }
 export interface SignalAttribute { key: string; valueCode: string; valueText: string; valueNum: number | null; confidence: number }
+export interface LiveSignal { id: string; title: string; country?: string | null; severity: string; lastSeenAt: string }
 export interface AttributeValue { code: string; label: string }
 export interface AttributeDefinition { key: string; label: string; kind: string; description: string; values: AttributeValue[] }
 export interface Signal {
@@ -191,6 +192,9 @@ export const api = {
   signal: (id: string) => gql<{ signal: Signal | null }>(`query($id:ID!){signal(id:$id){${SIGNAL_FIELDS}}}`, { id }).then((d) => d.signal),
   attributeDictionary: () =>
     gql<{ attributeDictionary: AttributeDefinition[] }>(`{attributeDictionary{key label kind description values{code label}}}`).then((d) => d.attributeDictionary),
+  // Lightweight feed for the live map: only what a marker needs.
+  liveSignals: (limit = 150) =>
+    gql<{ signals: LiveSignal[] }>(`query($l:Int){signals(limit:$l){id title country severity lastSeenAt}}`, { l: limit }).then((d) => d.signals),
 
   // sources
   sources: (filter: SourceFilter = {}, limit = 50, offset = 0) =>
