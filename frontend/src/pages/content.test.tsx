@@ -22,7 +22,7 @@ const signal = (over = {}) => ({
   country: "US", sourceCount: 3, firstSeenAt: "2026-01-01T00:00:00Z", lastSeenAt: "2026-01-01T00:00:00Z",
   region: "California", city: "Los Angeles", locality: null, geoScope: "LOCAL",
   sentiment: "NEGATIVE", sentimentScore: -0.6, influence: "HIGH", relevance: 0.9,
-  language: "en", translated: false,
+  language: "en", translated: false, originalTitle: null, originalSummary: null,
   tags: [{ code: "DISASTER.EARTHQUAKE", confidence: 0.9 }],
   sources: [{ publisher: "BBC", url: "https://bbc.example/a", publishedAt: "2026-01-01T00:00:00Z" }],
   attributes: [
@@ -121,10 +121,18 @@ describe("SignalDetail", () => {
     renderWithProviders(<SignalDetail />, { route: "/signals/x", path: "/signals/:id" });
     expect(await screen.findByText("Signal not found.")).toBeInTheDocument();
   });
-  it("shows a translated badge for non-English sources", async () => {
-    apiMock.signal.mockResolvedValue(signal({ language: "fr", translated: true }));
+  it("shows original + translated for non-English sources", async () => {
+    apiMock.signal.mockResolvedValue(signal({
+      title: "Major earthquake", language: "fr", translated: true,
+      originalTitle: "Séisme majeur", originalSummary: "Un séisme a frappé la côte.",
+    }));
     renderWithProviders(<SignalDetail />, { route: "/signals/sg", path: "/signals/:id" });
     expect(await screen.findByTestId("signal-translated")).toHaveTextContent("Translated from French");
+    const original = screen.getByTestId("signal-original");
+    expect(original).toHaveTextContent("Séisme majeur");
+    expect(original).toHaveTextContent("Un séisme a frappé la côte.");
+    // The English translation is still shown as the main title.
+    expect(screen.getByRole("heading", { name: "Major earthquake" })).toBeInTheDocument();
   });
   it("hides the translated badge for English signals", async () => {
     apiMock.signal.mockResolvedValue(signal());

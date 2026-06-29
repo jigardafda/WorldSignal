@@ -126,6 +126,7 @@ func signalToMap(a *db.SignalAggregate) map[string]any {
 		"sentiment": a.Sentiment, "sentimentScore": a.SentimentScore,
 		"influence": a.Influence, "relevance": a.Relevance,
 		"language": a.Language, "translated": isTranslated(a.Language),
+		"originalTitle": a.OriginalTitle, "originalSummary": a.OriginalSummary,
 		"attributes": attributeMaps(a.Attributes),
 	}
 }

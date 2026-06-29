@@ -128,7 +128,9 @@ CREATE TABLE public."Signal" (
     "sentimentScore" double precision,
     influence text,
     relevance double precision,
-    language text
+    language text,
+    "originalTitle" text,
+    "originalSummary" text
 );
 CREATE TABLE public."SignalAttribute" (
     "signalId" text NOT NULL,

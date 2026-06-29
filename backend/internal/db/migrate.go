@@ -140,6 +140,8 @@ ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "sentimentScore" double precision;
 ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "influence"      text;
 ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "relevance"      double precision;
 ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "language"       text;
+ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "originalTitle"   text;
+ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "originalSummary" text;
 CREATE INDEX IF NOT EXISTS "Signal_region_idx"    ON "Signal"("region");
 CREATE INDEX IF NOT EXISTS "Signal_geoScope_idx"  ON "Signal"("geoScope");
 CREATE INDEX IF NOT EXISTS "Signal_sentiment_idx" ON "Signal"("sentiment");

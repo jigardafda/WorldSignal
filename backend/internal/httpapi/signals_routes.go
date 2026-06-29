@@ -42,32 +42,34 @@ type restAttr struct {
 // restSignal mirrors serializeSignal() in routes.ts (field order preserved),
 // extended with the deep-enrichment attributes.
 type restSignal struct {
-	ID             string        `json:"id"`
-	Title          string        `json:"title"`
-	Summary        string        `json:"summary"`
-	WhatHappened   *string       `json:"whatHappened"`
-	WhyItMatters   *string       `json:"whyItMatters"`
-	Status         string        `json:"status"`
-	Severity       string        `json:"severity"`
-	Confidence     float64       `json:"confidence"`
-	EventType      *string       `json:"eventType"`
-	Country        *string       `json:"country"`
-	Region         *string       `json:"region"`
-	City           *string       `json:"city"`
-	Locality       *string       `json:"locality"`
-	GeoScope       *string       `json:"geoScope"`
-	Sentiment      *string       `json:"sentiment"`
-	SentimentScore *float64      `json:"sentimentScore"`
-	Influence      *string       `json:"influence"`
-	Relevance      *float64      `json:"relevance"`
-	Language       *string       `json:"language"`
-	Translated     bool          `json:"translated"`
-	SourceCount    int           `json:"sourceCount"`
-	FirstSeenAt    db.PrismaTime `json:"firstSeenAt"`
-	LastSeenAt     db.PrismaTime `json:"lastSeenAt"`
-	Tags           []restTag     `json:"tags"`
-	Sources        []restSource  `json:"sources"`
-	Attributes     []restAttr    `json:"attributes"`
+	ID              string        `json:"id"`
+	Title           string        `json:"title"`
+	Summary         string        `json:"summary"`
+	WhatHappened    *string       `json:"whatHappened"`
+	WhyItMatters    *string       `json:"whyItMatters"`
+	Status          string        `json:"status"`
+	Severity        string        `json:"severity"`
+	Confidence      float64       `json:"confidence"`
+	EventType       *string       `json:"eventType"`
+	Country         *string       `json:"country"`
+	Region          *string       `json:"region"`
+	City            *string       `json:"city"`
+	Locality        *string       `json:"locality"`
+	GeoScope        *string       `json:"geoScope"`
+	Sentiment       *string       `json:"sentiment"`
+	SentimentScore  *float64      `json:"sentimentScore"`
+	Influence       *string       `json:"influence"`
+	Relevance       *float64      `json:"relevance"`
+	Language        *string       `json:"language"`
+	Translated      bool          `json:"translated"`
+	OriginalTitle   *string       `json:"originalTitle"`
+	OriginalSummary *string       `json:"originalSummary"`
+	SourceCount     int           `json:"sourceCount"`
+	FirstSeenAt     db.PrismaTime `json:"firstSeenAt"`
+	LastSeenAt      db.PrismaTime `json:"lastSeenAt"`
+	Tags            []restTag     `json:"tags"`
+	Sources         []restSource  `json:"sources"`
+	Attributes      []restAttr    `json:"attributes"`
 }
 
 func serializeRESTSignal(a *db.SignalAggregate) restSignal {
@@ -96,6 +98,7 @@ func serializeRESTSignal(a *db.SignalAggregate) restSignal {
 		Region: a.Region, City: a.City, Locality: a.Locality, GeoScope: a.GeoScope,
 		Sentiment: a.Sentiment, SentimentScore: a.SentimentScore, Influence: a.Influence, Relevance: a.Relevance,
 		Language: a.Language, Translated: isTranslated(a.Language),
+		OriginalTitle: a.OriginalTitle, OriginalSummary: a.OriginalSummary,
 		SourceCount: a.SourceCount,
 		FirstSeenAt: db.NewTime(a.FirstSeenAt), LastSeenAt: db.NewTime(a.LastSeenAt),
 		Tags: tags, Sources: sources, Attributes: attrs,

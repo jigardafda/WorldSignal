@@ -24,15 +24,17 @@ type Signal struct {
 	FirstSeenAt  time.Time
 	LastSeenAt   time.Time
 	// Deep-enrichment attributes.
-	Region         *string
-	City           *string
-	Locality       *string
-	GeoScope       *string
-	Sentiment      *string
-	SentimentScore *float64
-	Influence      *string
-	Relevance      *float64
-	Language       *string
+	Region          *string
+	City            *string
+	Locality        *string
+	GeoScope        *string
+	Sentiment       *string
+	SentimentScore  *float64
+	Influence       *string
+	Relevance       *float64
+	Language        *string
+	OriginalTitle   *string
+	OriginalSummary *string
 }
 
 // SignalTagRow is a tag attached to a signal.
@@ -86,7 +88,7 @@ type SignalFilter struct {
 	Offset       int
 }
 
-const signalScalarCols = `"id","title","summary","whatHappened","whyItMatters","status","severity","confidence","eventType","country","sourceCount","firstSeenAt","lastSeenAt","region","city","locality","geoScope","sentiment","sentimentScore","influence","relevance","language"`
+const signalScalarCols = `"id","title","summary","whatHappened","whyItMatters","status","severity","confidence","eventType","country","sourceCount","firstSeenAt","lastSeenAt","region","city","locality","geoScope","sentiment","sentimentScore","influence","relevance","language","originalTitle","originalSummary"`
 
 func scanSignal(row pgx.Row) (*Signal, error) {
 	var s Signal
@@ -94,7 +96,7 @@ func scanSignal(row pgx.Row) (*Signal, error) {
 		&s.Status, &s.Severity, &s.Confidence, &s.EventType, &s.Country, &s.SourceCount,
 		&s.FirstSeenAt, &s.LastSeenAt,
 		&s.Region, &s.City, &s.Locality, &s.GeoScope, &s.Sentiment, &s.SentimentScore,
-		&s.Influence, &s.Relevance, &s.Language)
+		&s.Influence, &s.Relevance, &s.Language, &s.OriginalTitle, &s.OriginalSummary)
 	if err != nil {
 		return nil, err
 	}

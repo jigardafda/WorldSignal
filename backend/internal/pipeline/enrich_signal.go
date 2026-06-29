@@ -130,6 +130,18 @@ func EnrichSignal(ctx context.Context, d *db.DB, gw llm.Gateway, cr PageCrawler,
 	// every dimension is queryable consistently, alongside industries/entities.
 	attrRows := buildAttributeRows(enr.Tags, attrs)
 
+	// When translated, keep the source-language title/summary for side-by-side
+	// display. Use the feed article text (not the crawled page).
+	var origTitle, origSummary *string
+	if enr.Translated {
+		origTitle = nilIfEmpty(rep.Title)
+		os := derefStr(rep.Summary)
+		if os == "" {
+			os = sliceRunes(body, 400)
+		}
+		origSummary = nilIfEmpty(os)
+	}
+
 	return d.ApplyEnrichment(ctx, signalID, db.EnrichmentUpdate{
 		Title:        enr.Title,
 		Summary:      enr.Summary,
@@ -143,17 +155,19 @@ func EnrichSignal(ctx context.Context, d *db.DB, gw llm.Gateway, cr PageCrawler,
 		Metadata:     meta,
 		Tags:         tagAssignments,
 
-		Country:        nilIfEmpty(attrs.Country),
-		Region:         nilIfEmpty(attrs.Region),
-		City:           nilIfEmpty(attrs.City),
-		Locality:       nilIfEmpty(attrs.Locality),
-		GeoScope:       nilIfEmpty(attrs.GeoScope),
-		Sentiment:      nilIfEmpty(attrs.Sentiment),
-		SentimentScore: &attrs.SentimentScore,
-		Influence:      nilIfEmpty(attrs.Influence),
-		Relevance:      &attrs.Relevance,
-		Language:       nilIfEmpty(enr.Language),
-		Attributes:     attrRows,
+		Country:         nilIfEmpty(attrs.Country),
+		Region:          nilIfEmpty(attrs.Region),
+		City:            nilIfEmpty(attrs.City),
+		Locality:        nilIfEmpty(attrs.Locality),
+		GeoScope:        nilIfEmpty(attrs.GeoScope),
+		Sentiment:       nilIfEmpty(attrs.Sentiment),
+		SentimentScore:  &attrs.SentimentScore,
+		Influence:       nilIfEmpty(attrs.Influence),
+		Relevance:       &attrs.Relevance,
+		Language:        nilIfEmpty(enr.Language),
+		OriginalTitle:   origTitle,
+		OriginalSummary: origSummary,
+		Attributes:      attrRows,
 	})
 }
 

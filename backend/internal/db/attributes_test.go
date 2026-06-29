@@ -42,6 +42,7 @@ func TestApplyEnrichmentPersistsAttributes(t *testing.T) {
 		Region: ptrS("Maharashtra"), City: ptrS("Mumbai"), Locality: ptrS("Bandra"),
 		GeoScope: ptrS("LOCAL"), Sentiment: ptrS("NEGATIVE"), SentimentScore: ptrF(-0.6),
 		Influence: ptrS("HIGH"), Relevance: ptrF(0.85), Language: ptrS("fr"),
+		OriginalTitle: ptrS("Séisme"), OriginalSummary: ptrS("Un séisme a frappé."),
 		Attributes: []db.SignalAttr{
 			{Key: "industry", ValueCode: "TECHNOLOGY", Confidence: 1},
 			{Key: "category", ValueCode: "DISASTER.EARTHQUAKE", Confidence: 0.9},
@@ -73,6 +74,9 @@ func TestApplyEnrichmentPersistsAttributes(t *testing.T) {
 	}
 	if agg.Language == nil || *agg.Language != "fr" {
 		t.Errorf("language wrong: %v", agg.Language)
+	}
+	if agg.OriginalTitle == nil || *agg.OriginalTitle != "Séisme" || agg.OriginalSummary == nil || *agg.OriginalSummary != "Un séisme a frappé." {
+		t.Errorf("original title/summary wrong: %v %v", agg.OriginalTitle, agg.OriginalSummary)
 	}
 	if len(agg.Attributes) != 3 {
 		t.Fatalf("expected 3 attributes, got %d: %+v", len(agg.Attributes), agg.Attributes)

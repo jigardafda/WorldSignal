@@ -88,7 +88,8 @@ type dualGateway struct{}
 func (dualGateway) Enabled() bool { return true }
 func (dualGateway) JSONCompletion(_ context.Context, system, _ string, _ int) ([]byte, error) {
 	if strings.Contains(system, "Taxonomy:") {
-		return []byte(`{"title":"Quake","summary":"S","whatHappened":"W","whyItMatters":"Y","severity":"HIGH","confidence":0.8,"tags":[{"code":"DISASTER.EARTHQUAKE","confidence":0.9}]}`), nil
+		// Non-English source ("hi") → narrative is the English translation.
+		return []byte(`{"title":"Quake","summary":"S","whatHappened":"W","whyItMatters":"Y","severity":"HIGH","confidence":0.8,"language":"hi","tags":[{"code":"DISASTER.EARTHQUAKE","confidence":0.9}]}`), nil
 	}
 	return []byte(`{"country":"India","region":"Maharashtra","city":"Mumbai","geoScope":"local","sentiment":"negative","sentimentScore":-0.7,"influence":"high","relevance":0.9,"industries":["energy"],"entities":[{"name":"NDMA","type":"government"}]}`), nil
 }
@@ -111,6 +112,15 @@ func TestEnrichSignalLLMPathPersistsGeoAndEntities(t *testing.T) {
 	mustScan(t, d, `SELECT country, region, "geoScope" FROM "Signal" WHERE id='sg'`, &country, &region, &geoScope)
 	if country == nil || *country != "IN" || region == nil || *region != "Maharashtra" || geoScope == nil || *geoScope != "LOCAL" {
 		t.Fatalf("geo not persisted: %v %v %v", country, region, geoScope)
+	}
+	// Non-English source → language stored and the original title kept for display.
+	var lang, origTitle, title *string
+	mustScan(t, d, `SELECT language, "originalTitle", title FROM "Signal" WHERE id='sg'`, &lang, &origTitle, &title)
+	if lang == nil || *lang != "hi" {
+		t.Fatalf("language not persisted: %v", lang)
+	}
+	if origTitle == nil || *origTitle != "Quake" || title == nil || *title != "Quake" {
+		t.Fatalf("original/translated title wrong: orig=%v title=%v", origTitle, title)
 	}
 	attrs, err := d.SignalAttributes(ctx, "sg")
 	if err != nil {

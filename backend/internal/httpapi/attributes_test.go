@@ -28,12 +28,14 @@ func seedEnrichedSignal(t *testing.T, d *db.DB) {
 	ex(`INSERT INTO "SignalArticle" ("signalId","articleId","relationType","similarityScore") VALUES ('sg','a1','PRIMARY',1)`)
 
 	region, scope, sent, infl, lang := "California", "LOCAL", "NEGATIVE", "HIGH", "fr"
+	origT, origS := "Séisme", "Un séisme a frappé."
 	score, rel := -0.6, 0.9
 	if err := d.ApplyEnrichment(ctx, "sg", db.EnrichmentUpdate{
 		Title: "T", Summary: "S", Severity: "HIGH", Confidence: 0.8, Status: "CONFIRMED",
 		PublishedAt: time.Now(), Metadata: map[string]any{},
 		Region: &region, GeoScope: &scope, Sentiment: &sent, SentimentScore: &score,
 		Influence: &infl, Relevance: &rel, Language: &lang,
+		OriginalTitle: &origT, OriginalSummary: &origS,
 		Attributes: []db.SignalAttr{
 			{Key: "industry", ValueCode: "CYBERSECURITY", Confidence: 1},
 			{Key: "category", ValueCode: "DISASTER.EARTHQUAKE", Confidence: 0.9},
@@ -52,8 +54,8 @@ func TestGraphQLSignalAttributes(t *testing.T) {
 	bearer = tok
 	defer func() { bearer = "" }()
 
-	_, body := postGQL(t, ht.URL, `{"query":"{ signals { id geoScope sentiment sentimentScore influence relevance region language translated attributes { key valueCode valueText } } }"}`)
-	for _, want := range []string{`"geoScope":"LOCAL"`, `"sentiment":"NEGATIVE"`, `"influence":"HIGH"`, `"region":"California"`, `"language":"fr"`, `"translated":true`, `"valueCode":"CYBERSECURITY"`, `"valueText":"Acme"`} {
+	_, body := postGQL(t, ht.URL, `{"query":"{ signals { id geoScope sentiment sentimentScore influence relevance region language translated originalTitle originalSummary attributes { key valueCode valueText } } }"}`)
+	for _, want := range []string{`"geoScope":"LOCAL"`, `"sentiment":"NEGATIVE"`, `"influence":"HIGH"`, `"region":"California"`, `"language":"fr"`, `"translated":true`, `"originalTitle":"Séisme"`, `"valueCode":"CYBERSECURITY"`, `"valueText":"Acme"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("signals response missing %s: %s", want, body)
 		}

@@ -48,10 +48,17 @@ export function SignalDetail() {
                       </Badge>
                     )}
                   </Group>
-                  <Title order={3}>{s.title}</Title>
-                  {s.translated && (
-                    <Text size="xs" c="dimmed" mt={2}>Auto-translated to English from {languageName(s.language)} during enrichment.</Text>
+
+                  {s.translated && (s.originalTitle || s.originalSummary) && (
+                    <Paper withBorder p="sm" radius="md" mb="md" bg="var(--mantine-color-default-hover)" data-testid="signal-original">
+                      <Text size="xs" tt="uppercase" fw={600} c="dimmed" mb={4}>Original · {languageName(s.language)}</Text>
+                      {s.originalTitle && <Text fw={600} dir="auto">{s.originalTitle}</Text>}
+                      {s.originalSummary && <Text size="sm" c="dimmed" mt={4} dir="auto">{s.originalSummary}</Text>}
+                    </Paper>
                   )}
+
+                  {s.translated && <Text size="xs" tt="uppercase" fw={600} c="indigo" mb={4}>English translation</Text>}
+                  <Title order={3}>{s.title}</Title>
                   <ConfidenceBar value={s.confidence} />
                   <Text mt="md">{s.summary}</Text>
                   {s.whatHappened && (<><Title order={5} mt="md">What happened</Title><Text>{s.whatHappened}</Text></>)}
