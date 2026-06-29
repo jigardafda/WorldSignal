@@ -5,6 +5,7 @@ import { LoadingState } from "./components/States";
 import { useAuth } from "./lib/auth";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
+import { LiveDashboard } from "./pages/LiveDashboard";
 import { Signals } from "./pages/Signals";
 import { SignalDetail } from "./pages/SignalDetail";
 import { Analytics } from "./pages/Analytics";
@@ -41,6 +42,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<RequireAuth />}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/live" element={<LiveDashboard />} />
         <Route path="/signals" element={<Signals />} />
         <Route path="/signals/:id" element={<SignalDetail />} />
         <Route path="/analytics" element={<Analytics />} />

@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { SegmentedControl, SimpleGrid, Stack, Paper, Text, Title, Group } from "@mantine/core";
+import { SimpleGrid, Stack, Paper, Text, Title, Group } from "@mantine/core";
 import { IconActivity, IconArticle, IconBroadcast, IconSend, IconClock } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { api, type Signal, type Stats } from "../lib/api";
@@ -10,34 +9,15 @@ import { StatCard } from "../components/StatCard";
 import { DataTable } from "../components/DataTable";
 import { SeverityBadge, ConfidenceBar, SignalIntel } from "../components/badges";
 import { fmtDate } from "../lib/format";
-import { LiveDashboard } from "./LiveDashboard";
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<string>("dashboard");
   const stats = useAsync<Stats>(() => api.stats(), []);
   const recent = useAsync<Signal[]>(() => api.signals({}, 8, 0), []);
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        subtitle="Live overview of the WorldSignal pipeline"
-        actions={
-          <SegmentedControl
-            value={mode}
-            onChange={setMode}
-            data-testid="dashboard-mode"
-            data={[
-              { value: "dashboard", label: "Dashboard" },
-              { value: "live", label: "Live" },
-            ]}
-          />
-        }
-      />
-      {mode === "live" ? (
-        <LiveDashboard />
-      ) : (
+      <PageHeader title="Dashboard" subtitle="Live overview of the WorldSignal pipeline" />
       <Stack gap="lg">
         <AsyncBoundary state={stats}>
           {(s) => (
@@ -78,7 +58,6 @@ export function Dashboard() {
           </AsyncBoundary>
         </Paper>
       </Stack>
-      )}
     </>
   );
 }

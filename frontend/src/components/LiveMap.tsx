@@ -22,12 +22,12 @@ export function LiveMap({
   markers,
   center,
   zoom,
-  height = 560,
+  height = "100%",
 }: {
   markers: MapMarker[];
   center: [number, number];
   zoom: number;
-  height?: number;
+  height?: number | string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);

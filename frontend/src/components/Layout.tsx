@@ -1,4 +1,4 @@
-import { AppShell, Burger, Group, Menu, NavLink, ScrollArea, Text, Avatar, UnstyledButton } from "@mantine/core";
+import { AppShell, Burger, Group, Menu, NavLink, ScrollArea, SegmentedControl, Text, Avatar, UnstyledButton } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
   IconActivity, IconArticle, IconBell, IconBroadcast, IconChartBar, IconDatabase,
@@ -35,22 +35,33 @@ export function Layout() {
   const { user, logout, hasPerm } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const live = location.pathname === "/live"; // URL-driven so it survives reloads
 
   const visible = NAV.filter((n) => !n.perm || hasPerm(n.perm));
 
   return (
     <AppShell
       header={{ height: 56 }}
-      navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: !opened } }}
-      padding="md"
+      navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: !opened || live, desktop: live } }}
+      padding={live ? 0 : "md"}
     >
       <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between">
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="xs">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <LogoMark size={28} />
             <Text fw={700}>World<Text span c="blue" inherit>Signal</Text></Text>
           </Group>
+          <SegmentedControl
+            size="xs"
+            value={live ? "live" : "dashboard"}
+            onChange={(v) => navigate(v === "live" ? "/live" : "/")}
+            data-testid="dashboard-mode"
+            data={[
+              { value: "dashboard", label: "Dashboard" },
+              { value: "live", label: "Live" },
+            ]}
+          />
           <Menu position="bottom-end" withArrow>
             <Menu.Target>
               <UnstyledButton data-testid="user-menu">

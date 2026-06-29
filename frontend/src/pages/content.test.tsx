@@ -10,8 +10,6 @@ const { apiMock } = vi.hoisted(() => ({
   },
 }));
 vi.mock("../lib/api", () => ({ api: apiMock }));
-// The live map mounts Leaflet (needs a real DOM map); stub it for the toggle test.
-vi.mock("./LiveDashboard", () => ({ LiveDashboard: () => <div data-testid="live-dash">live map</div> }));
 
 import { _resetCountriesCache } from "../lib/countries";
 import { Dashboard } from "./Dashboard";
@@ -56,21 +54,6 @@ describe("Dashboard", () => {
     apiMock.signals.mockResolvedValue([]);
     renderWithProviders(<Dashboard />);
     expect(await screen.findByTestId("error")).toBeInTheDocument();
-  });
-  it("toggles between Dashboard and Live modes", async () => {
-    apiMock.stats.mockResolvedValue({ sources: 2, articles: 4, signals: 1, deliveriesSent: 5, deliveriesPending: 1 });
-    apiMock.signals.mockResolvedValue([signal()]);
-    renderWithProviders(<Dashboard />);
-    expect(await screen.findByText("Latest signals")).toBeInTheDocument();
-    expect(screen.queryByTestId("live-dash")).toBeNull();
-
-    const control = screen.getByTestId("dashboard-mode");
-    fireEvent.click(within(control).getByText("Live"));
-    expect(await screen.findByTestId("live-dash")).toBeInTheDocument();
-    expect(screen.queryByText("Latest signals")).toBeNull();
-
-    fireEvent.click(within(control).getByText("Dashboard"));
-    expect(await screen.findByText("Latest signals")).toBeInTheDocument();
   });
 });
 

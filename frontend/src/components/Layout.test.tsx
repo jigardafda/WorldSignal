@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -10,6 +10,9 @@ const { authMock } = vi.hoisted(() => ({
   authMock: { user: { id: "me", email: "me@x.io", name: "Me", role: "ADMIN" }, loading: false, logout: vi.fn(), login: vi.fn(), refresh: vi.fn(), hasPerm: (_p: string): boolean => true },
 }));
 vi.mock("../lib/auth", () => ({ useAuth: () => authMock }));
+// Live Mode mounts Leaflet (needs a real DOM map); stub it here.
+vi.mock("../pages/LiveDashboard", () => ({ LiveDashboard: () => <div data-testid="live-dashboard">live map</div> }));
+import { LiveDashboard } from "../pages/LiveDashboard";
 
 function renderLayout() {
   return render(
@@ -18,6 +21,7 @@ function renderLayout() {
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<div>home-content</div>} />
+            <Route path="live" element={<LiveDashboard />} />
             <Route path="account" element={<div>account-page</div>} />
           </Route>
         </Routes>
@@ -32,8 +36,21 @@ describe("Layout", () => {
   it("renders nav, brand and outlet content", () => {
     renderLayout();
     expect(screen.getByText("home-content")).toBeInTheDocument();
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(screen.getAllByText("Dashboard").length).toBeGreaterThan(0); // nav item + mode toggle
     expect(screen.getByText("Users")).toBeInTheDocument();
+  });
+
+  it("toggles full-screen Live Mode from the top bar", async () => {
+    renderLayout();
+    expect(screen.getByText("home-content")).toBeInTheDocument();
+    expect(screen.queryByTestId("live-dashboard")).toBeNull();
+
+    await userEvent.click(screen.getByText("Live")); // only the toggle has "Live"
+    expect(await screen.findByTestId("live-dashboard")).toBeInTheDocument();
+    expect(screen.queryByText("home-content")).toBeNull(); // outlet replaced by full-screen map
+
+    await userEvent.click(within(screen.getByTestId("dashboard-mode")).getByText("Dashboard"));
+    expect(await screen.findByText("home-content")).toBeInTheDocument();
   });
 
   it("hides permission-gated nav items", () => {

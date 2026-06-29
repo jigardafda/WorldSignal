@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Badge, Group, Paper, Text } from "@mantine/core";
+import { Badge, Group, Text } from "@mantine/core";
 import { IconBroadcast } from "@tabler/icons-react";
 import { api } from "../lib/api";
 import { useCountries } from "../lib/countries";
@@ -66,17 +66,17 @@ export function LiveDashboard() {
   const shown = country ? markers.filter((m) => m.country === country) : markers;
 
   return (
-    <>
-      <Paper withBorder p="sm" radius="md" mb="md">
-        <Group justify="space-between">
-          <Group gap="xs">
-            <Badge color="blue" variant="light" leftSection={<IconBroadcast size={12} />} data-testid="live-indicator">Live</Badge>
-            <Text size="sm" c="dimmed">{shown.length} events on map{lastUpdate && ` · updated ${lastUpdate}`}</Text>
-          </Group>
-          <CountrySelect placeholder="Whole world" value={country} onChange={setCountry} data-testid="live-country" />
+    <div style={{ height: "calc(100dvh - 56px)", display: "flex", flexDirection: "column" }} data-testid="live-dashboard">
+      <Group justify="space-between" px="md" py="xs" style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
+        <Group gap="xs">
+          <Badge color="blue" variant="light" leftSection={<IconBroadcast size={12} />} data-testid="live-indicator">Live</Badge>
+          <Text size="sm" c="dimmed">{shown.length} events on map{lastUpdate && ` · updated ${lastUpdate}`}</Text>
         </Group>
-      </Paper>
-      <LiveMap markers={shown} center={center} zoom={zoom} height={580} />
-    </>
+        <CountrySelect placeholder="Whole world" value={country} onChange={setCountry} data-testid="live-country" />
+      </Group>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" />
+      </div>
+    </div>
   );
 }
