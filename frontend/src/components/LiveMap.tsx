@@ -22,16 +22,19 @@ export function LiveMap({
   zoom,
   height = "100%",
   onSelect,
+  focus = null,
 }: {
   markers: MapMarker[];
   center: [number, number];
   zoom: number;
   height?: number | string;
   onSelect?: (id: string) => void;
+  focus?: [number, number] | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
+  const focusRef = useRef<L.Circle | null>(null);
 
   // Initialise the map exactly once.
   useEffect(() => {
@@ -55,6 +58,28 @@ export function LiveMap({
   useEffect(() => {
     mapRef.current?.setView(center, zoom);
   }, [center, zoom]);
+
+  // Highlight the selected country's area (a focus ring around its capital).
+  const fLat = focus ? focus[0] : null;
+  const fLng = focus ? focus[1] : null;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (focusRef.current) {
+      focusRef.current.remove();
+      focusRef.current = null;
+    }
+    if (fLat != null && fLng != null) {
+      focusRef.current = L.circle([fLat, fLng], {
+        radius: 350000,
+        color: "#2f6df6",
+        weight: 2,
+        dashArray: "6 6",
+        fillColor: "#2f6df6",
+        fillOpacity: 0.06,
+      }).addTo(map);
+    }
+  }, [fLat, fLng]);
 
   // Re-plot markers whenever the set changes.
   useEffect(() => {

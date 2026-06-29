@@ -20,6 +20,11 @@ vi.mock("leaflet", () => {
       layerGroup: vi.fn(() => layerObj),
       marker: vi.fn(() => chain()),
       divIcon: vi.fn(() => ({})),
+      circle: vi.fn(() => {
+        const o: Record<string, unknown> = { remove: vi.fn() };
+        o.addTo = vi.fn(() => o);
+        return o;
+      }),
     },
   };
 });
@@ -58,5 +63,13 @@ describe("LiveMap", () => {
     expect(onCall).toBeTruthy();
     (onCall![1] as () => void)(); // simulate the click
     expect(onSelect).toHaveBeenCalledWith("evt-42");
+  });
+
+  it("draws and clears a country focus ring", () => {
+    const { rerender } = render(<LiveMap markers={[]} center={[48, 2]} zoom={5} focus={[48, 2]} />);
+    expect(vi.mocked(L.circle)).toHaveBeenCalledWith([48, 2], expect.objectContaining({ radius: expect.any(Number) }));
+    const ring = vi.mocked(L.circle).mock.results.at(-1)!.value as Record<string, unknown>;
+    rerender(<LiveMap markers={[]} center={[20, 0]} zoom={2} focus={null} />);
+    expect(ring.remove as Mock).toHaveBeenCalled();
   });
 });

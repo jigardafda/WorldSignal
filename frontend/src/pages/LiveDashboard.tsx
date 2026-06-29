@@ -69,7 +69,7 @@ export function LiveDashboard() {
       const since = new Date(Date.now() - windowMs).toISOString();
       let signals;
       try {
-        signals = await api.liveSignals(since, MAX_MARKERS);
+        signals = await api.liveSignals(since, country, MAX_MARKERS);
       } catch {
         return; // transient; keep polling
       }
@@ -98,7 +98,7 @@ export function LiveDashboard() {
       active = false;
       clearInterval(t);
     };
-  }, [list, windowMin]);
+  }, [list, windowMin, country]);
 
   const sel = country ? byCode[country] : null;
   const center: [number, number] = sel && (sel.capitalLat || sel.capitalLng) ? [sel.capitalLat, sel.capitalLng] : WORLD_CENTER;
@@ -134,7 +134,7 @@ export function LiveDashboard() {
         })}
       </Group>
       <div style={{ flex: 1, minHeight: 0 }}>
-        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} />
+        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={sel ? [sel.capitalLat, sel.capitalLng] : null} />
       </div>
       <SignalDrawer signalId={selectedId} onClose={() => setSelectedId(null)} />
     </div>
