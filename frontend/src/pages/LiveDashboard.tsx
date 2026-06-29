@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ActionIcon, Badge, Checkbox, ColorSwatch, Group, Paper, Select, Stack, Text } from "@mantine/core";
 import { IconBroadcast, IconChevronDown, IconChevronUp, IconStack2 } from "@tabler/icons-react";
-import { api } from "../lib/api";
+import { api, type TaxonomyNode } from "../lib/api";
+import { useAsync } from "../lib/useAsync";
 import { useCountries } from "../lib/countries";
 import { CountrySelect } from "../components/CountrySelect";
 import { LiveMap, type MapMarker } from "../components/LiveMap";
@@ -22,42 +23,77 @@ const WINDOWS = [
   { value: "1440", label: "Last 24 hours" },
 ];
 
-type MarkerRec = MapMarker & { country: string; category: string };
+type MarkerRec = MapMarker & { country: string; category: string; leaf: string };
+
+function setOrDelete(p: URLSearchParams, key: string, value: string) {
+  if (value) p.set(key, value);
+  else p.delete(key);
+}
 
 /** Live Mode: a continuously-updating world map. Within the chosen time window it
  * shows past events plus newly-ingested ones, placed at each event's country
- * location and color-coded by taxonomy category. Filter by country, category
- * layer, and time window. No page refresh. */
+ * location and color-coded by taxonomy category. Layers can be filtered at the
+ * category level or, by expanding a category, at the subcategory level. Filter
+ * by country and time window too. State lives in the URL; no page refresh. */
 export function LiveDashboard() {
   const { byCode, list } = useCountries();
+  const tax = useAsync<TaxonomyNode[]>(() => api.taxonomy(), []);
+  const leavesByDomain = new Map<string, TaxonomyNode[]>();
+  for (const d of tax.data ?? []) leavesByDomain.set(d.code, d.children ?? []);
+
   // Filters live in the URL so they're retained on reload and shareable.
   const [params, setParams] = useSearchParams();
   const windowMin = params.get("w") ?? "60";
   const country = params.get("country");
-  const off = (params.get("off") ?? "").split(",").filter(Boolean);
-  const enabled = CATEGORIES.map((c) => c.code).filter((c) => !off.includes(c));
+  const disabledDomains = new Set((params.get("off") ?? "").split(",").filter(Boolean));
+  const disabledLeaves = new Set((params.get("offsub") ?? "").split(",").filter(Boolean));
 
-  const setParam = (key: string, value: string | null) =>
+  const update = (mut: (p: URLSearchParams) => void) =>
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (!value) next.delete(key);
-        else next.set(key, value);
+        mut(next);
         return next;
       },
       { replace: true },
     );
-  const setCountry = (v: string | null) => setParam("country", v);
-  const setWindowMin = (v: string) => setParam("w", v === "60" ? null : v); // 60 = default → omit
-  const toggle = (code: string) => {
-    const next = off.includes(code) ? off.filter((x) => x !== code) : [...off, code];
-    setParam("off", next.join(","));
-  };
+  const setOne = (key: string, value: string) => update((p) => setOrDelete(p, key, value));
+  const setCountry = (v: string | null) => setOne("country", v ?? "");
+  const setWindowMin = (v: string) => setOne("w", v === "60" ? "" : v); // 60 = default → omit
+
+  const toggleDomain = (code: string) =>
+    update((p) => {
+      const dom = new Set((p.get("off") ?? "").split(",").filter(Boolean));
+      const leaves = new Set((p.get("offsub") ?? "").split(",").filter(Boolean));
+      if (dom.has(code)) {
+        dom.delete(code); // re-enabling a category clears any per-subcategory exclusions
+        for (const l of leavesByDomain.get(code) ?? []) leaves.delete(l.code);
+      } else {
+        dom.add(code);
+      }
+      setOrDelete(p, "off", [...dom].join(","));
+      setOrDelete(p, "offsub", [...leaves].join(","));
+    });
+  const toggleLeaf = (code: string) =>
+    update((p) => {
+      const leaves = new Set((p.get("offsub") ?? "").split(",").filter(Boolean));
+      if (leaves.has(code)) leaves.delete(code);
+      else leaves.add(code);
+      setOrDelete(p, "offsub", [...leaves].join(","));
+    });
 
   const [markers, setMarkers] = useState<MarkerRec[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(true);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpand = (code: string) =>
+    setExpanded((prev) => {
+      const n = new Set(prev);
+      if (n.has(code)) n.delete(code);
+      else n.add(code);
+      return n;
+    });
   const prevIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -84,7 +120,7 @@ export function LiveDashboard() {
         if (!c || (!c.capitalLat && !c.capitalLng)) continue;
         const [lat, lng] = jitter(c.capitalLat, c.capitalLng, s.id);
         const category = domainOf(s.eventType);
-        recs.push({ id: s.id, lat, lng, title: s.title, color: categoryColor(category), country: s.country, category, isNew: !first && !prev.has(s.id) });
+        recs.push({ id: s.id, lat, lng, title: s.title, color: categoryColor(category), country: s.country, category, leaf: s.eventType ?? "", isNew: !first && !prev.has(s.id) });
         ids.add(s.id);
       }
       const freshly = recs.filter((r) => r.isNew).length;
@@ -106,9 +142,13 @@ export function LiveDashboard() {
   const zoom = sel ? 5 : 2;
 
   const inCountry = country ? markers.filter((m) => m.country === country) : markers;
-  const counts: Record<string, number> = {};
-  for (const m of inCountry) counts[m.category] = (counts[m.category] ?? 0) + 1;
-  const shown = inCountry.filter((m) => enabled.includes(m.category));
+  const domainCount: Record<string, number> = {};
+  const leafCount: Record<string, number> = {};
+  for (const m of inCountry) {
+    domainCount[m.category] = (domainCount[m.category] ?? 0) + 1;
+    if (m.leaf) leafCount[m.leaf] = (leafCount[m.leaf] ?? 0) + 1;
+  }
+  const shown = inCountry.filter((m) => !disabledDomains.has(m.category) && !disabledLeaves.has(m.leaf));
 
   return (
     <div style={{ height: "calc(100dvh - 56px)", display: "flex", flexDirection: "column" }} data-testid="live-dashboard">
@@ -129,7 +169,7 @@ export function LiveDashboard() {
           shadow="md"
           radius="md"
           p="xs"
-          style={{ position: "absolute", top: 12, right: 12, zIndex: 1000, width: 220, maxHeight: "calc(100% - 24px)", overflowY: "auto" }}
+          style={{ position: "absolute", top: 12, right: 12, zIndex: 1000, width: 240, maxHeight: "calc(100% - 24px)", overflowY: "auto" }}
           data-testid="live-legend"
         >
           <Group justify="space-between" wrap="nowrap" mb={legendOpen ? 6 : 0}>
@@ -143,23 +183,59 @@ export function LiveDashboard() {
           </Group>
           {legendOpen && (
             <Stack gap={2}>
-              {CATEGORIES.map((c) => (
-                <Checkbox
-                  key={c.code}
-                  size="xs"
-                  checked={enabled.includes(c.code)}
-                  onChange={() => toggle(c.code)}
-                  color={c.color}
-                  data-testid={`layer-${c.code}`}
-                  label={
-                    <Group gap={6} wrap="nowrap">
-                      <ColorSwatch color={c.color} size={10} />
-                      <Text size="xs">{categoryLabel(c.code)}</Text>
-                      <Text size="xs" c="dimmed">{counts[c.code] ?? 0}</Text>
+              {CATEGORIES.map((c) => {
+                const children = leavesByDomain.get(c.code) ?? [];
+                const domainOff = disabledDomains.has(c.code);
+                const offKids = children.filter((ch) => disabledLeaves.has(ch.code)).length;
+                const isExpanded = expanded.has(c.code);
+                return (
+                  <div key={c.code}>
+                    <Group gap={4} wrap="nowrap" justify="space-between">
+                      <Checkbox
+                        size="xs"
+                        checked={!domainOff && offKids === 0}
+                        indeterminate={!domainOff && offKids > 0}
+                        onChange={() => toggleDomain(c.code)}
+                        color={c.color}
+                        data-testid={`layer-${c.code}`}
+                        label={
+                          <Group gap={6} wrap="nowrap">
+                            <ColorSwatch color={c.color} size={10} />
+                            <Text size="xs">{categoryLabel(c.code)}</Text>
+                            <Text size="xs" c="dimmed">{domainCount[c.code] ?? 0}</Text>
+                          </Group>
+                        }
+                      />
+                      {children.length > 0 && (
+                        <ActionIcon variant="subtle" size="xs" color="gray" onClick={() => toggleExpand(c.code)} aria-label={`Expand ${c.label}`} data-testid={`expand-${c.code}`}>
+                          {isExpanded ? <IconChevronUp size={13} /> : <IconChevronDown size={13} />}
+                        </ActionIcon>
+                      )}
                     </Group>
-                  }
-                />
-              ))}
+                    {isExpanded && children.length > 0 && (
+                      <Stack gap={2} pl={26} mt={2}>
+                        {children.map((ch) => (
+                          <Checkbox
+                            key={ch.code}
+                            size="xs"
+                            color={c.color}
+                            checked={!domainOff && !disabledLeaves.has(ch.code)}
+                            disabled={domainOff}
+                            onChange={() => toggleLeaf(ch.code)}
+                            data-testid={`sub-${ch.code}`}
+                            label={
+                              <Group gap={6} wrap="nowrap">
+                                <Text size="xs">{ch.label}</Text>
+                                <Text size="xs" c="dimmed">{leafCount[ch.code] ?? 0}</Text>
+                              </Group>
+                            }
+                          />
+                        ))}
+                      </Stack>
+                    )}
+                  </div>
+                );
+              })}
             </Stack>
           )}
         </Paper>

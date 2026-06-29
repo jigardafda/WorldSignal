@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
 
 const { apiMock } = vi.hoisted(() => ({
-  apiMock: { liveSignals: vi.fn(), countries: vi.fn(), signal: vi.fn() },
+  apiMock: { liveSignals: vi.fn(), countries: vi.fn(), signal: vi.fn(), taxonomy: vi.fn() },
 }));
 vi.mock("../lib/api", () => ({ api: apiMock }));
 
@@ -28,6 +28,10 @@ afterEach(() => vi.clearAllMocks());
 beforeEach(() => {
   _resetCountriesCache();
   apiMock.countries.mockResolvedValue(COUNTRIES);
+  apiMock.taxonomy.mockResolvedValue([
+    { code: "DISASTER", label: "Disaster", children: [{ code: "DISASTER.EARTHQUAKE", label: "Earthquake" }, { code: "DISASTER.FLOOD", label: "Flood" }] },
+    { code: "TECHNOLOGY", label: "Technology", children: [{ code: "TECHNOLOGY.AI", label: "AI" }] },
+  ]);
 });
 
 describe("LiveDashboard", () => {
@@ -84,6 +88,20 @@ describe("LiveDashboard", () => {
     // Turn it back on → both return.
     fireEvent.click(screen.getByTestId("layer-DISASTER"));
     await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
+  });
+
+  it("drills into subcategories to filter at the leaf level", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "Quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+      { id: "s2", title: "Flood", country: "US", severity: "HIGH", eventType: "DISASTER.FLOOD", lastSeenAt: "" },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    const map = await screen.findByTestId("map");
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "2")); // both Disaster
+
+    fireEvent.click(screen.getByTestId("expand-DISASTER")); // reveal subcategories
+    fireEvent.click(await screen.findByTestId("sub-DISASTER.FLOOD")); // hide the Flood subcategory
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "1")); // only Earthquake remains
   });
 
   it("collapses the category legend widget", async () => {
