@@ -7,6 +7,9 @@ const { apiMock } = vi.hoisted(() => ({
 }));
 vi.mock("../lib/api", () => ({ api: apiMock }));
 
+// Geocoding loads a large offline DB; stub it. null => fall back to country capital.
+vi.mock("../lib/geocode", () => ({ geocode: vi.fn(() => null), preloadGeo: vi.fn(() => Promise.resolve()) }));
+
 // Stub the Leaflet map; expose a button to trigger onSelect for the first marker.
 vi.mock("../components/LiveMap", () => ({
   LiveMap: ({ markers, center, zoom, onSelect, focus }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void; focus?: string | null }) => (

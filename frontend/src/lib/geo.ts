@@ -12,7 +12,7 @@ export function jitter(lat: number, lng: number, seed: string): [number, number]
     h = (h ^ seed.charCodeAt(i)) >>> 0;
     h = (h * 16777619) >>> 0;
   }
-  const dx = ((h % 1000) / 1000 - 0.5) * 1.4; // ±0.7°
-  const dy = (((h >>> 10) % 1000) / 1000 - 0.5) * 1.4;
+  const dx = ((h % 1000) / 1000 - 0.5) * 0.24; // ±0.12° — separates co-located events without misplacing them
+  const dy = (((h >>> 10) % 1000) / 1000 - 0.5) * 0.24;
   return [clampLat(lat + dy), lng + dx];
 }

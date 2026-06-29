@@ -9,6 +9,7 @@ import { CountrySelect } from "../components/CountrySelect";
 import { LiveMap, type MapMarker } from "../components/LiveMap";
 import { SignalDrawer } from "../components/SignalDrawer";
 import { jitter } from "../lib/geo";
+import { geocode, preloadGeo } from "../lib/geocode";
 import { CATEGORIES, categoryColor, categoryLabel, domainOf } from "../lib/categories";
 
 const POLL_MS = 4000;
@@ -95,9 +96,11 @@ export function LiveDashboard() {
       return n;
     });
   const prevIdsRef = useRef<Set<string>>(new Set());
+  const coordRef = useRef<Map<string, [number, number]>>(new Map());
 
   useEffect(() => {
     if (list.length === 0) return; // wait until country coordinates are loaded
+    void preloadGeo(); // warm the precise-geocoding DB in the background
     const coords = new Map(list.map((c) => [c.code, c]));
     const windowMs = Number(windowMin) * 60_000;
     let active = true;
@@ -116,13 +119,26 @@ export function LiveDashboard() {
       const ids = new Set<string>();
       for (const s of signals) {
         if (!s.country) continue;
-        const c = coords.get(s.country);
-        if (!c || (!c.capitalLat && !c.capitalLng)) continue;
-        const [lat, lng] = jitter(c.capitalLat, c.capitalLng, s.id);
+        // Most precise location available: city → state → country capital. Precise
+        // hits are cached; the capital fallback is recomputed until the geocoding
+        // DB loads (then markers upgrade to their city/state position).
+        let pos = coordRef.current.get(s.id);
+        if (!pos) {
+          const g = geocode(s.country, s.region, s.city);
+          if (g) {
+            pos = jitter(g.lat, g.lng, s.id);
+            coordRef.current.set(s.id, pos);
+          } else {
+            const c = coords.get(s.country);
+            if (c && (c.capitalLat || c.capitalLng)) pos = jitter(c.capitalLat, c.capitalLng, s.id);
+          }
+        }
+        if (!pos) continue;
         const category = domainOf(s.eventType);
-        recs.push({ id: s.id, lat, lng, title: s.title, color: categoryColor(category), country: s.country, category, leaf: s.eventType ?? "", isNew: !first && !prev.has(s.id) });
+        recs.push({ id: s.id, lat: pos[0], lng: pos[1], title: s.title, color: categoryColor(category), country: s.country, category, leaf: s.eventType ?? "", isNew: !first && !prev.has(s.id) });
         ids.add(s.id);
       }
+      if (!active) return;
       const freshly = recs.filter((r) => r.isNew).length;
       prevIdsRef.current = ids;
       first = false;
