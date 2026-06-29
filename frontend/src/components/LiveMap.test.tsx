@@ -27,7 +27,7 @@ vi.mock("leaflet", () => {
 import L from "leaflet";
 import { LiveMap, type MapMarker } from "./LiveMap";
 
-const m = (id: string, isNew = false): MapMarker => ({ id, lat: 10, lng: 20, title: id, isNew });
+const m = (id: string, isNew = false): MapMarker => ({ id, lat: 10, lng: 20, title: id, color: "#e03131", isNew });
 
 describe("LiveMap", () => {
   it("initializes Leaflet once and plots a marker per event", () => {
@@ -35,9 +35,10 @@ describe("LiveMap", () => {
     expect(vi.mocked(L.map)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(L.tileLayer)).toHaveBeenCalled();
     expect(vi.mocked(L.marker)).toHaveBeenCalledTimes(2);
-    // A "new" marker uses the pulsing icon variant.
+    // A "new" marker uses the pulsing icon variant, color-coded via --ws-c.
     const iconHtml = vi.mocked(L.divIcon).mock.calls.map((c) => (c[0] as { html: string }).html).join("|");
     expect(iconHtml).toContain("ws-pulse-new");
+    expect(iconHtml).toContain("--ws-c:#e03131");
 
     // Re-rendering with more markers re-plots without re-initialising the map.
     rerender(<LiveMap markers={[m("a"), m("b"), m("c")]} center={[20, 0]} zoom={2} />);

@@ -31,10 +31,10 @@ beforeEach(() => {
 describe("LiveDashboard", () => {
   it("plots a marker per geo-locatable event and starts on the world view", async () => {
     apiMock.liveSignals.mockResolvedValue([
-      { id: "s1", title: "US quake", country: "US", severity: "HIGH", lastSeenAt: "" },
-      { id: "s2", title: "FR strike", country: "FR", severity: "LOW", lastSeenAt: "" },
-      { id: "s3", title: "No country", country: null, severity: "LOW", lastSeenAt: "" },
-      { id: "s4", title: "Unknown country", country: "ZZ", severity: "LOW", lastSeenAt: "" },
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+      { id: "s2", title: "FR strike", country: "FR", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" },
+      { id: "s3", title: "No country", country: null, severity: "LOW", eventType: null, lastSeenAt: "" },
+      { id: "s4", title: "Unknown country", country: "ZZ", severity: "LOW", eventType: null, lastSeenAt: "" },
     ]);
     renderWithProviders(<LiveDashboard />);
     const map = await screen.findByTestId("map");
@@ -47,8 +47,8 @@ describe("LiveDashboard", () => {
 
   it("reframes and filters to a selected country", async () => {
     apiMock.liveSignals.mockResolvedValue([
-      { id: "s1", title: "US quake", country: "US", severity: "HIGH", lastSeenAt: "" },
-      { id: "s2", title: "FR strike", country: "FR", severity: "LOW", lastSeenAt: "" },
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+      { id: "s2", title: "FR strike", country: "FR", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" },
     ]);
     renderWithProviders(<LiveDashboard />);
     await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "2"));
@@ -61,6 +61,24 @@ describe("LiveDashboard", () => {
     await waitFor(() => expect(map).toHaveAttribute("data-count", "1")); // only FR
     expect(map).toHaveAttribute("data-zoom", "5");
     expect(map).toHaveAttribute("data-center", "48.85,2.35");
+  });
+
+  it("filters events by category layer via the legend", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+      { id: "s2", title: "FR AI", country: "FR", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    const map = await screen.findByTestId("map");
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
+    expect(screen.getByTestId("live-legend")).toBeInTheDocument();
+
+    // Turn the Disaster layer off → only the Technology event remains.
+    fireEvent.click(screen.getByTestId("layer-DISASTER"));
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "1"));
+    // Turn it back on → both return.
+    fireEvent.click(screen.getByTestId("layer-DISASTER"));
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
   });
 
   it("survives a feed error without crashing", async () => {

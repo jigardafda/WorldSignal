@@ -5,30 +5,32 @@
   z-index: 0;
 }
 
-/* Glowing blue event marker rendered inside a Leaflet divIcon. */
+/* Event marker rendered inside a Leaflet divIcon. Color is per-category via the
+   --ws-c custom property set inline on the span. */
 .ws-pulse {
+  --ws-c: #2f6df6;
   display: block;
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #2f6df6;
-  box-shadow: 0 0 10px 2px rgba(47, 109, 246, 0.85);
+  background: var(--ws-c);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--ws-c) 75%, transparent);
   border: 2px solid rgba(255, 255, 255, 0.9);
 }
 
-/* Newly ingested events ripple a few times to draw the eye. */
+/* Newly ingested events ripple a few times in their category color. */
 .ws-pulse-new {
   animation: ws-pulse-ring 1.8s ease-out 4;
 }
 
 @keyframes ws-pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 rgba(34, 195, 230, 0.7), 0 0 10px 2px rgba(47, 109, 246, 0.85);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ws-c) 70%, transparent), 0 0 10px 2px color-mix(in srgb, var(--ws-c) 75%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 22px rgba(34, 195, 230, 0), 0 0 10px 2px rgba(47, 109, 246, 0.85);
+    box-shadow: 0 0 0 22px color-mix(in srgb, var(--ws-c) 0%, transparent), 0 0 10px 2px color-mix(in srgb, var(--ws-c) 75%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(34, 195, 230, 0), 0 0 10px 2px rgba(47, 109, 246, 0.85);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ws-c) 0%, transparent), 0 0 10px 2px color-mix(in srgb, var(--ws-c) 75%, transparent);
   }
 }

@@ -8,6 +8,7 @@ export interface MapMarker {
   lat: number;
   lng: number;
   title: string;
+  color?: string;
   isNew?: boolean;
 }
 
@@ -62,9 +63,10 @@ export function LiveMap({
     if (!layer) return;
     layer.clearLayers();
     for (const m of markers) {
+      const color = (m.color ?? "#2f6df6").replace(/[^#a-zA-Z0-9(),.% ]/g, "");
       const icon = L.divIcon({
         className: "ws-marker",
-        html: `<span class="ws-pulse${m.isNew ? " ws-pulse-new" : ""}"></span>`,
+        html: `<span class="ws-pulse${m.isNew ? " ws-pulse-new" : ""}" style="--ws-c:${color}"></span>`,
         iconSize: [14, 14],
         iconAnchor: [7, 7],
       });

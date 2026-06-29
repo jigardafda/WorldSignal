@@ -1,24 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-import { Badge, Group, Text } from "@mantine/core";
+import { Badge, Group, Text, UnstyledButton } from "@mantine/core";
 import { IconBroadcast } from "@tabler/icons-react";
 import { api } from "../lib/api";
 import { useCountries } from "../lib/countries";
 import { CountrySelect } from "../components/CountrySelect";
 import { LiveMap, type MapMarker } from "../components/LiveMap";
 import { jitter } from "../lib/geo";
+import { CATEGORIES, categoryColor, categoryLabel, domainOf } from "../lib/categories";
 
 const POLL_MS = 4000;
 const MAX_MARKERS = 500;
 const WORLD_CENTER: [number, number] = [20, 0];
 
-type MarkerRec = MapMarker & { country: string };
+type MarkerRec = MapMarker & { country: string; category: string };
 
 /** Live Mode: a continuously-updating world map. Polls the signal feed, places a
- * glowing pulse marker at each event's country location, and reframes to the
- * whole world or a single country. No page refresh required. */
+ * pulse marker at each event's country location color-coded by taxonomy category,
+ * and supports filtering by country and by category layer. No page refresh. */
 export function LiveDashboard() {
   const { byCode, list } = useCountries();
   const [country, setCountry] = useState<string | null>(null);
+  const [enabled, setEnabled] = useState<string[]>(CATEGORIES.map((c) => c.code));
   const [markers, setMarkers] = useState<MarkerRec[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string>("");
   const storeRef = useRef<Map<string, MarkerRec>>(new Map());
@@ -42,7 +44,8 @@ export function LiveDashboard() {
         const c = coords.get(s.country);
         if (!c || (!c.capitalLat && !c.capitalLng)) continue;
         const [lat, lng] = jitter(c.capitalLat, c.capitalLng, s.id);
-        store.set(s.id, { id: s.id, lat, lng, title: s.title, country: s.country });
+        const category = domainOf(s.eventType);
+        store.set(s.id, { id: s.id, lat, lng, title: s.title, color: categoryColor(category), country: s.country, category });
         fresh.add(s.id);
       }
       while (store.size > MAX_MARKERS) {
@@ -63,7 +66,14 @@ export function LiveDashboard() {
   const sel = country ? byCode[country] : null;
   const center: [number, number] = sel && (sel.capitalLat || sel.capitalLng) ? [sel.capitalLat, sel.capitalLng] : WORLD_CENTER;
   const zoom = sel ? 5 : 2;
-  const shown = country ? markers.filter((m) => m.country === country) : markers;
+
+  const inCountry = country ? markers.filter((m) => m.country === country) : markers;
+  const counts: Record<string, number> = {};
+  for (const m of inCountry) counts[m.category] = (counts[m.category] ?? 0) + 1;
+  const shown = inCountry.filter((m) => enabled.includes(m.category));
+
+  const toggle = (code: string) =>
+    setEnabled((prev) => (prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code]));
 
   return (
     <div style={{ height: "calc(100dvh - 56px)", display: "flex", flexDirection: "column" }} data-testid="live-dashboard">
@@ -73,6 +83,22 @@ export function LiveDashboard() {
           <Text size="sm" c="dimmed">{shown.length} events on map{lastUpdate && ` · updated ${lastUpdate}`}</Text>
         </Group>
         <CountrySelect placeholder="Whole world" value={country} onChange={setCountry} data-testid="live-country" />
+      </Group>
+      <Group gap={6} px="md" py="xs" style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }} data-testid="live-legend">
+        {CATEGORIES.map((c) => {
+          const on = enabled.includes(c.code);
+          return (
+            <UnstyledButton key={c.code} onClick={() => toggle(c.code)} data-testid={`layer-${c.code}`} aria-pressed={on}>
+              <Badge
+                variant={on ? "filled" : "outline"}
+                color={c.color}
+                style={{ opacity: on ? 1 : 0.45, cursor: "pointer" }}
+              >
+                {categoryLabel(c.code)} {counts[c.code] ?? 0}
+              </Badge>
+            </UnstyledButton>
+          );
+        })}
       </Group>
       <div style={{ flex: 1, minHeight: 0 }}>
         <LiveMap markers={shown} center={center} zoom={zoom} height="100%" />
