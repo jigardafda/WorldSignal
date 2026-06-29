@@ -18,7 +18,7 @@ export function SignalDrawer({ signalId, onClose }: { signalId: string | null; o
   const state = useAsync<Signal | null>(() => (signalId ? api.signal(signalId) : Promise.resolve(null)), [signalId]);
 
   return (
-    <Drawer opened={!!signalId} onClose={onClose} position="right" size="md" title="Signal details" data-testid="signal-drawer" closeButtonProps={{ "aria-label": "Close details" }}>
+    <Drawer opened={!!signalId} onClose={onClose} position="right" size="md" title="Signal details" data-testid="signal-drawer" zIndex={2000} closeButtonProps={{ "aria-label": "Close details" }}>
       {signalId && (
         <AsyncBoundary state={state}>
           {(s) =>
