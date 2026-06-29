@@ -1,12 +1,13 @@
-import { AppShell, Burger, Group, Menu, NavLink, ScrollArea, Text, ThemeIcon, Avatar, UnstyledButton } from "@mantine/core";
+import { AppShell, Burger, Group, Menu, NavLink, ScrollArea, Text, Avatar, UnstyledButton } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
   IconActivity, IconArticle, IconBell, IconBroadcast, IconChartBar, IconDatabase,
   IconFileText, IconGauge, IconListCheck, IconLogout, IconSettings, IconSitemap,
-  IconUsers, IconUsersGroup, IconWorld,
+  IconUsers, IconUsersGroup,
 } from "@tabler/icons-react";
 import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { LogoMark } from "./Logo";
 
 interface NavItem { to: string; label: string; icon: React.ReactNode; perm?: string }
 
@@ -47,7 +48,7 @@ export function Layout() {
         <Group h="100%" px="md" justify="space-between">
           <Group gap="xs">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <ThemeIcon variant="gradient" gradient={{ from: "blue", to: "cyan" }} radius="md"><IconWorld size={18} /></ThemeIcon>
+            <LogoMark size={28} />
             <Text fw={700}>World<Text span c="blue" inherit>Signal</Text></Text>
           </Group>
           <Menu position="bottom-end" withArrow>

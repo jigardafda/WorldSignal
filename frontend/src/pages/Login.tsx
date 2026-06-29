@@ -1,6 +1,6 @@
-import { Alert, Button, Center, Paper, PasswordInput, Stack, Text, TextInput, ThemeIcon, Title } from "@mantine/core";
+import { Alert, Button, Center, Paper, PasswordInput, Stack, Text, TextInput, Title } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { IconWorld } from "@tabler/icons-react";
+import { LogoMark } from "../components/Logo";
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
@@ -42,7 +42,7 @@ export function Login() {
     <Center mih="100vh" bg="var(--mantine-color-gray-0)">
       <Paper withBorder shadow="md" p="xl" radius="md" w={380}>
         <Stack align="center" gap="xs" mb="md">
-          <ThemeIcon variant="gradient" gradient={{ from: "blue", to: "cyan" }} size={48} radius="md"><IconWorld size={28} /></ThemeIcon>
+          <LogoMark size={48} />
           <Title order={3}>WorldSignal</Title>
           <Text c="dimmed" size="sm">Sign in to the admin console</Text>
         </Stack>
