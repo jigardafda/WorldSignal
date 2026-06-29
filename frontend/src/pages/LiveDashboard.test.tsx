@@ -3,14 +3,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
 
 const { apiMock } = vi.hoisted(() => ({
-  apiMock: { liveSignals: vi.fn(), countries: vi.fn() },
+  apiMock: { liveSignals: vi.fn(), countries: vi.fn(), signal: vi.fn() },
 }));
 vi.mock("../lib/api", () => ({ api: apiMock }));
 
-// Stub the Leaflet map so the page logic is testable without a real DOM map.
+// Stub the Leaflet map; expose a button to trigger onSelect for the first marker.
 vi.mock("../components/LiveMap", () => ({
-  LiveMap: ({ markers, center, zoom }: { markers: { id: string }[]; center: [number, number]; zoom: number }) => (
-    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")} />
+  LiveMap: ({ markers, center, zoom, onSelect }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void }) => (
+    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")}>
+      {markers[0] && <button data-testid="map-pick" onClick={() => onSelect?.(markers[0].id)}>pick</button>}
+    </div>
   ),
 }));
 
@@ -90,6 +92,24 @@ describe("LiveDashboard", () => {
     const since = apiMock.liveSignals.mock.calls[0][0];
     expect(typeof since).toBe("string");
     expect(Number.isNaN(Date.parse(since))).toBe(false); // valid ISO timestamp
+  });
+
+  it("opens the detail drawer when a marker is selected", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+    ]);
+    apiMock.signal.mockResolvedValue({
+      id: "s1", title: "US quake detail", summary: "Big one.", whatHappened: null, whyItMatters: null,
+      status: "CONFIRMED", severity: "HIGH", confidence: 0.8, eventType: "DISASTER.EARTHQUAKE",
+      country: "US", region: null, city: null, sentiment: null, influence: null, relevance: null,
+      language: "en", translated: false, originalTitle: null, originalSummary: null,
+      sourceCount: 1, firstSeenAt: "", lastSeenAt: "", tags: [], sources: [], attributes: [],
+    });
+    renderWithProviders(<LiveDashboard />);
+    await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "1"));
+    fireEvent.click(screen.getByTestId("map-pick"));
+    expect(await screen.findByText("US quake detail")).toBeInTheDocument();
+    expect(apiMock.signal).toHaveBeenCalledWith("s1");
   });
 
   it("survives a feed error without crashing", async () => {

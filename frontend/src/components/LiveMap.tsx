@@ -12,23 +12,22 @@ export interface MapMarker {
   isNew?: boolean;
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
-}
-
 /** An interactive 2D world map (Leaflet + OpenStreetMap tiles) that plots events
- * as glowing blue pulse markers. `center`/`zoom` drive world-vs-country framing;
- * markers flagged `isNew` ripple. Real Leaflet runs in the browser; tests mock it. */
+ * as glowing pulse markers, color-coded per category. `center`/`zoom` drive
+ * world-vs-country framing; markers flagged `isNew` ripple. Clicking a marker
+ * invokes `onSelect` with its id. Real Leaflet runs in the browser; tests mock it. */
 export function LiveMap({
   markers,
   center,
   zoom,
   height = "100%",
+  onSelect,
 }: {
   markers: MapMarker[];
   center: [number, number];
   zoom: number;
   height?: number | string;
+  onSelect?: (id: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -71,10 +70,10 @@ export function LiveMap({
         iconAnchor: [7, 7],
       });
       L.marker([m.lat, m.lng], { icon, title: m.title })
-        .bindPopup(`<b>${escapeHtml(m.title)}</b>`)
+        .on("click", () => onSelect?.(m.id))
         .addTo(layer);
     }
-  }, [markers]);
+  }, [markers, onSelect]);
 
   return <div ref={containerRef} data-testid="live-map" style={{ height, width: "100%", borderRadius: 8, overflow: "hidden" }} />;
 }

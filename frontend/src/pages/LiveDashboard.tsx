@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Group, Select, Text, UnstyledButton } from "@mantine/core";
 import { IconBroadcast } from "@tabler/icons-react";
 import { api } from "../lib/api";
 import { useCountries } from "../lib/countries";
 import { CountrySelect } from "../components/CountrySelect";
 import { LiveMap, type MapMarker } from "../components/LiveMap";
+import { SignalDrawer } from "../components/SignalDrawer";
 import { jitter } from "../lib/geo";
 import { CATEGORIES, categoryColor, categoryLabel, domainOf } from "../lib/categories";
 
@@ -33,7 +34,9 @@ export function LiveDashboard() {
   const [enabled, setEnabled] = useState<string[]>(CATEGORIES.map((c) => c.code));
   const [markers, setMarkers] = useState<MarkerRec[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string>("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const prevIdsRef = useRef<Set<string>>(new Set());
+  const onSelect = useCallback((id: string) => setSelectedId(id), []);
 
   useEffect(() => {
     if (list.length === 0) return; // wait until country coordinates are loaded
@@ -113,8 +116,9 @@ export function LiveDashboard() {
         })}
       </Group>
       <div style={{ flex: 1, minHeight: 0 }}>
-        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" />
+        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={onSelect} />
       </div>
+      <SignalDrawer signalId={selectedId} onClose={() => setSelectedId(null)} />
     </div>
   );
 }

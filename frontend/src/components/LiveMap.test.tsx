@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 import { render } from "@testing-library/react";
 
 vi.mock("leaflet", () => {
@@ -10,7 +10,7 @@ vi.mock("leaflet", () => {
   const chain = () => {
     const o: Record<string, unknown> = {};
     o.addTo = vi.fn(() => o);
-    o.bindPopup = vi.fn(() => o);
+    o.on = vi.fn(() => o);
     return o;
   };
   return {
@@ -48,5 +48,15 @@ describe("LiveMap", () => {
     // Changing the frame recenters the existing map.
     rerender(<LiveMap markers={[m("a")]} center={[48, 2]} zoom={5} />);
     unmount();
+  });
+
+  it("invokes onSelect with the marker id on click", () => {
+    const onSelect = vi.fn();
+    render(<LiveMap markers={[m("evt-42")]} center={[0, 0]} zoom={2} onSelect={onSelect} />);
+    const markerInstance = vi.mocked(L.marker).mock.results.at(-1)!.value as Record<string, unknown>;
+    const onCall = (markerInstance.on as Mock).mock.calls.find((c) => c[0] === "click");
+    expect(onCall).toBeTruthy();
+    (onCall![1] as () => void)(); // simulate the click
+    expect(onSelect).toHaveBeenCalledWith("evt-42");
   });
 });
