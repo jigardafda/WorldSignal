@@ -11,6 +11,21 @@ func canon(t *testing.T, in string) string {
 	return out
 }
 
+func TestGoogleNewsRssArticlesRewritten(t *testing.T) {
+	got := canon(t, "https://news.google.com/rss/articles/CBMiABC?oc=5&hl=en-IN")
+	want := "https://news.google.com/articles/CBMiABC?hl=en-IN&oc=5"
+	if got != want {
+		t.Fatalf("Canonicalize rss/articles = %q, want %q", got, want)
+	}
+	// Non-RSS Google News paths and other hosts are untouched.
+	if got := canon(t, "https://news.google.com/articles/XYZ"); got != "https://news.google.com/articles/XYZ" {
+		t.Fatalf("plain /articles changed: %q", got)
+	}
+	if got := canon(t, "https://example.com/rss/articles/abc"); got != "https://example.com/rss/articles/abc" {
+		t.Fatalf("other host changed: %q", got)
+	}
+}
+
 func TestStripsTrackingWwwLowercaseHost(t *testing.T) {
 	got := canon(t, "https://WWW.Example.com/Story?utm_source=twitter&id=5&fbclid=abc")
 	if got != "https://example.com/Story?id=5" {

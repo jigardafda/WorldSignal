@@ -54,6 +54,13 @@ func Canonicalize(input string) (string, bool) {
 		}
 	}
 
+	// Google News RSS item links use the feed-only "/rss/articles/<token>" form,
+	// which shows a "Redirect notice"/invalid-address error in a browser. The
+	// browser-resolvable form is "/articles/<token>".
+	if host == "news.google.com" && strings.HasPrefix(path, "/rss/articles/") {
+		path = strings.TrimPrefix(path, "/rss")
+	}
+
 	out := scheme + "://" + host + path
 	if query != "" {
 		out += "?" + query
