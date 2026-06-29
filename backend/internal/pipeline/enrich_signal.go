@@ -152,6 +152,7 @@ func EnrichSignal(ctx context.Context, d *db.DB, gw llm.Gateway, cr PageCrawler,
 		SentimentScore: &attrs.SentimentScore,
 		Influence:      nilIfEmpty(attrs.Influence),
 		Relevance:      &attrs.Relevance,
+		Language:       nilIfEmpty(enr.Language),
 		Attributes:     attrRows,
 	})
 }

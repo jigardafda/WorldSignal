@@ -60,6 +60,40 @@ func TestLLMPathValid(t *testing.T) {
 	}
 }
 
+func TestLLMTranslationFlag(t *testing.T) {
+	// Non-English source → translated, with the English narrative the LLM returned.
+	fr := fakeGateway{enabled: true, out: []byte(`{"title":"Quake","summary":"S","language":"fr-FR"}`)}
+	r := EnrichArticle(context.Background(), fr, EnrichInput{Title: "Séisme", Body: "y"})
+	if r.Language != "fr" || !r.Translated {
+		t.Fatalf("french source should be translated: lang=%q translated=%v", r.Language, r.Translated)
+	}
+	if r.Title != "Quake" {
+		t.Fatalf("title should be the English translation: %q", r.Title)
+	}
+	// English source → not translated.
+	en := fakeGateway{enabled: true, out: []byte(`{"title":"T","summary":"S","language":"en"}`)}
+	if r := EnrichArticle(context.Background(), en, EnrichInput{Title: "x", Body: "y"}); r.Translated || r.Language != "en" {
+		t.Fatalf("english source should not be translated: %+v", r)
+	}
+	// Missing/garbage language → empty, not translated.
+	none := fakeGateway{enabled: true, out: []byte(`{"title":"T","summary":"S","language":"xyz"}`)}
+	if r := EnrichArticle(context.Background(), none, EnrichInput{Title: "x", Body: "y"}); r.Translated || r.Language != "" {
+		t.Fatalf("garbage language should be dropped: %+v", r)
+	}
+}
+
+func TestNormalizeLang(t *testing.T) {
+	cases := map[string]string{
+		"en": "en", "EN": "en", " fr ": "fr", "en-US": "en", "pt_BR": "pt",
+		"english": "", "e": "", "": "", "e1": "", "zh-Hans-CN": "zh",
+	}
+	for in, want := range cases {
+		if got := normalizeLang(in); got != want {
+			t.Errorf("normalizeLang(%q) = %q want %q", in, got, want)
+		}
+	}
+}
+
 func TestLLMPathEmptyTagsFallback(t *testing.T) {
 	gw := fakeGateway{enabled: true, out: []byte(`{"title":"T","summary":"S","tags":[{"code":"BAD","confidence":0.5}]}`)}
 	r := EnrichArticle(context.Background(), gw, EnrichInput{Title: "x", Body: "y"})

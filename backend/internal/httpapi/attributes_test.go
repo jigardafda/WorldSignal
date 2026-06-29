@@ -27,13 +27,13 @@ func seedEnrichedSignal(t *testing.T, d *db.DB) {
 	ex(`INSERT INTO "Article" ("id","sourceId","canonicalUrl","title","publishedAt") VALUES ('a1','s1','https://s.example/a','A',now())`)
 	ex(`INSERT INTO "SignalArticle" ("signalId","articleId","relationType","similarityScore") VALUES ('sg','a1','PRIMARY',1)`)
 
-	region, scope, sent, infl := "California", "LOCAL", "NEGATIVE", "HIGH"
+	region, scope, sent, infl, lang := "California", "LOCAL", "NEGATIVE", "HIGH", "fr"
 	score, rel := -0.6, 0.9
 	if err := d.ApplyEnrichment(ctx, "sg", db.EnrichmentUpdate{
 		Title: "T", Summary: "S", Severity: "HIGH", Confidence: 0.8, Status: "CONFIRMED",
 		PublishedAt: time.Now(), Metadata: map[string]any{},
 		Region: &region, GeoScope: &scope, Sentiment: &sent, SentimentScore: &score,
-		Influence: &infl, Relevance: &rel,
+		Influence: &infl, Relevance: &rel, Language: &lang,
 		Attributes: []db.SignalAttr{
 			{Key: "industry", ValueCode: "CYBERSECURITY", Confidence: 1},
 			{Key: "category", ValueCode: "DISASTER.EARTHQUAKE", Confidence: 0.9},
@@ -52,8 +52,8 @@ func TestGraphQLSignalAttributes(t *testing.T) {
 	bearer = tok
 	defer func() { bearer = "" }()
 
-	_, body := postGQL(t, ht.URL, `{"query":"{ signals { id geoScope sentiment sentimentScore influence relevance region attributes { key valueCode valueText } } }"}`)
-	for _, want := range []string{`"geoScope":"LOCAL"`, `"sentiment":"NEGATIVE"`, `"influence":"HIGH"`, `"region":"California"`, `"valueCode":"CYBERSECURITY"`, `"valueText":"Acme"`} {
+	_, body := postGQL(t, ht.URL, `{"query":"{ signals { id geoScope sentiment sentimentScore influence relevance region language translated attributes { key valueCode valueText } } }"}`)
+	for _, want := range []string{`"geoScope":"LOCAL"`, `"sentiment":"NEGATIVE"`, `"influence":"HIGH"`, `"region":"California"`, `"language":"fr"`, `"translated":true`, `"valueCode":"CYBERSECURITY"`, `"valueText":"Acme"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("signals response missing %s: %s", want, body)
 		}
@@ -146,7 +146,7 @@ func TestRESTSignalAttributes(t *testing.T) {
 	ht, _ := newServer(t, d)
 
 	_, body := get(t, ht.URL, "/v1/signals/sg")
-	for _, want := range []string{`"geoScope":"LOCAL"`, `"sentiment":"NEGATIVE"`, `"relevance":0.9`, `"valueCode":"CYBERSECURITY"`} {
+	for _, want := range []string{`"geoScope":"LOCAL"`, `"sentiment":"NEGATIVE"`, `"relevance":0.9`, `"language":"fr"`, `"translated":true`, `"valueCode":"CYBERSECURITY"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("REST signal missing %s: %s", want, body)
 		}

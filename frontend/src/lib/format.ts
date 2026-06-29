@@ -12,6 +12,20 @@ export function pct(value: number | null | undefined): string {
   return `${Math.round(value * 100)}%`;
 }
 
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English", fr: "French", es: "Spanish", de: "German", it: "Italian",
+  pt: "Portuguese", ru: "Russian", zh: "Chinese", ja: "Japanese", ko: "Korean",
+  ar: "Arabic", hi: "Hindi", bn: "Bengali", ur: "Urdu", fa: "Persian",
+  tr: "Turkish", nl: "Dutch", pl: "Polish", uk: "Ukrainian", vi: "Vietnamese",
+  th: "Thai", id: "Indonesian", he: "Hebrew", sv: "Swedish", el: "Greek",
+};
+
+/** Human-readable language name for an ISO 639-1 code, falling back to the code. */
+export function languageName(code: string | null | undefined): string {
+  if (!code) return "";
+  return LANGUAGE_NAMES[code.toLowerCase()] ?? code.toUpperCase();
+}
+
 /** Relative "x ago" string for an ISO timestamp. */
 export function timeAgo(iso: string | null | undefined): string {
   if (!iso) return "never";

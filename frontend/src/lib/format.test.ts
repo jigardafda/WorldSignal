@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { fmtDate, pct, timeAgo } from "./format";
+import { fmtDate, languageName, pct, timeAgo } from "./format";
+
+describe("languageName", () => {
+  it("maps known codes, falls back to upper-case, handles empty", () => {
+    expect(languageName("fr")).toBe("French");
+    expect(languageName("EN")).toBe("English");
+    expect(languageName("xx")).toBe("XX");
+    expect(languageName(null)).toBe("");
+    expect(languageName(undefined)).toBe("");
+  });
+});
 
 describe("fmtDate", () => {
   it("formats valid dates and dashes empties/invalids", () => {

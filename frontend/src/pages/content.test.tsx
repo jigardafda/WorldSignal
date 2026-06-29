@@ -22,6 +22,7 @@ const signal = (over = {}) => ({
   country: "US", sourceCount: 3, firstSeenAt: "2026-01-01T00:00:00Z", lastSeenAt: "2026-01-01T00:00:00Z",
   region: "California", city: "Los Angeles", locality: null, geoScope: "LOCAL",
   sentiment: "NEGATIVE", sentimentScore: -0.6, influence: "HIGH", relevance: 0.9,
+  language: "en", translated: false,
   tags: [{ code: "DISASTER.EARTHQUAKE", confidence: 0.9 }],
   sources: [{ publisher: "BBC", url: "https://bbc.example/a", publishedAt: "2026-01-01T00:00:00Z" }],
   attributes: [
@@ -119,6 +120,17 @@ describe("SignalDetail", () => {
     apiMock.signal.mockResolvedValue(null);
     renderWithProviders(<SignalDetail />, { route: "/signals/x", path: "/signals/:id" });
     expect(await screen.findByText("Signal not found.")).toBeInTheDocument();
+  });
+  it("shows a translated badge for non-English sources", async () => {
+    apiMock.signal.mockResolvedValue(signal({ language: "fr", translated: true }));
+    renderWithProviders(<SignalDetail />, { route: "/signals/sg", path: "/signals/:id" });
+    expect(await screen.findByTestId("signal-translated")).toHaveTextContent("Translated from French");
+  });
+  it("hides the translated badge for English signals", async () => {
+    apiMock.signal.mockResolvedValue(signal());
+    renderWithProviders(<SignalDetail />, { route: "/signals/sg", path: "/signals/:id" });
+    await screen.findByText("Quake");
+    expect(screen.queryByTestId("signal-translated")).toBeNull();
   });
   it("renders deep-enrichment attributes", async () => {
     apiMock.signal.mockResolvedValue(signal());

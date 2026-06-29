@@ -32,6 +32,7 @@ type Signal struct {
 	SentimentScore *float64
 	Influence      *string
 	Relevance      *float64
+	Language       *string
 }
 
 // SignalTagRow is a tag attached to a signal.
@@ -85,7 +86,7 @@ type SignalFilter struct {
 	Offset       int
 }
 
-const signalScalarCols = `"id","title","summary","whatHappened","whyItMatters","status","severity","confidence","eventType","country","sourceCount","firstSeenAt","lastSeenAt","region","city","locality","geoScope","sentiment","sentimentScore","influence","relevance"`
+const signalScalarCols = `"id","title","summary","whatHappened","whyItMatters","status","severity","confidence","eventType","country","sourceCount","firstSeenAt","lastSeenAt","region","city","locality","geoScope","sentiment","sentimentScore","influence","relevance","language"`
 
 func scanSignal(row pgx.Row) (*Signal, error) {
 	var s Signal
@@ -93,7 +94,7 @@ func scanSignal(row pgx.Row) (*Signal, error) {
 		&s.Status, &s.Severity, &s.Confidence, &s.EventType, &s.Country, &s.SourceCount,
 		&s.FirstSeenAt, &s.LastSeenAt,
 		&s.Region, &s.City, &s.Locality, &s.GeoScope, &s.Sentiment, &s.SentimentScore,
-		&s.Influence, &s.Relevance)
+		&s.Influence, &s.Relevance, &s.Language)
 	if err != nil {
 		return nil, err
 	}

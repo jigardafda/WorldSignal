@@ -140,6 +140,7 @@ type llmRaw struct {
 	WhyItMatters *string   `json:"whyItMatters"`
 	Severity     *string   `json:"severity"`
 	Confidence   *float64  `json:"confidence"`
+	Language     *string   `json:"language"`
 	Tags         []TagConf `json:"tags"`
 }
 
@@ -150,6 +151,10 @@ func runLLM(ctx context.Context, gw Gateway, in EnrichInput) *EnrichmentResult {
 	system := strings.Join([]string{
 		"You are an analyst that turns a news article into a canonical event Signal.",
 		"Return JSON only. Do not invent facts not present in the article.",
+		"Detect the source article's language. Write title, summary, whatHappened",
+		"and whyItMatters in ENGLISH, translating faithfully when the source is not",
+		"English. Set `language` to the ISO 639-1 code of the SOURCE language (e.g.",
+		"en, fr, es, de, hi, ar, zh, pt, ru, ja).",
 		"Choose tags ONLY from the provided taxonomy. Never create new tag codes.",
 		"If nothing fits, use GENERAL.OTHER.",
 		"",
@@ -165,9 +170,9 @@ func runLLM(ctx context.Context, gw Gateway, in EnrichInput) *EnrichmentResult {
 		publisher = "unknown"
 	}
 	user := strings.Join([]string{
-		"Produce JSON with keys: title, summary, whatHappened, whyItMatters,",
-		"severity (LOW|MEDIUM|HIGH|CRITICAL), confidence (0..1),",
-		"tags (array of {code, confidence}). Max 3 tags.",
+		"Produce JSON with keys: title, summary, whatHappened, whyItMatters (English),",
+		"language (ISO 639-1 of the source), severity (LOW|MEDIUM|HIGH|CRITICAL),",
+		"confidence (0..1), tags (array of {code, confidence}). Max 3 tags.",
 		"",
 		"PUBLISHER: " + publisher,
 		"TITLE: " + in.Title,
@@ -218,6 +223,7 @@ func runLLM(ctx context.Context, gw Gateway, in EnrichInput) *EnrichmentResult {
 	if title == "" {
 		title = in.Title
 	}
+	lang := normalizeLang(strDefault(p.Language, ""))
 	return &EnrichmentResult{
 		Title:        title,
 		Summary:      *p.Summary,
@@ -225,9 +231,30 @@ func runLLM(ctx context.Context, gw Gateway, in EnrichInput) *EnrichmentResult {
 		WhyItMatters: strDefault(p.WhyItMatters, ""),
 		Severity:     severity,
 		Confidence:   confidence,
+		Language:     lang,
+		Translated:   lang != "" && lang != "en",
 		Tags:         tags,
 		Source:       "llm",
 	}
+}
+
+// normalizeLang reduces a reported language to a lowercase ISO 639-1 code,
+// trimming region subtags (e.g. "en-US" -> "en", "FR" -> "fr"). Non-2-letter
+// values are dropped.
+func normalizeLang(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if i := strings.IndexAny(s, "-_"); i >= 0 {
+		s = s[:i]
+	}
+	if len(s) != 2 {
+		return ""
+	}
+	for _, r := range s {
+		if r < 'a' || r > 'z' {
+			return ""
+		}
+	}
+	return s
 }
 
 func strDefault(s *string, def string) string {

@@ -110,6 +110,7 @@ type EnrichmentUpdate struct {
 	SentimentScore *float64
 	Influence      *string
 	Relevance      *float64
+	Language       *string // detected source language (ISO 639-1); narrative is English
 	// Attributes fully replaces the signal's SignalAttribute rows.
 	Attributes []SignalAttr
 }
@@ -149,11 +150,11 @@ func (d *DB) ApplyEnrichment(ctx context.Context, signalID string, u EnrichmentU
 		 "city"=COALESCE($14,"city"),"locality"=COALESCE($15,"locality"),
 		 "geoScope"=COALESCE($16,"geoScope"),"sentiment"=COALESCE($17,"sentiment"),
 		 "sentimentScore"=COALESCE($18,"sentimentScore"),"influence"=COALESCE($19,"influence"),
-		 "relevance"=COALESCE($20,"relevance"),"updatedAt"=now() WHERE "id"=$1`,
+		 "relevance"=COALESCE($20,"relevance"),"language"=COALESCE($21,"language"),"updatedAt"=now() WHERE "id"=$1`,
 		signalID, u.Title, u.Summary, u.WhatHappened, u.WhyItMatters, u.Severity, u.Confidence,
 		u.Status, u.EventType, u.PublishedAt, meta,
 		u.Country, u.Region, u.City, u.Locality, u.GeoScope, u.Sentiment, u.SentimentScore,
-		u.Influence, u.Relevance); err != nil {
+		u.Influence, u.Relevance, u.Language); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM "SignalTag" WHERE "signalId"=$1`, signalID); err != nil {

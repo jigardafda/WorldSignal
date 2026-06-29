@@ -27,6 +27,7 @@ export interface Signal {
   // Deep-enrichment attributes.
   region?: string | null; city?: string | null; locality?: string | null; geoScope?: string | null;
   sentiment?: string | null; sentimentScore?: number | null; influence?: string | null; relevance?: number | null;
+  language?: string | null; translated?: boolean;
   attributes?: SignalAttribute[];
 }
 export interface Source {
@@ -127,7 +128,7 @@ export interface TaxonomyNode { code: string; label: string; children?: Taxonomy
 export interface Team { id: string; name: string; createdAt: string; memberCount: number; members?: TeamMember[] }
 export interface TeamMember { userId: string; email: string; name: string; role: string; addedAt: string }
 
-const SIGNAL_FIELDS = `id title summary whatHappened whyItMatters status severity confidence eventType country sourceCount firstSeenAt lastSeenAt region city locality geoScope sentiment sentimentScore influence relevance tags{code confidence} sources{publisher url publishedAt} attributes{key valueCode valueText valueNum confidence}`;
+const SIGNAL_FIELDS = `id title summary whatHappened whyItMatters status severity confidence eventType country sourceCount firstSeenAt lastSeenAt region city locality geoScope sentiment sentimentScore influence relevance language translated tags{code confidence} sources{publisher url publishedAt} attributes{key valueCode valueText valueNum confidence}`;
 const SOURCE_LIST_FIELDS = `id name type url country region language languages category priority credibility enabled failureCount sourceType officialFeed industry publisher orgType geographicScope healthScore validationStatus tags lastSuccessAt lastFailureAt lastValidatedAt lastFetchedAt cooldownUntil`;
 const SOURCE_FIELDS = `${SOURCE_LIST_FIELDS} crawlFrequency parserType subcategory websiteUrl contentType updateFrequency biasRating avgResponseMs lastValidationError lastFetchedAt createdAt updatedAt`;
 const VALIDATION_LOG_FIELDS = `id checkedAt ok httpStatus responseMs itemCount newestItemAt redirectedTo error`;

@@ -18,7 +18,9 @@ type TagConf struct {
 	Confidence float64 `json:"confidence"`
 }
 
-// EnrichmentResult mirrors the TS EnrichmentResult.
+// EnrichmentResult mirrors the TS EnrichmentResult. The narrative fields are
+// always English; when the source article is in another language the LLM
+// translates them and reports the detected source Language (ISO 639-1).
 type EnrichmentResult struct {
 	Title        string    `json:"title"`
 	Summary      string    `json:"summary"`
@@ -26,6 +28,8 @@ type EnrichmentResult struct {
 	WhyItMatters string    `json:"whyItMatters"`
 	Severity     string    `json:"severity"`
 	Confidence   float64   `json:"confidence"`
+	Language     string    `json:"language"` // detected source language, ISO 639-1
+	Translated   bool      `json:"translated"`
 	Tags         []TagConf `json:"tags"`
 	Source       string    `json:"source"`
 }

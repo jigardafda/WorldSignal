@@ -125,8 +125,15 @@ func signalToMap(a *db.SignalAggregate) map[string]any {
 		"region": a.Region, "city": a.City, "locality": a.Locality, "geoScope": a.GeoScope,
 		"sentiment": a.Sentiment, "sentimentScore": a.SentimentScore,
 		"influence": a.Influence, "relevance": a.Relevance,
+		"language": a.Language, "translated": isTranslated(a.Language),
 		"attributes": attributeMaps(a.Attributes),
 	}
+}
+
+// isTranslated reports whether the English narrative was translated from another
+// language (a non-empty, non-English detected source language).
+func isTranslated(lang *string) bool {
+	return lang != nil && *lang != "" && *lang != "en"
 }
 
 func (s *Server) resolveSignals(ctx context.Context, args map[string]any) (any, error) {

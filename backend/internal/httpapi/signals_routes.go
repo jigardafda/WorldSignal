@@ -60,6 +60,8 @@ type restSignal struct {
 	SentimentScore *float64      `json:"sentimentScore"`
 	Influence      *string       `json:"influence"`
 	Relevance      *float64      `json:"relevance"`
+	Language       *string       `json:"language"`
+	Translated     bool          `json:"translated"`
 	SourceCount    int           `json:"sourceCount"`
 	FirstSeenAt    db.PrismaTime `json:"firstSeenAt"`
 	LastSeenAt     db.PrismaTime `json:"lastSeenAt"`
@@ -93,6 +95,7 @@ func serializeRESTSignal(a *db.SignalAggregate) restSignal {
 		EventType: a.EventType, Country: a.Country,
 		Region: a.Region, City: a.City, Locality: a.Locality, GeoScope: a.GeoScope,
 		Sentiment: a.Sentiment, SentimentScore: a.SentimentScore, Influence: a.Influence, Relevance: a.Relevance,
+		Language: a.Language, Translated: isTranslated(a.Language),
 		SourceCount: a.SourceCount,
 		FirstSeenAt: db.NewTime(a.FirstSeenAt), LastSeenAt: db.NewTime(a.LastSeenAt),
 		Tags: tags, Sources: sources, Attributes: attrs,

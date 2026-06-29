@@ -6,9 +6,10 @@ import { api, type Signal } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { AsyncBoundary, EmptyState } from "../components/States";
 import { PageHeader } from "../components/PageHeader";
+import { IconLanguage } from "@tabler/icons-react";
 import { ConfidenceBar, SeverityBadge, StatusBadge } from "../components/badges";
 import { useCountries, countryDisplay } from "../lib/countries";
-import { fmtDate } from "../lib/format";
+import { fmtDate, languageName } from "../lib/format";
 
 export function SignalDetail() {
   const { id = "" } = useParams();
@@ -41,8 +42,16 @@ export function SignalDetail() {
                     <SeverityBadge severity={s.severity} />
                     <StatusBadge status={s.status} />
                     {s.eventType && <Badge variant="outline">{s.eventType}</Badge>}
+                    {s.translated && (
+                      <Badge variant="light" color="indigo" leftSection={<IconLanguage size={12} />} data-testid="signal-translated">
+                        Translated from {languageName(s.language)}
+                      </Badge>
+                    )}
                   </Group>
                   <Title order={3}>{s.title}</Title>
+                  {s.translated && (
+                    <Text size="xs" c="dimmed" mt={2}>Auto-translated to English from {languageName(s.language)} during enrichment.</Text>
+                  )}
                   <ConfidenceBar value={s.confidence} />
                   <Text mt="md">{s.summary}</Text>
                   {s.whatHappened && (<><Title order={5} mt="md">What happened</Title><Text>{s.whatHappened}</Text></>)}
