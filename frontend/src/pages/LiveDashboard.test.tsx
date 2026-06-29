@@ -9,8 +9,8 @@ vi.mock("../lib/api", () => ({ api: apiMock }));
 
 // Stub the Leaflet map; expose a button to trigger onSelect for the first marker.
 vi.mock("../components/LiveMap", () => ({
-  LiveMap: ({ markers, center, zoom, onSelect, focus }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void; focus?: [number, number] | null }) => (
-    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")} data-focus={focus ? focus.join(",") : ""}>
+  LiveMap: ({ markers, center, zoom, onSelect, focus }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void; focus?: string | null }) => (
+    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")} data-focus={focus ?? ""}>
       {markers[0] && <button data-testid="map-pick" onClick={() => onSelect?.(markers[0].id)}>pick</button>}
     </div>
   ),
@@ -63,7 +63,7 @@ describe("LiveDashboard", () => {
     await waitFor(() => expect(map).toHaveAttribute("data-count", "1")); // only FR
     expect(map).toHaveAttribute("data-zoom", "5");
     expect(map).toHaveAttribute("data-center", "48.85,2.35");
-    expect(map).toHaveAttribute("data-focus", "48.85,2.35"); // country highlight
+    expect(map).toHaveAttribute("data-focus", "FR"); // country outline
     // The feed is scoped to the country server-side for an accurate picture.
     await waitFor(() => expect(apiMock.liveSignals).toHaveBeenCalledWith(expect.any(String), "FR", expect.any(Number)));
   });

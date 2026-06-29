@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./LiveMap.css";
+import { countryOutline } from "../lib/boundaries";
 
 export interface MapMarker {
   id: string;
@@ -29,12 +30,12 @@ export function LiveMap({
   zoom: number;
   height?: number | string;
   onSelect?: (id: string) => void;
-  focus?: [number, number] | null;
+  focus?: string | null; // ISO alpha-2 country code to outline, or null
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
-  const focusRef = useRef<L.Circle | null>(null);
+  const focusRef = useRef<L.GeoJSON | null>(null);
 
   // Initialise the map exactly once.
   useEffect(() => {
@@ -59,27 +60,33 @@ export function LiveMap({
     mapRef.current?.setView(center, zoom);
   }, [center, zoom]);
 
-  // Highlight the selected country's area (a focus ring around its capital).
-  const fLat = focus ? focus[0] : null;
-  const fLng = focus ? focus[1] : null;
+  // Outline the selected country's actual border (lazy-loaded boundaries) and
+  // frame the map to it. Clears when no country is selected.
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
+    let cancelled = false;
     if (focusRef.current) {
       focusRef.current.remove();
       focusRef.current = null;
     }
-    if (fLat != null && fLng != null) {
-      focusRef.current = L.circle([fLat, fLng], {
-        radius: 350000,
-        color: "#2f6df6",
-        weight: 2,
-        dashArray: "6 6",
-        fillColor: "#2f6df6",
-        fillOpacity: 0.06,
-      }).addTo(map);
+    if (focus) {
+      void countryOutline(focus).then((feat) => {
+        const map = mapRef.current;
+        if (cancelled || !map || !feat) return;
+        const layer = L.geoJSON(feat, {
+          style: { color: "#2f6df6", weight: 2, fillColor: "#2f6df6", fillOpacity: 0.08 },
+        }).addTo(map);
+        focusRef.current = layer;
+        try {
+          map.fitBounds(layer.getBounds(), { maxZoom: 6, padding: [20, 20] });
+        } catch {
+          /* empty/invalid bounds — keep the capital-centered view */
+        }
+      });
     }
-  }, [fLat, fLng]);
+    return () => {
+      cancelled = true;
+    };
+  }, [focus]);
 
   // Re-plot markers whenever the set changes.
   useEffect(() => {

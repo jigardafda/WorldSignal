@@ -1,9 +1,16 @@
-import { describe, expect, it, vi, type Mock } from "vitest";
-import { render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { render, waitFor } from "@testing-library/react";
+
+vi.mock("../lib/boundaries", () => ({
+  countryOutline: vi.fn(async (code: string) =>
+    code === "FR" ? { type: "Feature", id: "250", properties: {}, geometry: { type: "Polygon", coordinates: [] } } : null,
+  ),
+}));
 
 vi.mock("leaflet", () => {
   const mapObj: Record<string, unknown> = {};
   mapObj.setView = vi.fn(() => mapObj);
+  mapObj.fitBounds = vi.fn(() => mapObj);
   mapObj.remove = vi.fn();
   const layerObj: Record<string, unknown> = { clearLayers: vi.fn() };
   layerObj.addTo = vi.fn(() => layerObj);
@@ -20,8 +27,8 @@ vi.mock("leaflet", () => {
       layerGroup: vi.fn(() => layerObj),
       marker: vi.fn(() => chain()),
       divIcon: vi.fn(() => ({})),
-      circle: vi.fn(() => {
-        const o: Record<string, unknown> = { remove: vi.fn() };
+      geoJSON: vi.fn(() => {
+        const o: Record<string, unknown> = { remove: vi.fn(), getBounds: vi.fn(() => ({})) };
         o.addTo = vi.fn(() => o);
         return o;
       }),
@@ -33,6 +40,8 @@ import L from "leaflet";
 import { LiveMap, type MapMarker } from "./LiveMap";
 
 const m = (id: string, isNew = false): MapMarker => ({ id, lat: 10, lng: 20, title: id, color: "#e03131", isNew });
+
+beforeEach(() => vi.clearAllMocks());
 
 describe("LiveMap", () => {
   it("initializes Leaflet once and plots a marker per event", () => {
@@ -65,11 +74,18 @@ describe("LiveMap", () => {
     expect(onSelect).toHaveBeenCalledWith("evt-42");
   });
 
-  it("draws and clears a country focus ring", () => {
-    const { rerender } = render(<LiveMap markers={[]} center={[48, 2]} zoom={5} focus={[48, 2]} />);
-    expect(vi.mocked(L.circle)).toHaveBeenCalledWith([48, 2], expect.objectContaining({ radius: expect.any(Number) }));
-    const ring = vi.mocked(L.circle).mock.results.at(-1)!.value as Record<string, unknown>;
+  it("outlines the selected country and clears it on deselect", async () => {
+    const { rerender } = render(<LiveMap markers={[]} center={[20, 0]} zoom={2} focus="FR" />);
+    await waitFor(() => expect(vi.mocked(L.geoJSON)).toHaveBeenCalled());
+    const map = vi.mocked(L.map).mock.results.at(-1)!.value as Record<string, unknown>;
+    expect(map.fitBounds as Mock).toHaveBeenCalled();
+    const layer = vi.mocked(L.geoJSON).mock.results.at(-1)!.value as Record<string, unknown>;
     rerender(<LiveMap markers={[]} center={[20, 0]} zoom={2} focus={null} />);
-    expect(ring.remove as Mock).toHaveBeenCalled();
+    expect(layer.remove as Mock).toHaveBeenCalled();
+  });
+
+  it("does not outline when no country is focused", () => {
+    render(<LiveMap markers={[]} center={[20, 0]} zoom={2} focus={null} />);
+    expect(vi.mocked(L.geoJSON)).not.toHaveBeenCalled();
   });
 });

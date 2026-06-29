@@ -134,7 +134,7 @@ export function LiveDashboard() {
         })}
       </Group>
       <div style={{ flex: 1, minHeight: 0 }}>
-        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={sel ? [sel.capitalLat, sel.capitalLng] : null} />
+        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} />
       </div>
       <SignalDrawer signalId={selectedId} onClose={() => setSelectedId(null)} />
     </div>

@@ -24,6 +24,9 @@ export default defineConfig({
         // dominates the initial payload (and to clear the chunk-size warning).
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
+          // Boundary geometry/converter/ISO map are only dynamically imported by
+          // the live map's country outline — keep them in a lazily-loaded chunk.
+          if (id.includes("world-atlas") || id.includes("topojson") || id.includes("i18n-iso-countries")) return "maps";
           if (id.includes("recharts") || id.includes("d3-") || id.includes("@mantine/charts")) return "charts";
           if (id.includes("@tabler")) return "icons";
           if (id.includes("@mantine")) return "mantine";
