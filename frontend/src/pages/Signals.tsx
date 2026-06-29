@@ -7,6 +7,7 @@ import { AsyncBoundary } from "../components/States";
 import { PageHeader } from "../components/PageHeader";
 import { DataTable } from "../components/DataTable";
 import { ConfidenceBar, SeverityBadge, SignalIntel, StatusBadge } from "../components/badges";
+import { CountrySelect } from "../components/CountrySelect";
 import { useCountries, countryDisplay } from "../lib/countries";
 import { fmtDate } from "../lib/format";
 
@@ -27,6 +28,7 @@ export function Signals() {
   const { byCode } = useCountries();
   const [search, setSearch] = useState("");
   const [pendingSearch, setPendingSearch] = useState("");
+  const [country, setCountry] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [minConf, setMinConf] = useState<string | null>(null);
   const [sentiment, setSentiment] = useState<string | null>(null);
@@ -38,13 +40,14 @@ export function Signals() {
 
   const filter: Record<string, unknown> = {};
   if (search) filter.search = search;
+  if (country) filter.country = country;
   if (status) filter.status = status;
   if (minConf) filter.minConfidence = Number(minConf);
   if (sentiment) filter.sentiment = sentiment;
   if (geoScope) filter.geoScope = geoScope;
   if (industry) filter.industry = industry;
 
-  const deps = [search, status, minConf, sentiment, geoScope, industry, page];
+  const deps = [search, country, status, minConf, sentiment, geoScope, industry, page];
   const list = useAsync<Signal[]>(() => api.signals(filter, PAGE_SIZE, (page - 1) * PAGE_SIZE), deps);
   const count = useAsync<number>(() => api.signalCount(filter), deps.slice(0, -1));
   const totalPages = Math.max(1, Math.ceil((count.data ?? 0) / PAGE_SIZE));
@@ -77,6 +80,8 @@ export function Signals() {
                 value={minConf} onChange={reset(setMinConf)} data-testid="signal-minconf" />
             </Group>
             <Group>
+              <CountrySelect placeholder="Country" value={country}
+                onChange={reset(setCountry)} data-testid="signal-country" />
               <Select placeholder="Sentiment" clearable data={SENTIMENTS} value={sentiment}
                 onChange={reset(setSentiment)} data-testid="signal-sentiment" />
               <Select placeholder="Geo scope" clearable data={GEO_SCOPES} value={geoScope}

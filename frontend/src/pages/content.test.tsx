@@ -89,6 +89,16 @@ describe("Signals", () => {
     fireEvent.click(await within(listbox).findByRole("option", { name: "NEGATIVE", hidden: true }));
     await waitFor(() => expect(apiMock.signals).toHaveBeenCalledWith(expect.objectContaining({ sentiment: "NEGATIVE" }), 25, 0));
   });
+  it("filters by country", async () => {
+    apiMock.signals.mockResolvedValue([signal()]);
+    apiMock.signalCount.mockResolvedValue(1);
+    renderWithProviders(<Signals />);
+    await screen.findByText("Quake");
+    fireEvent.click(screen.getByTestId("signal-country"));
+    const listbox = document.getElementById(screen.getByTestId("signal-country").getAttribute("aria-controls")!)!;
+    fireEvent.click(await within(listbox).findByRole("option", { name: /United States/, hidden: true }));
+    await waitFor(() => expect(apiMock.signals).toHaveBeenCalledWith(expect.objectContaining({ country: "US" }), 25, 0));
+  });
   it("shows empty state", async () => {
     apiMock.signals.mockResolvedValue([]);
     apiMock.signalCount.mockResolvedValue(0);
