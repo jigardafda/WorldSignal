@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Badge, Group, Select, Text, UnstyledButton } from "@mantine/core";
 import { IconBroadcast } from "@tabler/icons-react";
 import { api } from "../lib/api";
@@ -29,14 +30,34 @@ type MarkerRec = MapMarker & { country: string; category: string };
  * layer, and time window. No page refresh. */
 export function LiveDashboard() {
   const { byCode, list } = useCountries();
-  const [country, setCountry] = useState<string | null>(null);
-  const [windowMin, setWindowMin] = useState<string>("60");
-  const [enabled, setEnabled] = useState<string[]>(CATEGORIES.map((c) => c.code));
+  // Filters live in the URL so they're retained on reload and shareable.
+  const [params, setParams] = useSearchParams();
+  const windowMin = params.get("w") ?? "60";
+  const country = params.get("country");
+  const off = (params.get("off") ?? "").split(",").filter(Boolean);
+  const enabled = CATEGORIES.map((c) => c.code).filter((c) => !off.includes(c));
+
+  const setParam = (key: string, value: string | null) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (!value) next.delete(key);
+        else next.set(key, value);
+        return next;
+      },
+      { replace: true },
+    );
+  const setCountry = (v: string | null) => setParam("country", v);
+  const setWindowMin = (v: string) => setParam("w", v === "60" ? null : v); // 60 = default → omit
+  const toggle = (code: string) => {
+    const next = off.includes(code) ? off.filter((x) => x !== code) : [...off, code];
+    setParam("off", next.join(","));
+  };
+
   const [markers, setMarkers] = useState<MarkerRec[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const prevIdsRef = useRef<Set<string>>(new Set());
-  const onSelect = useCallback((id: string) => setSelectedId(id), []);
 
   useEffect(() => {
     if (list.length === 0) return; // wait until country coordinates are loaded
@@ -88,9 +109,6 @@ export function LiveDashboard() {
   for (const m of inCountry) counts[m.category] = (counts[m.category] ?? 0) + 1;
   const shown = inCountry.filter((m) => enabled.includes(m.category));
 
-  const toggle = (code: string) =>
-    setEnabled((prev) => (prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code]));
-
   return (
     <div style={{ height: "calc(100dvh - 56px)", display: "flex", flexDirection: "column" }} data-testid="live-dashboard">
       <Group justify="space-between" px="md" py="xs" style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
@@ -116,7 +134,7 @@ export function LiveDashboard() {
         })}
       </Group>
       <div style={{ flex: 1, minHeight: 0 }}>
-        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={onSelect} />
+        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} />
       </div>
       <SignalDrawer signalId={selectedId} onClose={() => setSelectedId(null)} />
     </div>

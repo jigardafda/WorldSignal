@@ -112,6 +112,28 @@ describe("LiveDashboard", () => {
     expect(apiMock.signal).toHaveBeenCalledWith("s1");
   });
 
+  it("initializes filters from the URL so they survive a reload", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+      { id: "s2", title: "FR AI", country: "FR", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" },
+      { id: "s3", title: "FR flood", country: "FR", severity: "HIGH", eventType: "DISASTER.FLOOD", lastSeenAt: "" },
+    ]);
+    renderWithProviders(<LiveDashboard />, { route: "/live?w=30&country=FR&off=DISASTER" });
+    const map = await screen.findByTestId("map");
+    // country=FR (s2,s3) minus the DISASTER layer (s3) => only s2 shown, framed on France.
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "1"));
+    expect(map).toHaveAttribute("data-center", "48.85,2.35");
+    expect(map).toHaveAttribute("data-zoom", "5");
+    // Controls reflect the URL.
+    expect((screen.getByTestId("live-window") as HTMLInputElement).value).toBe("Last 30 min");
+    expect(screen.getByTestId("layer-DISASTER")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("layer-TECHNOLOGY")).toHaveAttribute("aria-pressed", "true");
+    // The window drives the feed query (~30 min ago).
+    const since = Date.parse(apiMock.liveSignals.mock.calls[0][0]);
+    expect(Date.now() - since).toBeGreaterThan(25 * 60_000);
+    expect(Date.now() - since).toBeLessThan(35 * 60_000);
+  });
+
   it("survives a feed error without crashing", async () => {
     apiMock.liveSignals.mockRejectedValue(new Error("down"));
     renderWithProviders(<LiveDashboard />);
