@@ -131,6 +131,26 @@ func TestGraphQLSignalByID(t *testing.T) {
 	}
 }
 
+func TestGraphQLSignalsSinceFilter(t *testing.T) {
+	d := dbtest.Connect(t)
+	seedEnrichedSignal(t, d)
+	ht, _ := newServer(t, d)
+	tok, _ := dbtest.AuthToken(t, d, "VIEWER")
+	bearer = tok
+	defer func() { bearer = "" }()
+
+	// A window starting in the past includes the (now-stamped) signal.
+	_, recent := postGQL(t, ht.URL, `{"query":"{ signals(filter:{since:\"2020-01-01T00:00:00Z\"}){ id } }"}`)
+	if !strings.Contains(recent, `"id":"sg"`) {
+		t.Errorf("past since should include the signal: %s", recent)
+	}
+	// A window starting in the future excludes it.
+	_, future := postGQL(t, ht.URL, `{"query":"{ signals(filter:{since:\"2999-01-01T00:00:00Z\"}){ id } }"}`)
+	if strings.Contains(future, `"id":"sg"`) {
+		t.Errorf("future since should exclude the signal: %s", future)
+	}
+}
+
 func TestAttributeDictionaryRequiresAuth(t *testing.T) {
 	d := dbtest.Connect(t)
 	seedEnrichedSignal(t, d)

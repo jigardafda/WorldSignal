@@ -193,8 +193,12 @@ export const api = {
   attributeDictionary: () =>
     gql<{ attributeDictionary: AttributeDefinition[] }>(`{attributeDictionary{key label kind description values{code label}}}`).then((d) => d.attributeDictionary),
   // Lightweight feed for the live map: only what a marker needs.
-  liveSignals: (limit = 150) =>
-    gql<{ signals: LiveSignal[] }>(`query($l:Int){signals(limit:$l){id title country severity eventType lastSeenAt}}`, { l: limit }).then((d) => d.signals),
+  // Events within a rolling time window (since ISO timestamp), newest first.
+  liveSignals: (since?: string, limit = 500) =>
+    gql<{ signals: LiveSignal[] }>(
+      `query($f:SignalFilter,$l:Int){signals(filter:$f,limit:$l){id title country severity eventType lastSeenAt}}`,
+      { f: since ? { since } : {}, l: limit },
+    ).then((d) => d.signals),
 
   // sources
   sources: (filter: SourceFilter = {}, limit = 50, offset = 0) =>

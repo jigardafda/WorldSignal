@@ -81,6 +81,17 @@ describe("LiveDashboard", () => {
     await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
   });
 
+  it("requests events within a rolling time window", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    await waitFor(() => expect(apiMock.liveSignals).toHaveBeenCalled());
+    const since = apiMock.liveSignals.mock.calls[0][0];
+    expect(typeof since).toBe("string");
+    expect(Number.isNaN(Date.parse(since))).toBe(false); // valid ISO timestamp
+  });
+
   it("survives a feed error without crashing", async () => {
     apiMock.liveSignals.mockRejectedValue(new Error("down"));
     renderWithProviders(<LiveDashboard />);

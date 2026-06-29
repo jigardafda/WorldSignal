@@ -160,6 +160,11 @@ func (s *Server) resolveSignals(ctx context.Context, args map[string]any) (any, 
 		f.Sentiment = strArg(filter, "sentiment")
 		f.Influence = strArg(filter, "influence")
 		f.Industry = strArg(filter, "industry")
+		if since, ok := filter["since"].(string); ok && since != "" {
+			if ts, err := parseJSDate(since); err == nil {
+				f.Since = &ts
+			}
+		}
 		if mr, ok := toFloatOK(filter["minRelevance"]); ok {
 			f.MinRelevance = &mr
 		}
