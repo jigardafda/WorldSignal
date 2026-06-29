@@ -32,7 +32,6 @@ export function SignalDetail() {
             const attrs = s.attributes ?? [];
             const industries = attrs.filter((a) => a.key === "industry");
             const entities = attrs.filter((a) => a.key === "entity");
-            const geoBits = [s.locality, s.city, s.region].filter(Boolean).join(", ");
             const pct = (n?: number | null) => (n == null ? null : `${Math.round(n * 100)}%`);
             return (
             <Grid>
@@ -82,9 +81,11 @@ export function SignalDetail() {
                 <Stack>
                   <Card withBorder radius="md">
                     <Title order={5} mb="xs">Details</Title>
-                    <Stack gap={4}>
+                    <Stack gap={4} data-testid="signal-geo">
                       <Text size="sm"><b>Country:</b> {countryDisplay(s.country, byCode)}</Text>
-                      {geoBits && <Text size="sm" data-testid="signal-geo"><b>Location:</b> {geoBits}</Text>}
+                      {s.region && <Text size="sm"><b>Region / State:</b> {s.region}</Text>}
+                      {s.city && <Text size="sm"><b>City:</b> {s.city}</Text>}
+                      {s.locality && <Text size="sm"><b>Locality:</b> {s.locality}</Text>}
                       {s.geoScope && <Text size="sm"><b>Scope:</b> {s.geoScope}</Text>}
                       <Text size="sm"><b>Source count:</b> {s.sourceCount}</Text>
                       <Text size="sm"><b>First seen:</b> {fmtDate(s.firstSeenAt)}</Text>

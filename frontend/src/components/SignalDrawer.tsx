@@ -53,7 +53,14 @@ export function SignalDrawer({ signalId, onClose }: { signalId: string | null; o
                 {s.whatHappened && (<><Text size="xs" tt="uppercase" c="dimmed" fw={600}>What happened</Text><Text size="sm">{s.whatHappened}</Text></>)}
                 {s.whyItMatters && (<><Text size="xs" tt="uppercase" c="dimmed" fw={600}>Why it matters</Text><Text size="sm">{s.whyItMatters}</Text></>)}
 
-                <Text size="sm"><b>Location:</b> {[s.city, s.region].filter(Boolean).join(", ") || "—"}{" "}({countryDisplay(s.country, byCode)})</Text>
+                <Stack gap={2} data-testid="drawer-geo">
+                  <Text size="xs" tt="uppercase" c="dimmed" fw={600}>Location</Text>
+                  <Text size="sm"><b>Country:</b> {countryDisplay(s.country, byCode)}</Text>
+                  {s.region && <Text size="sm"><b>Region / State:</b> {s.region}</Text>}
+                  {s.city && <Text size="sm"><b>City:</b> {s.city}</Text>}
+                  {s.locality && <Text size="sm"><b>Locality:</b> {s.locality}</Text>}
+                  {s.geoScope && <Text size="sm"><b>Scope:</b> {s.geoScope}</Text>}
+                </Stack>
 
                 {s.tags.length > 0 && (
                   <Group gap={4}>{s.tags.map((t) => <Badge key={t.code} variant="light" size="sm">{t.code}</Badge>)}</Group>

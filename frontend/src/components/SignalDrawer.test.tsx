@@ -34,6 +34,9 @@ describe("SignalDrawer", () => {
     expect(await screen.findByText("Quake hits coast")).toBeInTheDocument();
     expect(screen.getByText("A strong quake.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "BBC" })).toBeInTheDocument();
+    const geo = screen.getByTestId("drawer-geo");
+    expect(geo).toHaveTextContent("California"); // region
+    expect(geo).toHaveTextContent("LA"); // city
     expect(apiMock.signal).toHaveBeenCalledWith("sg");
   });
 

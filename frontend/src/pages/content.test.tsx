@@ -144,7 +144,9 @@ describe("SignalDetail", () => {
     apiMock.signal.mockResolvedValue(signal());
     renderWithProviders(<SignalDetail />, { route: "/signals/sg", path: "/signals/:id" });
     expect(await screen.findByText("Quake")).toBeInTheDocument();
-    expect(screen.getByTestId("signal-geo")).toHaveTextContent("Los Angeles, California");
+    const geo = screen.getByTestId("signal-geo");
+    expect(geo).toHaveTextContent("California"); // region
+    expect(geo).toHaveTextContent("Los Angeles"); // city
     expect(screen.getByTestId("signal-assessment")).toHaveTextContent("Sentiment: NEGATIVE");
     expect(screen.getByTestId("signal-assessment")).toHaveTextContent("Influence: HIGH");
     expect(screen.getByTestId("signal-assessment")).toHaveTextContent("Relevance: 90%");
