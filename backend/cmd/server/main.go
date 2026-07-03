@@ -13,10 +13,12 @@ import (
 
 	"github.com/worldsignal/backend/internal/config"
 	"github.com/worldsignal/backend/internal/db"
+	"github.com/worldsignal/backend/internal/email"
 	"github.com/worldsignal/backend/internal/httpapi"
 	"github.com/worldsignal/backend/internal/jobs"
 	"github.com/worldsignal/backend/internal/llm"
 	"github.com/worldsignal/backend/internal/logging"
+	"github.com/worldsignal/backend/internal/pipeline"
 )
 
 func main() {
@@ -69,18 +71,25 @@ func run() error {
 	workers.Cooldown = time.Duration(cfg.SourceCooldownMinutes) * time.Minute
 	srv.Enqueue = workers
 
+	// Email delivery chrome: rendered signal/digest emails link back to the console
+	// when a public base URL is configured.
+	pipeline.EmailBranding = email.Branding{AppName: "WorldSignal", BaseURL: cfg.AppBaseURL}
+
 	// Ensure the jobs table exists regardless of role (the API exposes a jobs view).
 	if err := queue.Migrate(ctx); err != nil {
 		return err
 	}
 
 	var scheduler *jobs.Scheduler
+	var digester *jobs.Digester
 	runWorkers := cfg.Role == "all" || cfg.Role == "worker"
 	if runWorkers {
 		workers.Register()
 		queue.Start(ctx)
 		scheduler = jobs.NewScheduler(database, workers, time.Duration(cfg.SchedulerTickMS)*time.Millisecond)
 		scheduler.Start(ctx)
+		digester = jobs.NewDigester(database, workers, time.Duration(cfg.DigestTickSeconds)*time.Second)
+		digester.Start(ctx)
 	}
 
 	var httpSrv *http.Server
@@ -101,6 +110,9 @@ func run() error {
 	log.Info("shutting down")
 	if scheduler != nil {
 		scheduler.Stop()
+	}
+	if digester != nil {
+		digester.Stop()
 	}
 	if runWorkers {
 		queue.Stop()

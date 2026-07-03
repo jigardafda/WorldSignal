@@ -74,6 +74,15 @@ func MatchSubscriptions(ctx context.Context, d *db.DB, signalID string, now time
 		if !matchesFilter(f, sig) {
 			continue
 		}
+		// Digest-mode email subscriptions accumulate matches in the digest queue;
+		// the digest scheduler rolls them into one email per interval instead of
+		// sending immediately.
+		if sub.Channel == "EMAIL" && isDigestConfig(sub.Config) {
+			if err := d.QueueDigestItem(ctx, sub.ID, signalID, now); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		payload := buildEnvelope(sub.ID, sig, now)
 		id, err := d.CreateDeliveryIfNew(ctx, sub.ID, signalID, sub.Channel, payload)
 		if err != nil {
@@ -158,6 +167,11 @@ func SendDelivery(ctx context.Context, d *db.DB, client *http.Client, secret, de
 		return d.MarkDeliverySent(ctx, deliveryID, now)
 	}
 
+	if del.Channel == "EMAIL" {
+		return finishDelivery(ctx, d, deliveryID, isFinalAttempt, now,
+			sendEmailDelivery(ctx, d, secret, del, now))
+	}
+
 	var config struct {
 		URL string `json:"url"`
 	}
@@ -194,20 +208,29 @@ func SendDelivery(ctx context.Context, d *db.DB, client *http.Client, secret, de
 		defer func() { _ = resp.Body.Close() }()
 		_, _ = io.Copy(io.Discard, resp.Body)
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			return d.MarkDeliverySent(ctx, deliveryID, now)
+			return finishDelivery(ctx, d, deliveryID, isFinalAttempt, now, nil)
 		}
 		err = fmt.Errorf("webhook responded %d", resp.StatusCode)
 	}
+	return finishDelivery(ctx, d, deliveryID, isFinalAttempt, now, err)
+}
 
+// finishDelivery records the terminal state of a send attempt: SENT on success,
+// else RETRYING (surfacing the error so the queue retries) or DEAD_LETTERED once
+// the retry limit is reached.
+func finishDelivery(ctx context.Context, d *db.DB, id string, isFinal bool, now time.Time, sendErr error) error {
+	if sendErr == nil {
+		return d.MarkDeliverySent(ctx, id, now)
+	}
 	status := "RETRYING"
-	if isFinalAttempt {
+	if isFinal {
 		status = "DEAD_LETTERED"
 	}
-	if merr := d.MarkDeliveryFailed(ctx, deliveryID, status, now, err.Error()); merr != nil {
+	if merr := d.MarkDeliveryFailed(ctx, id, status, now, sendErr.Error()); merr != nil {
 		return merr
 	}
-	if !isFinalAttempt {
-		return err // surface so the queue retries
+	if !isFinal {
+		return sendErr // surface so the queue retries
 	}
 	return nil
 }

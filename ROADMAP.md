@@ -16,8 +16,10 @@ consume.
   freshness, and cooldown visibility surfaced in the admin console to make it
   easy to spot and retire failing sources.
 - **Delivery channels.** Expand beyond current outbound delivery with
-  additional channels (e.g. richer webhook payloads, email digests, and
-  chat-style integrations).
+  additional channels. **Email delivery and hourly/daily digests have shipped**
+  (SMTP connectors with Gmail/Outlook/Zoho/SendGrid presets — see
+  [docs/EMAIL.md](docs/EMAIL.md)); richer webhook payloads and chat-style
+  integrations are still planned.
 - **Operability improvements.** Better observability around the scheduler, job
   queue, and worker pool (metrics, structured insight into retries and
   backoff).

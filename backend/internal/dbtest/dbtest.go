@@ -24,9 +24,9 @@ func URL() string {
 
 // tables are truncated in dependency-safe order (CASCADE handles the rest).
 var tables = []string{
-	"DeliveryEvent", "Subscription", "Subscriber", "SignalTag", "SignalArticle",
+	"DigestQueue", "DeliveryEvent", "Subscription", "Subscriber", "SignalTag", "SignalArticle",
 	"Signal", "Article", "RawItem", "SourceValidationLog", "Source", "TaxonomyTag",
-	"LLMKey", "AuditLog", "Session", "TeamMember", "Team", "User",
+	"LLMKey", "EmailConnector", "AuditLog", "Session", "TeamMember", "Team", "User",
 }
 
 // Connect opens a pool to the test DB (ensuring auth tables exist), skipping the

@@ -25,6 +25,9 @@ const RESP: Record<string, unknown> = {
   subscriptions: [{ id: "x" }], subscription: { id: "x" }, createSubscription: { id: "x" },
   updateSubscription: { id: "x" }, deleteSubscription: true,
   subscribers: [{ id: "sb" }], createSubscriber: { id: "sb" }, deleteSubscriber: true,
+  emailConnectors: [{ id: "c" }], emailProviders: [{ code: "GMAIL" }], createEmailConnector: { id: "c" },
+  updateEmailConnector: { id: "c" }, setActiveEmailConnector: { id: "c" }, testEmailConnector: { ok: true },
+  sendTestEmail: { ok: true }, deleteEmailConnector: true,
   countries: [{ code: "US", name: "United States" }],
   taxonomy: [{ code: "C" }], taxonomyStats: [{ key: "C", count: 1 }],
   jobs: { items: [], total: 0 }, jobCounts: [{ key: "k", count: 1 }], retryJob: true,
@@ -101,6 +104,15 @@ describe("api wrappers", () => {
     expect(await api.subscribers()).toEqual(RESP.subscribers);
     expect(await api.createSubscriber("n")).toEqual(RESP.createSubscriber);
     expect(await api.deleteSubscriber("sb")).toBe(true);
+
+    expect(await api.emailConnectors()).toEqual(RESP.emailConnectors);
+    expect(await api.emailProviders()).toEqual(RESP.emailProviders);
+    expect(await api.createEmailConnector({ name: "n" })).toEqual(RESP.createEmailConnector);
+    expect(await api.updateEmailConnector("c", { name: "n" })).toEqual(RESP.updateEmailConnector);
+    expect(await api.setActiveEmailConnector("c")).toEqual(RESP.setActiveEmailConnector);
+    expect(await api.testEmailConnector("c")).toEqual(RESP.testEmailConnector);
+    expect(await api.sendTestEmail("c", "a@x.com")).toEqual(RESP.sendTestEmail);
+    expect(await api.deleteEmailConnector("c")).toBe(true);
 
     expect(await api.countries()).toEqual(RESP.countries);
     expect(await api.taxonomy()).toEqual(RESP.taxonomy);

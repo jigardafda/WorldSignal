@@ -41,6 +41,16 @@ Every resolver enforces a permission. Roles → permissions:
 - `subscriptions` · `subscription(id)` · `subscribers` · `deliveries(…) { items, total }` · `delivery(id)`
 - Mutations: `createSubscription`, `updateSubscription`, `deleteSubscription`,
   `createSubscriber`, `deleteSubscriber`, `retryDelivery` (`deliveries:retry`)
+- Channels: `WEBHOOK` (HMAC-signed POST), `POLLING` (pull via `deliveries`), and
+  `EMAIL`. Email subscriptions carry `config { to, connectorId?, mode, interval }`
+  and can send instantly or as an hourly/daily **digest** — see [EMAIL.md](EMAIL.md).
+
+### Admin — email connectors (`settings:manage`)
+- `emailConnectors` (secrets masked to last 4) · `emailProviders` — SMTP presets
+  (Gmail, Outlook, Zoho, SendGrid, Custom) with host/port/security + setup hints
+- Mutations: `createEmailConnector(input)`, `updateEmailConnector(id, input)`,
+  `setActiveEmailConnector(id)`, `testEmailConnector(id)`, `sendTestEmail(id, to)`,
+  `deleteEmailConnector(id)`
 
 ### Jobs (`jobs:read` / `jobs:manage`)
 - `jobs(queue, state, limit, offset) { items, total }` · `jobCounts` · `retryJob(id)`

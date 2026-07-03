@@ -161,7 +161,45 @@ CREATE TABLE IF NOT EXISTS "SignalAttribute" (
   PRIMARY KEY ("signalId","key","valueCode","valueText")
 );
 CREATE INDEX IF NOT EXISTS "SignalAttribute_key_value_idx" ON "SignalAttribute"("key","valueCode");
-CREATE INDEX IF NOT EXISTS "SignalAttribute_signal_idx"    ON "SignalAttribute"("signalId");`
+CREATE INDEX IF NOT EXISTS "SignalAttribute_signal_idx"    ON "SignalAttribute"("signalId");
+
+-- EmailConnector is an admin-managed SMTP configuration ("connector") used by the
+-- EMAIL delivery channel. The secret (password/API key) is stored only as
+-- ciphertext (AES-GCM, same key as LLMKey); secretLast4 is safe to display.
+CREATE TABLE IF NOT EXISTS "EmailConnector" (
+  "id"               text PRIMARY KEY,
+  "name"             text NOT NULL,
+  "provider"         text NOT NULL DEFAULT 'CUSTOM',
+  "host"             text NOT NULL,
+  "port"             integer NOT NULL DEFAULT 587,
+  "security"         text NOT NULL DEFAULT 'STARTTLS',
+  "username"         text NOT NULL DEFAULT '',
+  "secretCiphertext" text NOT NULL DEFAULT '',
+  "secretLast4"      text NOT NULL DEFAULT '',
+  "fromEmail"        text NOT NULL,
+  "fromName"         text NOT NULL DEFAULT 'WorldSignal',
+  "isActive"         boolean NOT NULL DEFAULT false,
+  "enabled"          boolean NOT NULL DEFAULT true,
+  "status"           text NOT NULL DEFAULT 'UNTESTED',
+  "lastTestedAt"     timestamptz,
+  "lastError"        text,
+  "createdBy"        text,
+  "createdAt"        timestamptz NOT NULL DEFAULT now(),
+  "updatedAt"        timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "EmailConnector_active_idx" ON "EmailConnector"("isActive");
+
+-- Digest support: batched email subscriptions accumulate matched signals here
+-- instead of sending immediately; the digest scheduler drains this into one
+-- rollup delivery per interval. lastDigestAt tracks when a subscription last fired.
+ALTER TABLE "Subscription" ADD COLUMN IF NOT EXISTS "lastDigestAt" timestamptz;
+CREATE TABLE IF NOT EXISTS "DigestQueue" (
+  "subscriptionId" text NOT NULL REFERENCES "Subscription"("id") ON DELETE CASCADE,
+  "signalId"       text NOT NULL REFERENCES "Signal"("id") ON DELETE CASCADE,
+  "queuedAt"       timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("subscriptionId","signalId")
+);
+CREATE INDEX IF NOT EXISTS "DigestQueue_sub_idx" ON "DigestQueue"("subscriptionId","queuedAt");`
 
 // MigrateContent ensures the extended source-metadata columns and the
 // SourceValidationLog table exist. Safe to run repeatedly.

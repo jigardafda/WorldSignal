@@ -23,6 +23,11 @@ type Config struct {
 	// Source failure handling.
 	SourceFailureThreshold int // consecutive failures before cooldown
 	SourceCooldownMinutes  int // cooldown duration once threshold is hit
+	// AppBaseURL is the public console URL (e.g. https://signals.example.com). When
+	// set, emails link back to signals in the console. Optional.
+	AppBaseURL string
+	// DigestTickSeconds is how often the digest scheduler checks for due digests.
+	DigestTickSeconds int
 }
 
 // HasOpenAI reports whether an OpenAI key is configured.
@@ -46,6 +51,7 @@ func Load() (Config, error) {
 		WebhookSigningSecret: getenv("WEBHOOK_SIGNING_SECRET", "change-me-in-prod"),
 		AdminEmail:           getenv("ADMIN_EMAIL", "admin@worldsignal.local"),
 		AdminPassword:        getenv("ADMIN_PASSWORD", "admin12345"),
+		AppBaseURL:           getenv("APP_BASE_URL", ""),
 	}
 
 	if c.DatabaseURL == "" {
@@ -81,6 +87,12 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("SOURCE_COOLDOWN_MINUTES must be a positive number")
 	}
 	c.SourceCooldownMinutes = cd
+
+	dt, err := strconv.Atoi(getenv("DIGEST_TICK_SECONDS", "60"))
+	if err != nil || dt < 1 {
+		return Config{}, fmt.Errorf("DIGEST_TICK_SECONDS must be a positive number")
+	}
+	c.DigestTickSeconds = dt
 
 	return c, nil
 }

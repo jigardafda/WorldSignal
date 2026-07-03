@@ -2,7 +2,7 @@ import { AppShell, Burger, Group, Menu, NavLink, ScrollArea, SegmentedControl, T
 import { useDisclosure } from "@mantine/hooks";
 import {
   IconActivity, IconArticle, IconBell, IconBroadcast, IconChartBar, IconDatabase,
-  IconFileText, IconGauge, IconListCheck, IconLogout, IconSettings, IconSitemap,
+  IconFileText, IconGauge, IconListCheck, IconLogout, IconMail, IconSettings, IconSitemap,
   IconUsers, IconUsersGroup,
 } from "@tabler/icons-react";
 import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -27,6 +27,7 @@ const NAV: NavItem[] = [
   { to: "/users", label: "Users", icon: <IconUsers size={18} />, perm: "users:manage" },
   { to: "/teams", label: "Teams", icon: <IconUsersGroup size={18} />, perm: "teams:manage" },
   { to: "/settings", label: "Settings", icon: <IconSettings size={18} />, perm: "settings:manage" },
+  { to: "/connectors", label: "Connectors", icon: <IconMail size={18} />, perm: "settings:manage" },
   { to: "/audit", label: "Audit Log", icon: <IconListCheck size={18} />, perm: "settings:manage" },
 ];
 

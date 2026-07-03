@@ -58,11 +58,12 @@ type EnabledSubscription struct {
 	ID      string
 	Channel string
 	Filter  []byte
+	Config  []byte
 }
 
 // EnabledSubscriptions returns all enabled subscriptions.
 func (d *DB) EnabledSubscriptions(ctx context.Context) ([]EnabledSubscription, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT "id","channel","filter" FROM "Subscription" WHERE "enabled"=true`)
+	rows, err := d.Pool.Query(ctx, `SELECT "id","channel","filter","config" FROM "Subscription" WHERE "enabled"=true`)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +71,7 @@ func (d *DB) EnabledSubscriptions(ctx context.Context) ([]EnabledSubscription, e
 	var out []EnabledSubscription
 	for rows.Next() {
 		var s EnabledSubscription
-		if err := rows.Scan(&s.ID, &s.Channel, &s.Filter); err != nil {
+		if err := rows.Scan(&s.ID, &s.Channel, &s.Filter, &s.Config); err != nil {
 			return nil, err
 		}
 		out = append(out, s)
