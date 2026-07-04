@@ -66,7 +66,11 @@ This lets the API scale independently of ingestion workers.
 
 React + Vite + Mantine, React Router. `lib/api.ts` is the typed GraphQL client;
 `lib/auth.tsx` holds the auth context; pages live under `pages/`, shared UI under
-`components/`. Routes are gated by RBAC permissions (`Layout.tsx` nav + `RequireAuth`).
+`components/`. Routes are gated by RBAC permissions on three layers: `RequireAuth`
+(authentication), a per-route `RequirePerm` guard in `App.tsx` (direct navigation
+to a route the user lacks permission for renders an "Access denied" page), and
+`Layout.tsx` nav visibility. The server-side `authz` check on every resolver
+remains the source of truth; the client guards are defence-in-depth/UX.
 
 ## Security model
 

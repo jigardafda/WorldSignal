@@ -13,7 +13,9 @@ export function renderWithProviders(
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <MantineProvider>
-        <Notifications />
+        {/* autoClose disabled so a notification's timer can never fire after the
+            jsdom environment is torn down (which throws "window is not defined"). */}
+        <Notifications autoClose={false} />
         <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
       </MantineProvider>
     );

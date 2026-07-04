@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Per-route permission guards.** Directly navigating to a route the current
+  role can't access (e.g. `/users`, `/settings`) now renders an "Access denied"
+  page instead of the component, via a `RequirePerm` wrapper in `App.tsx` — the
+  gated page never mounts or fetches. This is defence-in-depth alongside the nav
+  gating and the authoritative server-side `authz` checks.
 - **Full-text search.** Signal and article search now use ranked Postgres
   full-text search — a generated, weighted `tsvector` column (title > summary >
   briefing) backed by a GIN index, parsed with `websearch_to_tsquery` and ordered
