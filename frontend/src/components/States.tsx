@@ -1,5 +1,5 @@
 import { Alert, Button, Center, Loader, Stack, Text } from "@mantine/core";
-import { IconAlertTriangle, IconInbox } from "@tabler/icons-react";
+import { IconAlertTriangle, IconInbox, IconLock } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 
 export function LoadingState({ label = "Loading…" }: { label?: string }) {
@@ -35,6 +35,18 @@ export function EmptyState({ message = "Nothing here yet.", action }: { message?
         <IconInbox size={32} opacity={0.4} />
         <Text c="dimmed" size="sm">{message}</Text>
         {action}
+      </Stack>
+    </Center>
+  );
+}
+
+export function ForbiddenState({ message = "You don't have permission to view this page." }: { message?: string }) {
+  return (
+    <Center py="xl" data-testid="forbidden">
+      <Stack align="center" gap="xs" maw={420} ta="center">
+        <IconLock size={32} opacity={0.5} />
+        <Text fw={600}>Access denied</Text>
+        <Text c="dimmed" size="sm">{message}</Text>
       </Stack>
     </Center>
   );

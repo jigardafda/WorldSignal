@@ -1,7 +1,8 @@
 import { Center } from "@mantine/core";
+import type { ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import { LoadingState } from "./components/States";
+import { ForbiddenState, LoadingState } from "./components/States";
 import { useAuth } from "./lib/auth";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
@@ -38,6 +39,14 @@ function RequireAuth() {
   return <Layout />;
 }
 
+// RequirePerm gates a route on a permission. Directly navigating to a route the
+// user lacks access to renders an "Access denied" page instead of the component
+// (defence-in-depth alongside the nav gating and the server-side authz).
+function RequirePerm({ perm, children }: { perm: string; children: ReactNode }) {
+  const { hasPerm } = useAuth();
+  return hasPerm(perm) ? <>{children}</> : <ForbiddenState />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -45,29 +54,29 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/live" element={<LiveDashboard />} />
-        <Route path="/signals" element={<Signals />} />
-        <Route path="/signals/:id" element={<SignalDetail />} />
-        <Route path="/entities" element={<Entities />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/sources" element={<Sources />} />
-        <Route path="/sources/:id" element={<SourceDetail />} />
-        <Route path="/coverage" element={<Coverage />} />
-        <Route path="/articles" element={<Articles />} />
-        <Route path="/articles/:id" element={<ArticleDetail />} />
-        <Route path="/raw-items" element={<RawItems />} />
-        <Route path="/raw-items/:id" element={<RawItemDetail />} />
-        <Route path="/deliveries" element={<Deliveries />} />
-        <Route path="/deliveries/:id" element={<DeliveryDetail />} />
-        <Route path="/subscriptions" element={<Subscriptions />} />
-        <Route path="/subscribers" element={<Subscribers />} />
-        <Route path="/taxonomy" element={<Taxonomy />} />
-        <Route path="/jobs" element={<Jobs />} />
-        <Route path="/users" element={<Users />} />
-        <Route path="/teams" element={<Teams />} />
+        <Route path="/signals" element={<RequirePerm perm="signals:read"><Signals /></RequirePerm>} />
+        <Route path="/signals/:id" element={<RequirePerm perm="signals:read"><SignalDetail /></RequirePerm>} />
+        <Route path="/entities" element={<RequirePerm perm="signals:read"><Entities /></RequirePerm>} />
+        <Route path="/analytics" element={<RequirePerm perm="analytics:read"><Analytics /></RequirePerm>} />
+        <Route path="/sources" element={<RequirePerm perm="sources:read"><Sources /></RequirePerm>} />
+        <Route path="/sources/:id" element={<RequirePerm perm="sources:read"><SourceDetail /></RequirePerm>} />
+        <Route path="/coverage" element={<RequirePerm perm="sources:read"><Coverage /></RequirePerm>} />
+        <Route path="/articles" element={<RequirePerm perm="signals:read"><Articles /></RequirePerm>} />
+        <Route path="/articles/:id" element={<RequirePerm perm="signals:read"><ArticleDetail /></RequirePerm>} />
+        <Route path="/raw-items" element={<RequirePerm perm="signals:read"><RawItems /></RequirePerm>} />
+        <Route path="/raw-items/:id" element={<RequirePerm perm="signals:read"><RawItemDetail /></RequirePerm>} />
+        <Route path="/deliveries" element={<RequirePerm perm="deliveries:read"><Deliveries /></RequirePerm>} />
+        <Route path="/deliveries/:id" element={<RequirePerm perm="deliveries:read"><DeliveryDetail /></RequirePerm>} />
+        <Route path="/subscriptions" element={<RequirePerm perm="subscriptions:read"><Subscriptions /></RequirePerm>} />
+        <Route path="/subscribers" element={<RequirePerm perm="subscriptions:read"><Subscribers /></RequirePerm>} />
+        <Route path="/taxonomy" element={<RequirePerm perm="signals:read"><Taxonomy /></RequirePerm>} />
+        <Route path="/jobs" element={<RequirePerm perm="jobs:read"><Jobs /></RequirePerm>} />
+        <Route path="/users" element={<RequirePerm perm="users:manage"><Users /></RequirePerm>} />
+        <Route path="/teams" element={<RequirePerm perm="teams:manage"><Teams /></RequirePerm>} />
         <Route path="/account" element={<Account />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/connectors" element={<Connectors />} />
-        <Route path="/audit" element={<AuditLog />} />
+        <Route path="/settings" element={<RequirePerm perm="settings:manage"><Settings /></RequirePerm>} />
+        <Route path="/connectors" element={<RequirePerm perm="settings:manage"><Connectors /></RequirePerm>} />
+        <Route path="/audit" element={<RequirePerm perm="settings:manage"><AuditLog /></RequirePerm>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
