@@ -62,6 +62,7 @@ func (s *Server) root() gql.Root {
 	s.registerEntityResolvers(q, m)    // Phase B: articles, rawItems, deliveries, jobs, analytics, …
 	s.registerLLMResolvers(q, m)       // LLM key management (settings:manage)
 	s.registerConnectorResolvers(q, m) // email connectors (settings:manage)
+	s.registerAPIKeyResolvers(q, m)    // public-API keys (settings:manage)
 	return gql.Root{Query: q, Mutation: m}
 }
 

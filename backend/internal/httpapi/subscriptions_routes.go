@@ -9,9 +9,9 @@ import (
 )
 
 func (s *Server) registerSubscriptionRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /v1/subscriptions", s.listSubscriptions)
-	mux.HandleFunc("POST /v1/subscriptions", s.createSubscriptionREST)
-	mux.HandleFunc("GET /v1/deliveries", s.listDeliveries)
+	mux.HandleFunc("GET /v1/subscriptions", s.requireAPIKey("subscriptions:read", s.listSubscriptions))
+	mux.HandleFunc("POST /v1/subscriptions", s.requireAPIKey("subscriptions:write", s.createSubscriptionREST))
+	mux.HandleFunc("GET /v1/deliveries", s.requireAPIKey("deliveries:read", s.listDeliveries))
 }
 
 type createSubscriptionBody struct {

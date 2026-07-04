@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/worldsignal/backend/internal/crypto"
+	"github.com/worldsignal/backend/internal/cuid"
 	"github.com/worldsignal/backend/internal/db"
 	"github.com/worldsignal/backend/internal/dbtest"
 	"github.com/worldsignal/backend/internal/httpapi"
@@ -30,6 +32,7 @@ func newServer(t *testing.T, d *db.DB) (*httptest.Server, *recordEnqueuer) {
 	srv := &httpapi.Server{DB: d, Enqueue: enq, SigningSecret: "s"}
 	ht := httptest.NewServer(srv.Handler())
 	t.Cleanup(ht.Close)
+	seedFullAPIKey(t, d)
 	return ht, enq
 }
 
@@ -39,7 +42,37 @@ func newServerWith(t *testing.T, d *db.DB, enq httpapi.Enqueuer) string {
 	srv := &httpapi.Server{DB: d, Enqueue: enq, SigningSecret: "s"}
 	ht := httptest.NewServer(srv.Handler())
 	t.Cleanup(ht.Close)
+	seedFullAPIKey(t, d)
 	return ht.URL
+}
+
+// apiKey, when set, is attached by get/post as the X-API-Key header so REST
+// tests authenticate against the /v1 surface. seedFullAPIKey provisions an
+// all-scopes, effectively-unlimited key and points apiKey at it.
+var apiKey string
+
+func seedFullAPIKey(t *testing.T, d *db.DB) {
+	t.Helper()
+	raw := "wsk_test_" + cuid.New()
+	_, err := d.Pool.Exec(context.Background(),
+		`INSERT INTO "ApiKey" ("id","name","keyHash","keyPrefix","scopes","rateLimitPerMin") VALUES ($1,$2,$3,$4,$5,$6)`,
+		cuid.New(), "test", crypto.SHA256Hex(raw), "wsk_test",
+		[]string{"signals:read", "sources:read", "sources:write", "subscriptions:read", "subscriptions:write", "deliveries:read", "stats:read"},
+		1000000)
+	if err != nil {
+		t.Fatalf("seed api key: %v", err)
+	}
+	apiKey = raw
+}
+
+// authHeaders applies the current API key (and bearer, if any) to a REST request.
+func authHeaders(req *http.Request) {
+	if apiKey != "" {
+		req.Header.Set("X-API-Key", apiKey)
+	}
+	if bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+bearer)
+	}
 }
 
 func seed(t *testing.T, d *db.DB) {
@@ -68,9 +101,7 @@ var bearer string
 func get(t *testing.T, base, path string) (int, string) {
 	t.Helper()
 	req, _ := http.NewRequest("GET", base+path, nil)
-	if bearer != "" {
-		req.Header.Set("Authorization", "Bearer "+bearer)
-	}
+	authHeaders(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -197,7 +228,10 @@ func TestRESTMutationsAndEdges(t *testing.T) {
 	ht, enq := newServer(t, d)
 
 	post := func(path, body string) (int, string) {
-		resp, err := http.Post(ht.URL+path, "application/json", strings.NewReader(body))
+		req, _ := http.NewRequest("POST", ht.URL+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		authHeaders(req)
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -236,6 +270,7 @@ func TestRESTMutationsAndEdges(t *testing.T) {
 	// PATCH + fetch action.
 	req, _ := http.NewRequest("PATCH", ht.URL+"/v1/sources/s1", strings.NewReader(`{"enabled":false,"priority":3,"crawlFrequency":120}`))
 	req.Header.Set("Content-Type", "application/json")
+	authHeaders(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -281,7 +316,10 @@ func TestEmptyBodyCreateSource(t *testing.T) {
 	d := dbtest.Connect(t)
 	seed(t, d)
 	ht, _ := newServer(t, d)
-	resp, err := http.Post(ht.URL+"/v1/sources", "application/json", strings.NewReader(""))
+	req, _ := http.NewRequest("POST", ht.URL+"/v1/sources", strings.NewReader(""))
+	req.Header.Set("Content-Type", "application/json")
+	authHeaders(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,6 +336,10 @@ func TestErrorPathsWithClosedDB(t *testing.T) {
 	srv := &httpapi.Server{DB: d, Enqueue: enq, SigningSecret: "s"}
 	ht := httptest.NewServer(srv.Handler())
 	defer ht.Close()
+	// A key is presented so the middleware reaches its DB lookup, which errors on
+	// the closed pool → 500 (the auth check itself fails, as expected).
+	apiKey = "wsk_closed"
+	authKey := func(req *http.Request) { req.Header.Set("X-API-Key", apiKey) }
 
 	// signal(id) resolver error branch.
 	sr, _ := http.Post(ht.URL+"/graphql", "application/json", strings.NewReader(`{"query":"query($id:ID!){signal(id:$id){id}}","variables":{"id":"x"}}`))
@@ -332,12 +374,16 @@ func TestErrorPathsWithClosedDB(t *testing.T) {
 		}
 	}
 	// REST writes error.
-	r1, _ := http.Post(ht.URL+"/v1/sources", "application/json", strings.NewReader(`{"name":"n","url":"u"}`))
+	r1req, _ := http.NewRequest("POST", ht.URL+"/v1/sources", strings.NewReader(`{"name":"n","url":"u"}`))
+	authKey(r1req)
+	r1, _ := http.DefaultClient.Do(r1req)
 	if r1.StatusCode != 500 {
 		t.Fatalf("create with closed DB want 500 got %d", r1.StatusCode)
 	}
 	r1.Body.Close()
-	r2, _ := http.Post(ht.URL+"/v1/subscriptions", "application/json", strings.NewReader(`{"name":"n"}`))
+	r2req, _ := http.NewRequest("POST", ht.URL+"/v1/subscriptions", strings.NewReader(`{"name":"n"}`))
+	authKey(r2req)
+	r2, _ := http.DefaultClient.Do(r2req)
 	if r2.StatusCode != 500 {
 		t.Fatalf("create sub closed DB want 500 got %d", r2.StatusCode)
 	}
@@ -345,6 +391,7 @@ func TestErrorPathsWithClosedDB(t *testing.T) {
 	// PATCH on closed DB → 500.
 	preq, _ := http.NewRequest("PATCH", ht.URL+"/v1/sources/x", strings.NewReader(`{"enabled":true}`))
 	preq.Header.Set("Content-Type", "application/json")
+	authKey(preq)
 	pres, _ := http.DefaultClient.Do(preq)
 	if pres.StatusCode != 500 {
 		t.Fatalf("patch closed DB want 500 got %d", pres.StatusCode)

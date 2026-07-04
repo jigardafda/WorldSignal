@@ -122,6 +122,12 @@ export interface EmailProvider {
   usernameHint: string; secretHint: string; help: string; docsAnchor: string; editable: boolean;
 }
 export interface ConnectorTestResult { ok: boolean; status?: string; error?: string | null }
+export interface ApiKey {
+  id: string; name: string; keyPrefix: string; scopes: string[];
+  rateLimitPerMin: number; enabled: boolean; expiresAt: string | null;
+  lastUsedAt: string | null; requestCount: number; createdBy: string | null; createdAt: string;
+  key?: string; // the raw secret — only present in the createApiKey response
+}
 export interface Subscriber { id: string; name: string; status: string; createdAt: string; subscriptionCount: number }
 export interface Entity { name: string; type: string; signalCount: number }
 export interface EntityFilter { search?: string; type?: string }
@@ -323,6 +329,16 @@ export const api = {
   deleteEmailConnector: (id: string) =>
     gql<{ deleteEmailConnector: boolean }>(`mutation($id:ID!){deleteEmailConnector(id:$id)}`, { id }).then((d) => d.deleteEmailConnector),
 
+  // API keys — public REST API credentials (settings:manage)
+  apiKeys: () => gql<{ apiKeys: ApiKey[] }>(`{apiKeys{${API_KEY_FIELDS}}}`).then((d) => d.apiKeys),
+  apiScopes: () => gql<{ apiScopes: string[] }>(`{apiScopes}`).then((d) => d.apiScopes),
+  createApiKey: (input: { name: string; scopes: string[]; rateLimitPerMin?: number; expiresAt?: string }) =>
+    gql<{ createApiKey: ApiKey }>(`mutation($i:CreateApiKeyInput!){createApiKey(input:$i){${API_KEY_FIELDS} key}}`, { i: input }).then((d) => d.createApiKey),
+  setApiKeyEnabled: (id: string, enabled: boolean) =>
+    gql<{ setApiKeyEnabled: ApiKey }>(`mutation($id:ID!,$e:Boolean!){setApiKeyEnabled(id:$id,enabled:$e){${API_KEY_FIELDS}}}`, { id, e: enabled }).then((d) => d.setApiKeyEnabled),
+  deleteApiKey: (id: string) =>
+    gql<{ deleteApiKey: boolean }>(`mutation($id:ID!){deleteApiKey(id:$id)}`, { id }).then((d) => d.deleteApiKey),
+
   // audit log (settings:manage)
   auditLogs: (filter: AuditFilter = {}, limit = 50, offset = 0) => {
     const args = sourceArgs(filter as Record<string, string>, { limit, offset });
@@ -332,3 +348,4 @@ export const api = {
 
 const LLM_KEY_FIELDS = `id provider label keyLast4 model isActive status lastTestedAt lastError createdBy createdAt updatedAt`;
 const CONNECTOR_FIELDS = `id name provider host port security username secretLast4 fromEmail fromName isActive enabled status lastTestedAt lastError createdAt updatedAt`;
+const API_KEY_FIELDS = `id name keyPrefix scopes rateLimitPerMin enabled expiresAt lastUsedAt requestCount createdBy createdAt`;

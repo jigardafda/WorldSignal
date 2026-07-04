@@ -209,6 +209,34 @@ CREATE TABLE IF NOT EXISTS "EmailConnector" (
 );
 CREATE INDEX IF NOT EXISTS "EmailConnector_active_idx" ON "EmailConnector"("isActive");
 
+-- ApiKey secures the public REST API (/v1/*). Only a one-way SHA-256 hash of the
+-- key is stored (the raw key is shown once at creation); keyPrefix is safe to
+-- display. Each key carries a scope set and a per-minute rate limit.
+CREATE TABLE IF NOT EXISTS "ApiKey" (
+  "id"              text PRIMARY KEY,
+  "name"            text NOT NULL,
+  "keyHash"         text NOT NULL UNIQUE,
+  "keyPrefix"       text NOT NULL,
+  "scopes"          text[] NOT NULL DEFAULT '{}',
+  "rateLimitPerMin" integer NOT NULL DEFAULT 120,
+  "enabled"         boolean NOT NULL DEFAULT true,
+  "expiresAt"       timestamptz,
+  "lastUsedAt"      timestamptz,
+  "requestCount"    bigint NOT NULL DEFAULT 0,
+  "createdBy"       text,
+  "createdAt"       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "ApiKey_hash_idx" ON "ApiKey"("keyHash");
+
+-- Fixed-window (per-minute) request counters for API-key rate limiting. One live
+-- row per active key; stale windows are pruned on write.
+CREATE TABLE IF NOT EXISTS "ApiKeyUsage" (
+  "keyId"       text NOT NULL REFERENCES "ApiKey"("id") ON DELETE CASCADE,
+  "windowStart" timestamptz NOT NULL,
+  "count"       integer NOT NULL DEFAULT 0,
+  PRIMARY KEY ("keyId","windowStart")
+);
+
 -- Digest support: batched email subscriptions accumulate matched signals here
 -- instead of sending immediately; the digest scheduler drains this into one
 -- rollup delivery per interval. lastDigestAt tracks when a subscription last fired.

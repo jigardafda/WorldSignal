@@ -11,9 +11,9 @@ import (
 )
 
 func (s *Server) registerSignalRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /v1/signals", s.listSignals)
-	mux.HandleFunc("GET /v1/signals/{id}", s.getSignal)
-	mux.HandleFunc("GET /v1/entities", s.listEntities)
+	mux.HandleFunc("GET /v1/signals", s.requireAPIKey("signals:read", s.listSignals))
+	mux.HandleFunc("GET /v1/signals/{id}", s.requireAPIKey("signals:read", s.getSignal))
+	mux.HandleFunc("GET /v1/entities", s.requireAPIKey("signals:read", s.listEntities))
 }
 
 // listEntities serves the queryable entity index: {data:[{name,type,signalCount}]}.

@@ -62,6 +62,7 @@ Sources → Ingestion → Normalization → Dedupe/Cluster → Enrichment → Di
 - **Closed taxonomy classification** — the LLM is constrained to a fixed vocabulary; with no API key it falls back to a deterministic keyword classifier, so the pipeline always produces Signals.
 - **LLM key management** — system key from the environment plus admin-managed keys, encrypted at rest, validated against the provider, with a live model picker.
 - **Auth, RBAC & audit** — bearer sessions, bcrypt, ADMIN/EDITOR/VIEWER roles, and an audit log of security-relevant actions.
+- **Public API keys** — the REST `/v1/*` surface is secured with hashed, scoped API keys and per-key rate limiting (401/403/429), managed in the console. See [docs/API.md](docs/API.md#authentication-api-keys).
 - **GraphQL + REST APIs** and a responsive **React + Mantine** admin console.
 - **Postgres-only** job queue, scheduler and storage — one dependency to operate.
 

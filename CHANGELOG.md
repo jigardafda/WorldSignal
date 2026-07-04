@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Public REST API authentication.** Every `/v1/*` endpoint now requires a
+  scoped **API key** (only `/health` stays open) — closing a gap where the REST
+  surface was unauthenticated behind permissive CORS. Keys are stored **hashed**
+  (SHA-256; the raw secret is shown once at creation), carry a **scope** set
+  (`signals:read`, `sources:read/write`, `subscriptions:read/write`,
+  `deliveries:read`, `stats:read`), and enforce a **per-minute rate limit**
+  (Postgres fixed-window) returning `401`/`403`/`429` with `X-RateLimit-*` and
+  `Retry-After` headers. Managed in a new **API Keys** console page and via
+  GraphQL (`apiKeys`, `apiScopes`, `createApiKey`, `setApiKeyEnabled`,
+  `deleteApiKey`; `settings:manage`). See [docs/API.md](docs/API.md#authentication-api-keys).
+
 - **Per-route permission guards.** Directly navigating to a route the current
   role can't access (e.g. `/users`, `/settings`) now renders an "Access denied"
   page instead of the component, via a `RequirePerm` wrapper in `App.tsx` — the

@@ -11,6 +11,7 @@ func restPost(t *testing.T, base, path, body string) (int, string) {
 	t.Helper()
 	req, _ := http.NewRequest("POST", base+path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	authHeaders(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -24,6 +25,7 @@ func restPatch(t *testing.T, base, path, body string) (int, string) {
 	t.Helper()
 	req, _ := http.NewRequest("PATCH", base+path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	authHeaders(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -72,6 +74,7 @@ func TestSourcesREST(t *testing.T) {
 	}
 	// GET list.
 	req, _ := http.NewRequest("GET", ht.URL+"/v1/sources", nil)
+	authHeaders(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)

@@ -83,14 +83,46 @@ High-cardinality lists (`signals`, `articles`, `rawItems`, `deliveries`, `jobs`,
 
 ## REST surface
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/health` | Liveness probe (`{status:"ok"}`). |
-| GET | `/v1/stats` | Headline counts. |
-| GET | `/v1/signals` | `{ data: Signal[] }`. Filters incl. `search` (full-text), `entity`, `country`, `status`, `tags`, … |
-| GET | `/v1/signals/{id}` | A single signal aggregate. |
-| GET | `/v1/entities` | `{ data: [{name,type,signalCount}] }`. Params: `search`, `type`, `limit`. |
-| GET | `/v1/sources` | `{ data: Source[] }`. |
-| POST | `/v1/sources` | Create a source (also enqueues a fetch). |
-| PATCH | `/v1/sources/{id}` | Patch enabled/priority/crawlFrequency. |
-| POST | `/v1/sources/{id}/fetch` | Enqueue an immediate fetch. |
+### Authentication (API keys)
+
+Every `/v1/*` endpoint requires an **API key** (only `/health` is open). Admins
+create keys under **API Keys** in the console; each key is stored **hashed**
+(SHA-256 — the raw secret is shown once, at creation), carries a set of **scopes**,
+and has a per-minute **rate limit**.
+
+Send the key on each request as either header:
+
+```bash
+curl -H "Authorization: Bearer wsk_…" https://host/v1/signals
+curl -H "X-API-Key: wsk_…"            https://host/v1/signals
+```
+
+- **401** — missing or unknown key.
+- **403** — key is disabled, expired, or lacks the required scope.
+- **429** — rate limit exceeded. Responses carry `X-RateLimit-Limit`,
+  `X-RateLimit-Remaining`, and (on 429) `Retry-After`.
+
+Scopes: `signals:read`, `sources:read`, `sources:write`, `subscriptions:read`,
+`subscriptions:write`, `deliveries:read`, `stats:read`.
+
+Admin management (GraphQL, `settings:manage`): `apiKeys`, `apiScopes`,
+`createApiKey(input)` (returns the raw `key` once), `setApiKeyEnabled(id, enabled)`,
+`deleteApiKey(id)`.
+
+### Endpoints
+
+| Method | Path | Scope | Notes |
+|---|---|---|---|
+| GET | `/health` | — (open) | Liveness probe (`{status:"ok"}`). |
+| GET | `/v1/stats` | `stats:read` | Headline counts. |
+| GET | `/v1/taxonomy` | `signals:read` | The closed classification vocabulary. |
+| GET | `/v1/signals` | `signals:read` | `{ data: Signal[] }`. Filters incl. `search` (full-text), `entity`, `country`, `status`, `tags`, … |
+| GET | `/v1/signals/{id}` | `signals:read` | A single signal aggregate. |
+| GET | `/v1/entities` | `signals:read` | `{ data: [{name,type,signalCount}] }`. Params: `search`, `type`, `limit`. |
+| GET | `/v1/sources` | `sources:read` | `{ data: Source[] }`. |
+| POST | `/v1/sources` | `sources:write` | Create a source (also enqueues a fetch). |
+| PATCH | `/v1/sources/{id}` | `sources:write` | Patch enabled/priority/crawlFrequency. |
+| POST | `/v1/sources/{id}/fetch` | `sources:write` | Enqueue an immediate fetch. |
+| GET | `/v1/subscriptions` | `subscriptions:read` | `{ data: Subscription[] }`. |
+| POST | `/v1/subscriptions` | `subscriptions:write` | Create a subscription. |
+| GET | `/v1/deliveries` | `deliveries:read` | `{ data: DeliveryEvent[] }`. |
