@@ -73,6 +73,24 @@ func buckets(bs []db.Bucket) []any {
 	return out
 }
 
+// resolveEntities lists distinct extracted entities (name, type, signalCount),
+// searchable by name and filterable by type. Gated by signals:read.
+func (s *Server) resolveEntities(ctx context.Context, args map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSignalsRead); err != nil {
+		return nil, err
+	}
+	f := db.EntityFilter{Search: strArg(args, "search"), Type: strArg(args, "type"), Limit: toInt(args["limit"], 50)}
+	rows, err := s.DB.SearchEntities(ctx, f)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]any, len(rows))
+	for i, e := range rows {
+		out[i] = map[string]any{"name": e.Name, "type": e.Type, "signalCount": e.SignalCount}
+	}
+	return out, nil
+}
+
 // ---- sources ----
 
 func sourceDetailMap(src *db.Source) map[string]any {

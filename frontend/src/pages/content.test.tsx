@@ -69,6 +69,18 @@ describe("Signals", () => {
 
     await userEvent.click(screen.getByText("Quake")); // row click → navigate
   });
+  it("applies a URL-seeded entity filter and clears it", async () => {
+    apiMock.signals.mockResolvedValue([signal()]);
+    apiMock.signalCount.mockResolvedValue(1);
+    renderWithProviders(<Signals />, { route: "/signals?entity=Acme%20Corp" });
+    await screen.findByText("Quake");
+    // The entity filter is passed to the query and shown as a removable chip.
+    await waitFor(() => expect(apiMock.signals).toHaveBeenCalledWith(expect.objectContaining({ entity: "Acme Corp" }), 25, 0));
+    expect(screen.getByTestId("signal-entity-chip")).toHaveTextContent("Acme Corp");
+    // Clearing it drops the filter.
+    await userEvent.click(screen.getByRole("button", { name: "Clear entity filter" }));
+    await waitFor(() => expect(apiMock.signals).toHaveBeenLastCalledWith(expect.not.objectContaining({ entity: expect.anything() }), 25, 0));
+  });
   it("shows enrichment intel in rows", async () => {
     apiMock.signals.mockResolvedValue([signal()]);
     apiMock.signalCount.mockResolvedValue(1);

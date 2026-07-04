@@ -123,6 +123,8 @@ export interface EmailProvider {
 }
 export interface ConnectorTestResult { ok: boolean; status?: string; error?: string | null }
 export interface Subscriber { id: string; name: string; status: string; createdAt: string; subscriptionCount: number }
+export interface Entity { name: string; type: string; signalCount: number }
+export interface EntityFilter { search?: string; type?: string }
 export interface Bucket { key: string; count: number }
 export interface Analytics {
   signalsBySeverity: Bucket[]; signalsByStatus: Bucket[]; signalsByEventType: Bucket[];
@@ -266,6 +268,13 @@ export const api = {
   subscribers: () => gql<{ subscribers: Subscriber[] }>(`{subscribers{id name status createdAt subscriptionCount}}`).then((d) => d.subscribers),
   createSubscriber: (name: string) => gql<{ createSubscriber: Subscriber }>(`mutation($n:String!){createSubscriber(name:$n){id name status createdAt subscriptionCount}}`, { n: name }).then((d) => d.createSubscriber),
   deleteSubscriber: (id: string) => gql<{ deleteSubscriber: boolean }>(`mutation($id:ID!){deleteSubscriber(id:$id)}`, { id }).then((d) => d.deleteSubscriber),
+
+  // entities (signals:read)
+  entities: (filter: EntityFilter = {}, limit = 100) =>
+    gql<{ entities: Entity[] }>(
+      `query($s:String,$t:String,$l:Int){entities(search:$s,type:$t,limit:$l){name type signalCount}}`,
+      { s: filter.search ?? null, t: filter.type ?? null, l: limit },
+    ).then((d) => d.entities),
 
   // reference data
   countries: () =>

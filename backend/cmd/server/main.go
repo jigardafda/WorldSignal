@@ -52,6 +52,11 @@ func run() error {
 	if err := database.MigrateContent(ctx); err != nil {
 		return err
 	}
+	// Trigram indexes for fuzzy search — best-effort (needs the pg_trgm extension,
+	// which some managed roles can't create). Full-text search works without it.
+	if err := database.MigrateSearch(ctx); err != nil {
+		log.Info(fmt.Sprintf("search: trigram indexes unavailable (%v); using full-text search only", err))
+	}
 	if created, err := httpapi.SeedDefaultAdmin(ctx, database, cfg.AdminEmail, cfg.AdminPassword); err != nil {
 		return err
 	} else if created {

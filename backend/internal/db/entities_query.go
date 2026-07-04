@@ -70,9 +70,13 @@ func (d *DB) ListArticles(ctx context.Context, f ListFilter) ([]ArticleRow, int,
 		args = append(args, *f.SourceID)
 		conds = append(conds, `a."sourceId"=$`+itoa(len(args)))
 	}
-	if f.Search != nil {
-		args = append(args, "%"+*f.Search+"%")
-		conds = append(conds, `a."title" ILIKE $`+itoa(len(args)))
+	qParam := ""
+	if f.Search != nil && strings.TrimSpace(*f.Search) != "" {
+		args = append(args, strings.TrimSpace(*f.Search))
+		qParam = itoa(len(args))
+		args = append(args, "%"+strings.TrimSpace(*f.Search)+"%")
+		like := itoa(len(args))
+		conds = append(conds, `(a."searchVector" @@ websearch_to_tsquery('english', $`+qParam+`) OR a."title" ILIKE $`+like+`)`)
 	}
 	where := ""
 	if len(conds) > 0 {
@@ -84,6 +88,10 @@ func (d *DB) ListArticles(ctx context.Context, f ListFilter) ([]ArticleRow, int,
 		return nil, 0, err
 	}
 
+	order := `a."fetchedAt" DESC`
+	if qParam != "" {
+		order = `ts_rank(a."searchVector", websearch_to_tsquery('english', $` + qParam + `)) DESC, a."fetchedAt" DESC`
+	}
 	args = append(args, clampLimit(f.Limit))
 	limitP := itoa(len(args))
 	args = append(args, f.Offset)
@@ -91,7 +99,7 @@ func (d *DB) ListArticles(ctx context.Context, f ListFilter) ([]ArticleRow, int,
 	q := `SELECT a."id",a."title",a."canonicalUrl",a."summary",a."publishedAt",a."fetchedAt",
 		a."sourceId",s."name",(SELECT count(*) FROM "SignalArticle" sa WHERE sa."articleId"=a."id")
 		FROM "Article" a JOIN "Source" s ON s."id"=a."sourceId"` + where +
-		` ORDER BY a."fetchedAt" DESC LIMIT $` + limitP + ` OFFSET $` + offsetP
+		` ORDER BY ` + order + ` LIMIT $` + limitP + ` OFFSET $` + offsetP
 	rows, err := d.Pool.Query(ctx, q, args...)
 	if err != nil {
 		return nil, 0, err

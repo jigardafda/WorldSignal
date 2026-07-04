@@ -29,8 +29,9 @@ consume.
 - **Pluggable enrichment providers.** A provider interface so enrichment can use
   the OpenAI integration, the deterministic heuristic fallback, or alternative
   LLM/back-ends, selectable per deployment.
-- **Search.** First-class search and filtering over Signals (by classification,
-  source, entity, and time).
+- **Search.** ✅ **Shipped** — ranked Postgres full-text search over Signals and
+  articles, plus a queryable entity index (search + drill-down). Further
+  filtering refinements (saved searches, cross-field facets) remain planned.
 - **Classification and dedup tuning.** Configurable classification taxonomies
   and improved cross-source deduplication.
 

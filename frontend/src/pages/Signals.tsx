@@ -1,6 +1,6 @@
-import { Group, Pagination, Paper, Select, Stack, Text, TextInput } from "@mantine/core";
+import { Badge, CloseButton, Group, Pagination, Paper, Select, Stack, Text, TextInput } from "@mantine/core";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, type AttributeDefinition, type Signal } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { AsyncBoundary } from "../components/States";
@@ -26,6 +26,7 @@ function dictValues(dict: AttributeDefinition[] | null | undefined, key: string)
 export function Signals() {
   const navigate = useNavigate();
   const { byCode } = useCountries();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [pendingSearch, setPendingSearch] = useState("");
   const [country, setCountry] = useState<string | null>(null);
@@ -34,6 +35,8 @@ export function Signals() {
   const [sentiment, setSentiment] = useState<string | null>(null);
   const [geoScope, setGeoScope] = useState<string | null>(null);
   const [industry, setIndustry] = useState<string | null>(null);
+  // Entity filter is URL-driven so the Entities page can deep-link into it.
+  const entity = searchParams.get("entity");
   const [page, setPage] = useState(1);
 
   const dict = useAsync<AttributeDefinition[]>(() => api.attributeDictionary(), []);
@@ -46,8 +49,16 @@ export function Signals() {
   if (sentiment) filter.sentiment = sentiment;
   if (geoScope) filter.geoScope = geoScope;
   if (industry) filter.industry = industry;
+  if (entity) filter.entity = entity;
 
-  const deps = [search, country, status, minConf, sentiment, geoScope, industry, page];
+  function clearEntity() {
+    const next = new URLSearchParams(searchParams);
+    next.delete("entity");
+    setSearchParams(next);
+    setPage(1);
+  }
+
+  const deps = [search, country, status, minConf, sentiment, geoScope, industry, entity, page];
   const list = useAsync<Signal[]>(() => api.signals(filter, PAGE_SIZE, (page - 1) * PAGE_SIZE), deps);
   const count = useAsync<number>(() => api.signalCount(filter), deps.slice(0, -1));
   const totalPages = Math.max(1, Math.ceil((count.data ?? 0) / PAGE_SIZE));
@@ -66,7 +77,7 @@ export function Signals() {
           <Stack gap="xs">
             <Group>
               <TextInput
-                placeholder="Search title or summary…"
+                placeholder="Search signals — full-text over title, summary & briefing…"
                 value={pendingSearch}
                 onChange={(e) => setPendingSearch(e.currentTarget.value)}
                 onKeyDown={(e) => e.key === "Enter" && applySearch()}
@@ -89,6 +100,14 @@ export function Signals() {
               <Select placeholder="Industry" clearable searchable data={dictValues(dict.data, "industry")} value={industry}
                 onChange={reset(setIndustry)} data-testid="signal-industry" flex={1} />
             </Group>
+            {entity && (
+              <Group gap="xs">
+                <Text size="sm" c="dimmed">Entity:</Text>
+                <Badge size="lg" variant="light" rightSection={<CloseButton size="xs" onClick={clearEntity} aria-label="Clear entity filter" />} data-testid="signal-entity-chip">
+                  {entity}
+                </Badge>
+              </Group>
+            )}
           </Stack>
         </Paper>
 

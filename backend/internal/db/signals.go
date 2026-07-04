@@ -84,6 +84,7 @@ type SignalFilter struct {
 	Influence    *string
 	MinRelevance *float64
 	Industry     *string // matches a SignalAttribute industry code
+	Entity       *string // matches a SignalAttribute entity name (exact)
 	Limit        int
 	Offset       int
 }
@@ -103,10 +104,14 @@ func scanSignal(row pgx.Row) (*Signal, error) {
 	return &s, nil
 }
 
-// ListSignals returns signals matching the filter, ordered by lastSeenAt desc,
-// each with tags and sources loaded.
-// signalWhere builds the shared WHERE clause + args for the signal filter.
-func signalWhere(f SignalFilter) (string, []any) {
+// ListSignals returns signals matching the filter, ranked by relevance when a
+// search term is present (else by lastSeenAt desc), each with tags and sources
+// loaded.
+//
+// signalWhere builds the shared WHERE clause + args for the signal filter. The
+// third return value is the SQL placeholder holding the raw search text (for
+// ts_rank in ORDER BY), or "" when the filter has no search term.
+func signalWhere(f SignalFilter) (string, []any, string) {
 	var conds []string
 	var args []any
 	add := func(cond string, val any) {
@@ -142,13 +147,23 @@ func signalWhere(f SignalFilter) (string, []any) {
 		p := "$" + itoa(len(args))
 		conds = append(conds, `EXISTS (SELECT 1 FROM "SignalAttribute" sa WHERE sa."signalId"="Signal"."id" AND sa."key"='industry' AND sa."valueCode"=`+p+`)`)
 	}
+	if f.Entity != nil {
+		args = append(args, *f.Entity)
+		p := "$" + itoa(len(args))
+		conds = append(conds, `EXISTS (SELECT 1 FROM "SignalAttribute" sa WHERE sa."signalId"="Signal"."id" AND sa."key"='entity' AND sa."valueText"=`+p+`)`)
+	}
 	if f.Since != nil {
 		add(`"lastSeenAt" >= ?`, *f.Since)
 	}
-	if f.Search != nil {
-		args = append(args, "%"+*f.Search+"%")
-		p := "$" + itoa(len(args))
-		conds = append(conds, `("title" ILIKE `+p+` OR "summary" ILIKE `+p+`)`)
+	qParam := ""
+	if f.Search != nil && strings.TrimSpace(*f.Search) != "" {
+		// Full-text (ranked, GIN-indexed) OR a trigram/substring fallback so
+		// partial words and typos still surface results.
+		args = append(args, strings.TrimSpace(*f.Search))
+		qParam = "$" + itoa(len(args))
+		args = append(args, "%"+strings.TrimSpace(*f.Search)+"%")
+		like := "$" + itoa(len(args))
+		conds = append(conds, `("searchVector" @@ websearch_to_tsquery('english', `+qParam+`) OR "title" ILIKE `+like+` OR "summary" ILIKE `+like+`)`)
 	}
 	if len(f.Tags) > 0 {
 		args = append(args, f.Tags)
@@ -156,21 +171,21 @@ func signalWhere(f SignalFilter) (string, []any) {
 		conds = append(conds, `EXISTS (SELECT 1 FROM "SignalTag" st JOIN "TaxonomyTag" tt ON tt."id"=st."tagId" WHERE st."signalId"="Signal"."id" AND tt."code" = ANY(`+p+`))`)
 	}
 	if len(conds) == 0 {
-		return "", args
+		return "", args, qParam
 	}
-	return " WHERE " + strings.Join(conds, " AND "), args
+	return " WHERE " + strings.Join(conds, " AND "), args, qParam
 }
 
 // CountSignals returns the number of signals matching the filter.
 func (d *DB) CountSignals(ctx context.Context, f SignalFilter) (int, error) {
-	where, args := signalWhere(f)
+	where, args, _ := signalWhere(f)
 	var n int
 	err := d.Pool.QueryRow(ctx, `SELECT count(*) FROM "Signal"`+where, args...).Scan(&n)
 	return n, err
 }
 
 func (d *DB) ListSignals(ctx context.Context, f SignalFilter) ([]*SignalAggregate, error) {
-	where, args := signalWhere(f)
+	where, args, qParam := signalWhere(f)
 	limit := f.Limit
 	if limit <= 0 {
 		limit = 50
@@ -178,12 +193,17 @@ func (d *DB) ListSignals(ctx context.Context, f SignalFilter) ([]*SignalAggregat
 	if limit > 200 {
 		limit = 200
 	}
+	// Rank by text relevance when searching; otherwise most-recent first.
+	order := `ORDER BY "lastSeenAt" DESC`
+	if qParam != "" {
+		order = `ORDER BY ts_rank("searchVector", websearch_to_tsquery('english', ` + qParam + `)) DESC, "lastSeenAt" DESC`
+	}
 	args = append(args, limit)
 	limitP := "$" + itoa(len(args))
 	args = append(args, f.Offset)
 	offsetP := "$" + itoa(len(args))
 
-	q := `SELECT ` + signalScalarCols + ` FROM "Signal"` + where + ` ORDER BY "lastSeenAt" DESC LIMIT ` + limitP + ` OFFSET ` + offsetP
+	q := `SELECT ` + signalScalarCols + ` FROM "Signal"` + where + ` ` + order + ` LIMIT ` + limitP + ` OFFSET ` + offsetP
 	rows, err := d.Pool.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err

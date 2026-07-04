@@ -26,7 +26,15 @@ Every resolver enforces a permission. Roles → permissions:
 
 ### Signals & content (`signals:read`)
 - `signals(filter, limit, offset)` · `signal(id)` · `signalCount(filter)`
-- `articles(limit, offset, sourceId, status, search) { items, total }` · `article(id)`
+  - `filter.search` runs **ranked full-text search** (Postgres `tsvector` +
+    `websearch_to_tsquery`, weighted title > summary > briefing) with a
+    substring fallback; results are ordered by relevance. `filter.entity`
+    restricts to signals mentioning a named entity.
+- `entities(search, type, limit) { name, type, signalCount }` — distinct
+  extracted entities (people/orgs/places) with mention counts, searchable by
+  name and filterable by `entityType`.
+- `articles(limit, offset, sourceId, status, search) { items, total }` — `search`
+  is full-text + ranked. · `article(id)`
 - `rawItems(…) { items, total }` · `rawItem(id)`
 - `taxonomy` · `taxonomyStats { code, count }` · `analytics`
 
@@ -79,6 +87,9 @@ High-cardinality lists (`signals`, `articles`, `rawItems`, `deliveries`, `jobs`,
 |---|---|---|
 | GET | `/health` | Liveness probe (`{status:"ok"}`). |
 | GET | `/v1/stats` | Headline counts. |
+| GET | `/v1/signals` | `{ data: Signal[] }`. Filters incl. `search` (full-text), `entity`, `country`, `status`, `tags`, … |
+| GET | `/v1/signals/{id}` | A single signal aggregate. |
+| GET | `/v1/entities` | `{ data: [{name,type,signalCount}] }`. Params: `search`, `type`, `limit`. |
 | GET | `/v1/sources` | `{ data: Source[] }`. |
 | POST | `/v1/sources` | Create a source (also enqueues a fetch). |
 | PATCH | `/v1/sources/{id}` | Patch enabled/priority/crawlFrequency. |
