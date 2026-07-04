@@ -162,6 +162,26 @@ CREATE TABLE IF NOT EXISTS "SignalAttribute" (
 );
 CREATE INDEX IF NOT EXISTS "SignalAttribute_key_value_idx" ON "SignalAttribute"("key","valueCode");
 CREATE INDEX IF NOT EXISTS "SignalAttribute_signal_idx"    ON "SignalAttribute"("signalId");
+-- Entity lookups: exact-name filter and name search over the 'entity' attribute.
+CREATE INDEX IF NOT EXISTS "SignalAttribute_entity_idx" ON "SignalAttribute"("valueText","valueCode") WHERE "key"='entity';
+
+-- Full-text search. A generated tsvector column (weighted title > summary >
+-- narrative) backed by a GIN index replaces the previous unindexed ILIKE scan;
+-- queries rank with ts_rank and parse input with websearch_to_tsquery.
+ALTER TABLE "Signal" ADD COLUMN IF NOT EXISTS "searchVector" tsvector
+  GENERATED ALWAYS AS (
+    setweight(to_tsvector('english', coalesce("title", '')), 'A') ||
+    setweight(to_tsvector('english', coalesce("summary", '')), 'B') ||
+    setweight(to_tsvector('english', coalesce("whatHappened", '') || ' ' || coalesce("whyItMatters", '')), 'C')
+  ) STORED;
+CREATE INDEX IF NOT EXISTS "Signal_search_idx" ON "Signal" USING gin ("searchVector");
+
+ALTER TABLE "Article" ADD COLUMN IF NOT EXISTS "searchVector" tsvector
+  GENERATED ALWAYS AS (
+    setweight(to_tsvector('english', coalesce("title", '')), 'A') ||
+    setweight(to_tsvector('english', coalesce("summary", '') || ' ' || coalesce("body", '')), 'B')
+  ) STORED;
+CREATE INDEX IF NOT EXISTS "Article_search_idx" ON "Article" USING gin ("searchVector");
 
 -- EmailConnector is an admin-managed SMTP configuration ("connector") used by the
 -- EMAIL delivery channel. The secret (password/API key) is stored only as
@@ -205,5 +225,24 @@ CREATE INDEX IF NOT EXISTS "DigestQueue_sub_idx" ON "DigestQueue"("subscriptionI
 // SourceValidationLog table exist. Safe to run repeatedly.
 func (d *DB) MigrateContent(ctx context.Context) error {
 	_, err := d.Pool.Exec(ctx, contentSchema)
+	return err
+}
+
+// trgmSchema enables trigram indexes for fuzzy/substring search. It is applied
+// best-effort (see MigrateSearch) because CREATE EXTENSION needs a privilege that
+// some managed Postgres roles lack; full-text search works without it.
+const trgmSchema = `
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS "Signal_title_trgm_idx"  ON "Signal"  USING gin ("title" gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS "Signal_summary_trgm_idx" ON "Signal" USING gin ("summary" gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS "Article_title_trgm_idx" ON "Article" USING gin ("title" gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS "SignalAttribute_entity_trgm_idx" ON "SignalAttribute" USING gin ("valueText" gin_trgm_ops);`
+
+// MigrateSearch enables pg_trgm and its trigram indexes. It is best-effort: the
+// caller should log a failure (e.g. insufficient privilege to CREATE EXTENSION)
+// but continue, since substring/entity search still works via a sequential scan
+// and full-text search is unaffected. Returns the error for logging.
+func (d *DB) MigrateSearch(ctx context.Context) error {
+	_, err := d.Pool.Exec(ctx, trgmSchema)
 	return err
 }

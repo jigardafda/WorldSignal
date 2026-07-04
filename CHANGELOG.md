@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Full-text search.** Signal and article search now use ranked Postgres
+  full-text search — a generated, weighted `tsvector` column (title > summary >
+  briefing) backed by a GIN index, parsed with `websearch_to_tsquery` and ordered
+  by `ts_rank` — replacing the previous unindexed `ILIKE` scan. A substring
+  fallback (accelerated by best-effort `pg_trgm` trigram indexes) still catches
+  partial words.
+- **Queryable entities.** Entities extracted per Signal (people, organizations,
+  places, …) are now first-class: a new **Entities** console page and
+  `entities(search, type, limit)` GraphQL query / `GET /v1/entities` REST
+  endpoint list distinct entities with mention counts, searchable by name and
+  filterable by type. Signals can be filtered by entity (`filter.entity`), and
+  the Entities page drills into the matching Signals.
 - **Email delivery channel.** The `EMAIL` delivery channel is now fully
   implemented — matched Signals are rendered as HTML+text emails and sent over
   SMTP. See [docs/EMAIL.md](docs/EMAIL.md).

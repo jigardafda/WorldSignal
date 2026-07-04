@@ -55,6 +55,7 @@ func (s *Server) root() gql.Root {
 		"stats":               s.resolveStats,
 		"countries":           s.resolveCountries,
 		"attributeDictionary": s.resolveAttributeDictionary,
+		"entities":            s.resolveEntities,
 	}
 	m := s.mutationResolvers()
 	s.registerAuthResolvers(q, m)      // login/logout/me + admin (users/teams)
@@ -161,6 +162,7 @@ func (s *Server) resolveSignals(ctx context.Context, args map[string]any) (any, 
 		f.Sentiment = strArg(filter, "sentiment")
 		f.Influence = strArg(filter, "influence")
 		f.Industry = strArg(filter, "industry")
+		f.Entity = strArg(filter, "entity")
 		if since, ok := filter["since"].(string); ok && since != "" {
 			if ts, err := parseJSDate(since); err == nil {
 				f.Since = &ts

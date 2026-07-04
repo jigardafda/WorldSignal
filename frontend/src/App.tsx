@@ -8,6 +8,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { LiveDashboard } from "./pages/LiveDashboard";
 import { Signals } from "./pages/Signals";
 import { SignalDetail } from "./pages/SignalDetail";
+import { Entities } from "./pages/Entities";
 import { Analytics } from "./pages/Analytics";
 import { Sources } from "./pages/Sources";
 import { SourceDetail } from "./pages/SourceDetail";
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/live" element={<LiveDashboard />} />
         <Route path="/signals" element={<Signals />} />
         <Route path="/signals/:id" element={<SignalDetail />} />
+        <Route path="/entities" element={<Entities />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/sources" element={<Sources />} />
         <Route path="/sources/:id" element={<SourceDetail />} />

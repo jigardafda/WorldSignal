@@ -13,7 +13,11 @@ idempotent migrations that run on every boot (`cmd/server/main.go`) and in tests
 - **`MigrateAuth`** — `User`, `Session`, `Team`, `TeamMember`.
 - **`MigrateContent`** — extends `Source` with rich metadata, and creates
   `SourceValidationLog`, `LLMKey`, `AuditLog`, `EmailConnector`, `DigestQueue`
-  (plus `Subscription.lastDigestAt`), plus performance indexes.
+  (plus `Subscription.lastDigestAt`), the generated `searchVector` full-text
+  columns on `Signal`/`Article`, plus performance indexes.
+- **`MigrateSearch`** — best-effort `pg_trgm` extension + trigram indexes for
+  fuzzy/substring search. Logged-and-skipped if the role can't `CREATE EXTENSION`
+  (full-text search is unaffected).
 
 Both use `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`, so they apply
 cleanly to existing databases and are safe to re-run (backward compatible). The
@@ -44,7 +48,9 @@ Indexes back every filter/sort/join column:
 
 - **Source**: `country`, `enabled+priority`, `type`, `language`, `region`,
   `industry`, `geographicScope`, `validationStatus`, GIN on `tags`.
-- **Signal**: `status`, `severity`, `confidence`, `country`, `lastSeenAt`.
+- **Signal**: `status`, `severity`, `confidence`, `country`, `lastSeenAt`, GIN on `searchVector` (full-text), best-effort trigram GIN on `title`/`summary`.
+- **Article**: GIN on `searchVector` (full-text) + best-effort trigram GIN on `title` (in addition to the columns below).
+- **SignalAttribute**: partial index on `(valueText, valueCode) WHERE key='entity'` for entity search/filter.
 - **Article**: `sourceId`, `canonicalUrl`, `contentHash`, `publishedAt`, `fetchedAt`.
 - **RawItem**: `status`, `contentHash`, `publishedAt`, `fetchedAt`, unique `(sourceId, sourceGuid)`.
 - **DeliveryEvent**: `status`, `createdAt`, unique `(subscriptionId, signalId)`.

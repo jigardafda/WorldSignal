@@ -58,6 +58,7 @@ Sources → Ingestion → Normalization → Dedupe/Cluster → Enrichment → Di
 - **1,000+ validated global sources** — every feed is fetched, parsed, freshness-checked and health-scored before it's added; coverage spans countries, regions, industries and 30+ languages. See `cmd/sourcetool`.
 - **Fully automated ingestion** — a scheduler enqueues due sources by crawl interval; a concurrent, fair worker pool fetches, normalizes, clusters, enriches and delivers. Repeatedly-failing sources enter an automatic **cooldown** and self-recover.
 - **Multi-channel delivery** — webhooks (HMAC-signed), polling, and **email** with hourly/daily **digests**. Email uses admin-managed, encrypted **SMTP connectors** with one-click presets for Gmail, Outlook, Zoho and SendGrid. See [docs/EMAIL.md](docs/EMAIL.md).
+- **Full-text search & entities** — ranked Postgres full-text search over Signals and articles (weighted, `tsvector` + GIN, with a trigram fuzzy fallback), plus a queryable **entity index** (people/orgs/places extracted per Signal) you can search and drill into.
 - **Closed taxonomy classification** — the LLM is constrained to a fixed vocabulary; with no API key it falls back to a deterministic keyword classifier, so the pipeline always produces Signals.
 - **LLM key management** — system key from the environment plus admin-managed keys, encrypted at rest, validated against the provider, with a live model picker.
 - **Auth, RBAC & audit** — bearer sessions, bcrypt, ADMIN/EDITOR/VIEWER roles, and an audit log of security-relevant actions.

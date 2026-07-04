@@ -13,6 +13,41 @@ import (
 func (s *Server) registerSignalRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/signals", s.listSignals)
 	mux.HandleFunc("GET /v1/signals/{id}", s.getSignal)
+	mux.HandleFunc("GET /v1/entities", s.listEntities)
+}
+
+// listEntities serves the queryable entity index: {data:[{name,type,signalCount}]}.
+func (s *Server) listEntities(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	f := db.EntityFilter{Limit: 50}
+	if v := q.Get("search"); v != "" {
+		f.Search = &v
+	}
+	if v := q.Get("type"); v != "" {
+		f.Type = &v
+	}
+	if v := q.Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			f.Limit = n
+		}
+	}
+	rows, err := s.DB.SearchEntities(r.Context(), f)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	type restEntity struct {
+		Name        string `json:"name"`
+		Type        string `json:"type"`
+		SignalCount int    `json:"signalCount"`
+	}
+	out := make([]restEntity, len(rows))
+	for i, e := range rows {
+		out[i] = restEntity{Name: e.Name, Type: e.Type, SignalCount: e.SignalCount}
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Data []restEntity `json:"data"`
+	}{out})
 }
 
 // restTag mirrors the REST tag shape {code,label,confidence}.
@@ -141,6 +176,9 @@ func (s *Server) listSignals(w http.ResponseWriter, r *http.Request) {
 	}
 	if v := q.Get("industry"); v != "" {
 		f.Industry = &v
+	}
+	if v := q.Get("entity"); v != "" {
+		f.Entity = &v
 	}
 	if v := q.Get("minRelevance"); v != "" {
 		if n, err := strconv.ParseFloat(v, 64); err == nil {

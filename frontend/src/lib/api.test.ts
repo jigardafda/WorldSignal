@@ -28,6 +28,7 @@ const RESP: Record<string, unknown> = {
   emailConnectors: [{ id: "c" }], emailProviders: [{ code: "GMAIL" }], createEmailConnector: { id: "c" },
   updateEmailConnector: { id: "c" }, setActiveEmailConnector: { id: "c" }, testEmailConnector: { ok: true },
   sendTestEmail: { ok: true }, deleteEmailConnector: true,
+  entities: [{ name: "Acme", type: "ORG", signalCount: 3 }],
   countries: [{ code: "US", name: "United States" }],
   taxonomy: [{ code: "C" }], taxonomyStats: [{ key: "C", count: 1 }],
   jobs: { items: [], total: 0 }, jobCounts: [{ key: "k", count: 1 }], retryJob: true,
@@ -114,6 +115,8 @@ describe("api wrappers", () => {
     expect(await api.sendTestEmail("c", "a@x.com")).toEqual(RESP.sendTestEmail);
     expect(await api.deleteEmailConnector("c")).toBe(true);
 
+    expect(await api.entities({ search: "a", type: "ORG" }, 10)).toEqual(RESP.entities);
+    expect(await api.entities()).toEqual(RESP.entities);
     expect(await api.countries()).toEqual(RESP.countries);
     expect(await api.taxonomy()).toEqual(RESP.taxonomy);
     expect(await api.taxonomyStats()).toEqual(RESP.taxonomyStats);

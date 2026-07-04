@@ -3,7 +3,7 @@ import { useDisclosure } from "@mantine/hooks";
 import {
   IconActivity, IconArticle, IconBell, IconBroadcast, IconChartBar, IconDatabase,
   IconFileText, IconGauge, IconListCheck, IconLogout, IconMail, IconSettings, IconSitemap,
-  IconUsers, IconUsersGroup,
+  IconUsers, IconUsersGroup, IconUserSearch,
 } from "@tabler/icons-react";
 import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
@@ -14,6 +14,7 @@ interface NavItem { to: string; label: string; icon: React.ReactNode; perm?: str
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: <IconGauge size={18} /> },
   { to: "/signals", label: "Signals", icon: <IconActivity size={18} />, perm: "signals:read" },
+  { to: "/entities", label: "Entities", icon: <IconUserSearch size={18} />, perm: "signals:read" },
   { to: "/analytics", label: "Analytics", icon: <IconChartBar size={18} />, perm: "analytics:read" },
   { to: "/sources", label: "Sources", icon: <IconBroadcast size={18} />, perm: "sources:read" },
   { to: "/coverage", label: "Coverage", icon: <IconChartBar size={18} />, perm: "sources:read" },
