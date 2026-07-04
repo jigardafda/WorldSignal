@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Email delivery channel.** The `EMAIL` delivery channel is now fully
+  implemented — matched Signals are rendered as HTML+text emails and sent over
+  SMTP. See [docs/EMAIL.md](docs/EMAIL.md).
+- **Email connectors.** Admin-managed, encrypted SMTP configurations with
+  built-in presets for **Gmail, Outlook/Microsoft 365, Zoho, SendGrid** and a
+  custom option, configured interactively in a new **Connectors** console page.
+  Secrets are encrypted at rest (AES-256-GCM); connections are verified on save,
+  with **Test** and **Send test email** actions. GraphQL:
+  `emailConnectors`, `emailProviders`, `createEmailConnector`,
+  `updateEmailConnector`, `setActiveEmailConnector`, `testEmailConnector`,
+  `sendTestEmail`, `deleteEmailConnector` (all `settings:manage`).
+- **Digests.** Email subscriptions can batch matched Signals into a single
+  **hourly** or **daily** rollup instead of one message per Signal, driven by a
+  new digest scheduler. Digests reuse the existing delivery queue, so they get the
+  same retry/dead-letter handling.
+- **Structured email subscription config** in the console (recipients, connector,
+  delivery mode) instead of raw JSON.
+- Config: `APP_BASE_URL` (link emails back to the console) and
+  `DIGEST_TICK_SECONDS`.
 
 ## [0.1.0] - 2026-06-28
 

@@ -1,11 +1,12 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
 
 const { apiMock, authMock } = vi.hoisted(() => ({
   apiMock: {
     subscriptions: vi.fn(), createSubscription: vi.fn(), updateSubscription: vi.fn(), deleteSubscription: vi.fn(),
+    emailConnectors: vi.fn(),
     subscribers: vi.fn(), createSubscriber: vi.fn(), deleteSubscriber: vi.fn(),
     users: vi.fn(), createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn(),
     teams: vi.fn(), team: vi.fn(), createTeam: vi.fn(), deleteTeam: vi.fn(), addTeamMember: vi.fn(), removeTeamMember: vi.fn(),
@@ -27,6 +28,7 @@ afterEach(() => { vi.clearAllMocks(); authMock.hasPerm = () => true; });
 
 describe("Subscriptions", () => {
   const sub = { id: "x", name: "All", channel: "POLLING", enabled: true, filter: {}, config: {}, createdAt: "2026-01-01T00:00:00Z" };
+  beforeEach(() => apiMock.emailConnectors.mockResolvedValue([{ id: "c1", name: "Team", provider: "GMAIL", host: "smtp.gmail.com", port: 587, security: "STARTTLS", username: "", secretLast4: "", fromEmail: "me@gmail.com", fromName: "WS", isActive: true, enabled: true, status: "VALID", lastTestedAt: null, lastError: null, createdAt: "", updatedAt: "" }]));
   it("lists, toggles, deletes", async () => {
     apiMock.subscriptions.mockResolvedValue([sub]);
     apiMock.updateSubscription.mockResolvedValue({ ...sub, enabled: false });
@@ -49,6 +51,65 @@ describe("Subscriptions", () => {
     await userEvent.type(await screen.findByTestId("sub-name"), "New");
     await userEvent.click(screen.getByRole("button", { name: "Create" }));
     await waitFor(() => expect(apiMock.createSubscription).toHaveBeenCalled());
+  });
+  it("creates an EMAIL digest subscription with structured config", async () => {
+    apiMock.subscriptions.mockResolvedValue([]);
+    apiMock.createSubscription.mockResolvedValue(sub);
+    renderWithProviders(<Subscriptions />);
+    await screen.findByTestId("empty");
+    await userEvent.click(screen.getByRole("button", { name: "Add subscription" }));
+    await userEvent.type(await screen.findByTestId("sub-name"), "Email digest");
+    // Switch channel to EMAIL.
+    fireEvent.click(screen.getByTestId("sub-channel"));
+    fireEvent.click(await screen.findByRole("option", { name: "EMAIL", hidden: true }));
+    await userEvent.type(await screen.findByTestId("sub-recipients"), "a@x.com, b@y.com");
+    // Pick a daily digest.
+    fireEvent.click(screen.getByTestId("sub-mode"));
+    fireEvent.click(await screen.findByRole("option", { name: /Daily digest/, hidden: true }));
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await waitFor(() => expect(apiMock.createSubscription).toHaveBeenCalledWith(expect.objectContaining({
+      channel: "EMAIL",
+      config: expect.objectContaining({ to: "a@x.com, b@y.com", mode: "digest", interval: "daily" }),
+    })));
+  });
+  it("requires recipients for an EMAIL subscription", async () => {
+    apiMock.subscriptions.mockResolvedValue([]);
+    renderWithProviders(<Subscriptions />);
+    await screen.findByTestId("empty");
+    await userEvent.click(screen.getByRole("button", { name: "Add subscription" }));
+    await userEvent.type(await screen.findByTestId("sub-name"), "E");
+    fireEvent.click(screen.getByTestId("sub-channel"));
+    fireEvent.click(await screen.findByRole("option", { name: "EMAIL", hidden: true }));
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    expect(await screen.findByText("At least one recipient is required")).toBeInTheDocument();
+    expect(apiMock.createSubscription).not.toHaveBeenCalled();
+  });
+  it("creates an instant EMAIL subscription with a chosen connector", async () => {
+    apiMock.subscriptions.mockResolvedValue([]);
+    apiMock.createSubscription.mockResolvedValue(sub);
+    renderWithProviders(<Subscriptions />);
+    await screen.findByTestId("empty");
+    await userEvent.click(screen.getByRole("button", { name: "Add subscription" }));
+    await userEvent.type(await screen.findByTestId("sub-name"), "Instant email");
+    fireEvent.click(screen.getByTestId("sub-channel"));
+    fireEvent.click(await screen.findByRole("option", { name: "EMAIL", hidden: true }));
+    await userEvent.type(await screen.findByTestId("sub-recipients"), "ops@x.com");
+    // Pick a specific connector.
+    fireEvent.click(screen.getByTestId("sub-connector"));
+    fireEvent.click(await screen.findByRole("option", { name: /Team/, hidden: true }));
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await waitFor(() => expect(apiMock.createSubscription).toHaveBeenCalledWith(expect.objectContaining({
+      channel: "EMAIL",
+      config: expect.objectContaining({ to: "ops@x.com", mode: "instant", connectorId: "c1" }),
+    })));
+  });
+  it("surfaces an error when toggling fails", async () => {
+    apiMock.subscriptions.mockResolvedValue([{ ...sub, enabled: true }]);
+    apiMock.updateSubscription.mockRejectedValue(new Error("nope"));
+    renderWithProviders(<Subscriptions />);
+    await screen.findByText("All");
+    await userEvent.click(screen.getByRole("button", { name: "Disable" }));
+    await waitFor(() => expect(apiMock.updateSubscription).toHaveBeenCalled());
   });
 });
 

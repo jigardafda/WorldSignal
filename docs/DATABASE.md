@@ -12,7 +12,8 @@ idempotent migrations that run on every boot (`cmd/server/main.go`) and in tests
 
 - **`MigrateAuth`** — `User`, `Session`, `Team`, `TeamMember`.
 - **`MigrateContent`** — extends `Source` with rich metadata, and creates
-  `SourceValidationLog`, `LLMKey`, `AuditLog`, plus performance indexes.
+  `SourceValidationLog`, `LLMKey`, `AuditLog`, `EmailConnector`, `DigestQueue`
+  (plus `Subscription.lastDigestAt`), plus performance indexes.
 
 Both use `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`, so they apply
 cleanly to existing databases and are safe to re-run (backward compatible). The
@@ -29,6 +30,8 @@ Prisma schema file is kept in sync for documentation/ORM parity.
 | `Signal` | Canonical events. |
 | `SignalArticle`, `SignalTag` | Signal↔article and signal↔taxonomy joins. |
 | `Subscription`, `Subscriber`, `DeliveryEvent` | Delivery routing + history. |
+| `EmailConnector` | Admin-managed SMTP connectors for the email channel (secret ciphertext + last4). |
+| `DigestQueue` | Signals queued for a digest-mode email subscription, drained into one rollup delivery per interval. FK→Subscription/Signal ON DELETE CASCADE. |
 | `TaxonomyTag` | Closed classification vocabulary. |
 | `User`, `Session`, `Team`, `TeamMember` | Auth/RBAC. |
 | `LLMKey` | Admin-managed provider keys (ciphertext + last4). |
@@ -48,6 +51,7 @@ Indexes back every filter/sort/join column:
 - **Subscription**: `createdAt`.
 - **SourceValidationLog**: `(sourceId, checkedAt DESC)`.
 - **LLMKey**: `(provider, isActive)`.
+- **EmailConnector**: `isActive`. **DigestQueue**: `(subscriptionId, queuedAt)`.
 - **AuditLog**: `createdAt DESC`, `actorId`, `action`.
 
 ## Referential integrity

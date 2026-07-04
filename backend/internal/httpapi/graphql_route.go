@@ -57,9 +57,10 @@ func (s *Server) root() gql.Root {
 		"attributeDictionary": s.resolveAttributeDictionary,
 	}
 	m := s.mutationResolvers()
-	s.registerAuthResolvers(q, m)   // login/logout/me + admin (users/teams)
-	s.registerEntityResolvers(q, m) // Phase B: articles, rawItems, deliveries, jobs, analytics, …
-	s.registerLLMResolvers(q, m)    // LLM key management (settings:manage)
+	s.registerAuthResolvers(q, m)      // login/logout/me + admin (users/teams)
+	s.registerEntityResolvers(q, m)    // Phase B: articles, rawItems, deliveries, jobs, analytics, …
+	s.registerLLMResolvers(q, m)       // LLM key management (settings:manage)
+	s.registerConnectorResolvers(q, m) // email connectors (settings:manage)
 	return gql.Root{Query: q, Mutation: m}
 }
 

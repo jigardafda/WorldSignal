@@ -111,6 +111,17 @@ export interface Subscription {
   id: string; subscriberId?: string; name: string; channel: string; enabled: boolean;
   filter: unknown; config: unknown; createdAt: string;
 }
+export interface EmailConnector {
+  id: string; name: string; provider: string; host: string; port: number; security: string;
+  username: string; secretLast4: string; fromEmail: string; fromName: string;
+  isActive: boolean; enabled: boolean; status: string;
+  lastTestedAt: string | null; lastError: string | null; createdAt: string; updatedAt: string;
+}
+export interface EmailProvider {
+  code: string; label: string; host: string; port: number; security: string;
+  usernameHint: string; secretHint: string; help: string; docsAnchor: string; editable: boolean;
+}
+export interface ConnectorTestResult { ok: boolean; status?: string; error?: string | null }
 export interface Subscriber { id: string; name: string; status: string; createdAt: string; subscriptionCount: number }
 export interface Bucket { key: string; count: number }
 export interface Analytics {
@@ -285,6 +296,24 @@ export const api = {
   deleteLLMKey: (id: string) =>
     gql<{ deleteLLMKey: boolean }>(`mutation($id:ID!){deleteLLMKey(id:$id)}`, { id }).then((d) => d.deleteLLMKey),
 
+  // email connectors (settings:manage)
+  emailConnectors: () =>
+    gql<{ emailConnectors: EmailConnector[] }>(`{emailConnectors{${CONNECTOR_FIELDS}}}`).then((d) => d.emailConnectors),
+  emailProviders: () =>
+    gql<{ emailProviders: EmailProvider[] }>(`{emailProviders{code label host port security usernameHint secretHint help docsAnchor editable}}`).then((d) => d.emailProviders),
+  createEmailConnector: (input: Record<string, unknown>) =>
+    gql<{ createEmailConnector: EmailConnector }>(`mutation($i:CreateEmailConnectorInput!){createEmailConnector(input:$i){${CONNECTOR_FIELDS}}}`, { i: input }).then((d) => d.createEmailConnector),
+  updateEmailConnector: (id: string, input: Record<string, unknown>) =>
+    gql<{ updateEmailConnector: EmailConnector }>(`mutation($id:ID!,$i:UpdateEmailConnectorInput!){updateEmailConnector(id:$id,input:$i){${CONNECTOR_FIELDS}}}`, { id, i: input }).then((d) => d.updateEmailConnector),
+  setActiveEmailConnector: (id: string) =>
+    gql<{ setActiveEmailConnector: EmailConnector }>(`mutation($id:ID!){setActiveEmailConnector(id:$id){${CONNECTOR_FIELDS}}}`, { id }).then((d) => d.setActiveEmailConnector),
+  testEmailConnector: (id: string) =>
+    gql<{ testEmailConnector: ConnectorTestResult }>(`mutation($id:ID!){testEmailConnector(id:$id){ok status error}}`, { id }).then((d) => d.testEmailConnector),
+  sendTestEmail: (id: string, to: string) =>
+    gql<{ sendTestEmail: ConnectorTestResult }>(`mutation($id:ID!,$to:String!){sendTestEmail(id:$id,to:$to){ok error}}`, { id, to }).then((d) => d.sendTestEmail),
+  deleteEmailConnector: (id: string) =>
+    gql<{ deleteEmailConnector: boolean }>(`mutation($id:ID!){deleteEmailConnector(id:$id)}`, { id }).then((d) => d.deleteEmailConnector),
+
   // audit log (settings:manage)
   auditLogs: (filter: AuditFilter = {}, limit = 50, offset = 0) => {
     const args = sourceArgs(filter as Record<string, string>, { limit, offset });
@@ -293,3 +322,4 @@ export const api = {
 };
 
 const LLM_KEY_FIELDS = `id provider label keyLast4 model isActive status lastTestedAt lastError createdBy createdAt updatedAt`;
+const CONNECTOR_FIELDS = `id name provider host port security username secretLast4 fromEmail fromName isActive enabled status lastTestedAt lastError createdAt updatedAt`;
