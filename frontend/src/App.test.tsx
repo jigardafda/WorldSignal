@@ -19,7 +19,7 @@ vi.mock("./lib/api", () => ({ api: apiMock }));
 function renderApp(route: string) {
   return render(
     <MantineProvider>
-      <Notifications />
+      <Notifications autoClose={false} />
       <MemoryRouter initialEntries={[route]}>
         <App />
       </MemoryRouter>
