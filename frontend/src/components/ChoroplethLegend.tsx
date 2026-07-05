@@ -13,7 +13,7 @@ export function ChoroplethLegend({ metric, max }: { metric: Metric; max: number 
       shadow="md"
       radius="md"
       p="xs"
-      style={{ position: "absolute", bottom: 16, left: 16, zIndex: 1000, width: 200 }}
+      style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 1000, width: 220 }}
       data-testid="choropleth-legend"
     >
       <Text size="xs" fw={700} mb={4}>{TITLE[metric]}</Text>
