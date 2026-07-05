@@ -1,11 +1,54 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 
 // Backend target is overridable (e2e runs the Go backend on a separate port).
 const backend = process.env.WS_BACKEND ?? "http://localhost:4000";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Service worker: precache the app shell (instant/offline load) and
+    // runtime-cache OpenStreetMap tiles as they're viewed so already-seen map
+    // areas render offline. Reuses the existing static manifest.webmanifest.
+    VitePWA({
+      registerType: "autoUpdate",
+      injectRegister: "auto",
+      manifest: false,
+      devOptions: { enabled: true, type: "module" },
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
+        // The lazy geo/boundary chunk is multi-MB; keep it out of precache and
+        // cache it at runtime on first use instead (see runtimeCaching below).
+        globIgnores: ["**/maps-*.js"],
+        // SPA offline: serve the shell for navigations, but never for the API.
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/v1/, /^\/graphql/],
+        runtimeCaching: [
+          {
+            // OpenStreetMap basemap tiles — cache visited tiles for offline reuse.
+            urlPattern: /^https:\/\/[a-c]\.tile\.openstreetmap\.org\/.*/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "osm-tiles",
+              expiration: { maxEntries: 1500, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // The large boundary/geocoding chunk, cached on demand after first load.
+            urlPattern: /\/assets\/maps-.*\.js$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "geo-data",
+              expiration: { maxEntries: 3, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
+      },
+    }),
+  ],
   server: {
     port: 5173,
     proxy: {

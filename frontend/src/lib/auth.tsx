@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, type User } from "./api";
 import { getToken, setToken } from "./graphql";
+import { clearCache } from "./signalCache";
 
 interface AuthState {
   user: User | null;
@@ -54,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setToken(null);
     setUser(null);
+    void clearCache(); // drop the per-browser live-signal cache on logout
   }, []);
 
   const hasPerm = useCallback(

@@ -312,7 +312,7 @@ func TestListSignalsAllFilters(t *testing.T) {
 	out, err := d.ListSignals(ctx, db.SignalFilter{
 		Country: &country, Status: &status, MinConfidence: &minConf,
 		Since: &since, Search: &search, Tags: []string{"DISASTER.EARTHQUAKE"},
-		Limit: 500, Offset: 0, // Limit>200 exercises the cap
+		Limit: 6000, Offset: 0, // Limit>5000 exercises the cap
 	})
 	if err != nil {
 		t.Fatal(err)

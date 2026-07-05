@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "../test/utils";
 
@@ -10,10 +10,22 @@ vi.mock("../lib/api", () => ({ api: apiMock }));
 // Geocoding loads a large offline DB; stub it. null => fall back to country capital.
 vi.mock("../lib/geocode", () => ({ geocode: vi.fn(() => null), preloadGeo: vi.fn(() => Promise.resolve()) }));
 
-// Stub the Leaflet map; expose a button to trigger onSelect for the first marker.
+// Control the IndexedDB cache and capture breaking toasts.
+const { cacheMock, notifyMock } = vi.hoisted(() => ({
+  cacheMock: { getCached: vi.fn(), mergeCached: vi.fn() },
+  notifyMock: vi.fn(),
+}));
+vi.mock("../lib/signalCache", () => cacheMock);
+vi.mock("@mantine/notifications", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@mantine/notifications")>();
+  return { ...actual, notifications: { ...actual.notifications, show: notifyMock } };
+});
+
+// Stub the Leaflet map; expose a button to trigger onSelect for the first marker
+// and reflect the active view mode.
 vi.mock("../components/LiveMap", () => ({
-  LiveMap: ({ markers, center, zoom, onSelect, focus }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void; focus?: string | null }) => (
-    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")} data-focus={focus ?? ""}>
+  LiveMap: ({ markers, center, zoom, onSelect, focus, mode, flyTo }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void; focus?: string | null; mode?: string; flyTo?: { lat: number; lng: number } | null }) => (
+    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")} data-focus={focus ?? ""} data-mode={mode ?? "pins"} data-flyto={flyTo ? `${flyTo.lat},${flyTo.lng}` : ""}>
       {markers[0] && <button data-testid="map-pick" onClick={() => onSelect?.(markers[0].id)}>pick</button>}
     </div>
   ),
@@ -30,6 +42,8 @@ const COUNTRIES = [
 afterEach(() => vi.clearAllMocks());
 beforeEach(() => {
   _resetCountriesCache();
+  cacheMock.getCached.mockResolvedValue([]);
+  cacheMock.mergeCached.mockResolvedValue(undefined);
   apiMock.countries.mockResolvedValue(COUNTRIES);
   apiMock.taxonomy.mockResolvedValue([
     { code: "DISASTER", label: "Disaster", children: [{ code: "DISASTER.EARTHQUAKE", label: "Earthquake" }, { code: "DISASTER.FLOOD", label: "Flood" }] },
@@ -174,5 +188,106 @@ describe("LiveDashboard", () => {
     renderWithProviders(<LiveDashboard />);
     const map = await screen.findByTestId("map");
     expect(map).toHaveAttribute("data-count", "0");
+  });
+
+  it("switches the map view mode via the segmented control and persists it to the URL", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    const map = await screen.findByTestId("map");
+    expect(map).toHaveAttribute("data-mode", "pins"); // default
+
+    fireEvent.click(screen.getByRole("radio", { name: "Heat" }));
+    await waitFor(() => expect(map).toHaveAttribute("data-mode", "heat"));
+  });
+
+  it("initializes the view mode from the URL", async () => {
+    apiMock.liveSignals.mockResolvedValue([]);
+    renderWithProviders(<LiveDashboard />, { route: "/live?view=cluster" });
+    const map = await screen.findByTestId("map");
+    expect(map).toHaveAttribute("data-mode", "cluster");
+  });
+
+  it("paints instantly from the cache before the network responds", async () => {
+    cacheMock.getCached.mockResolvedValue([
+      { id: "c1", title: "Cached quake", country: "US", region: null, city: null, severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+    ]);
+    apiMock.liveSignals.mockRejectedValue(new Error("down")); // network unavailable
+    renderWithProviders(<LiveDashboard />);
+    const map = await screen.findByTestId("map");
+    // The cached marker is shown even though the live feed failed.
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "1"));
+  });
+
+  it("shows an offline indicator when connectivity drops", async () => {
+    apiMock.liveSignals.mockResolvedValue([]);
+    renderWithProviders(<LiveDashboard />);
+    await screen.findByTestId("map");
+    expect(screen.queryByTestId("live-offline")).toBeNull();
+    act(() => { window.dispatchEvent(new Event("offline")); });
+    expect(await screen.findByTestId("live-offline")).toBeInTheDocument();
+    act(() => { window.dispatchEvent(new Event("online")); });
+    await waitFor(() => expect(screen.queryByTestId("live-offline")).toBeNull());
+  });
+
+  it("renders the live ticker + pulse and flies to a marker on ticker click", async () => {
+    const iso = (secsAgo: number) => new Date(Date.now() - secsAgo * 1000).toISOString();
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "CRITICAL", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: iso(5) },
+      { id: "s2", title: "FR strike", country: "FR", severity: "LOW", eventType: "CONFLICT.PROTEST", lastSeenAt: iso(90) },
+    ]);
+    apiMock.signal.mockResolvedValue({
+      id: "s1", title: "US quake detail", summary: "Big one.", whatHappened: null, whyItMatters: null,
+      status: "CONFIRMED", severity: "CRITICAL", confidence: 0.9, eventType: "DISASTER.EARTHQUAKE",
+      country: "US", region: null, city: null, sentiment: null, influence: null, relevance: null,
+      language: "en", translated: false, originalTitle: null, originalSummary: null,
+      sourceCount: 1, firstSeenAt: "", lastSeenAt: "", tags: [], sources: [], attributes: [],
+    });
+    renderWithProviders(<LiveDashboard />);
+    await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "2"));
+
+    // Pulse velocity counts the event seen in the last 60s (s1 only).
+    expect(screen.getByTestId("pulse-velocity")).toHaveTextContent("1");
+    // Ticker lists newest-first; s1 (5s ago) before s2 (90s ago).
+    const ticker = screen.getByTestId("live-ticker");
+    const order = within(ticker).getAllByTestId(/^ticker-/).map((el) => el.getAttribute("data-testid"));
+    expect(order).toEqual(["ticker-s1", "ticker-s2"]);
+
+    // Clicking a ticker row opens the drawer and flies the map to that marker.
+    fireEvent.click(screen.getByTestId("ticker-s1"));
+    expect(await screen.findByText("US quake detail")).toBeInTheDocument();
+    expect(screen.getByTestId("map").getAttribute("data-flyto")).toMatch(/-?\d/); // coords set
+  });
+
+  it("collapses the live pulse panel", async () => {
+    apiMock.liveSignals.mockResolvedValue([]);
+    renderWithProviders(<LiveDashboard />);
+    await screen.findByTestId("live-pulse-panel");
+    expect(screen.getByTestId("pulse-velocity")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("pulse-toggle"));
+    await waitFor(() => expect(screen.queryByTestId("pulse-velocity")).toBeNull());
+  });
+
+  it("toasts newly-arrived breaking signals and caches each poll", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      apiMock.liveSignals
+        .mockResolvedValueOnce([{ id: "s1", title: "Calm", country: "US", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" }])
+        .mockResolvedValue([
+          { id: "s1", title: "Calm", country: "US", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" },
+          { id: "s2", title: "Major quake", country: "US", severity: "CRITICAL", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+        ]);
+      renderWithProviders(<LiveDashboard />);
+      await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "1"));
+      expect(notifyMock).not.toHaveBeenCalled(); // first paint never alerts
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(4000); }); // next poll
+      await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "2"));
+      expect(notifyMock).toHaveBeenCalledTimes(1); // s2 (CRITICAL, new) → one aggregated toast
+      expect(cacheMock.mergeCached).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

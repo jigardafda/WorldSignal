@@ -1,20 +1,49 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ActionIcon, Badge, Checkbox, ColorSwatch, Group, Paper, Select, Stack, Text } from "@mantine/core";
-import { IconBroadcast, IconChevronDown, IconChevronUp, IconStack2 } from "@tabler/icons-react";
-import { api, type TaxonomyNode } from "../lib/api";
+import { ActionIcon, Anchor, Badge, Checkbox, ColorSwatch, Group, Paper, SegmentedControl, Select, Stack, Text } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import { IconActivity, IconAlertTriangle, IconBroadcast, IconChevronDown, IconChevronUp, IconStack2, IconWifiOff } from "@tabler/icons-react";
+import { api, type LiveSignal, type TaxonomyNode } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useCountries } from "../lib/countries";
 import { CountrySelect } from "../components/CountrySelect";
-import { LiveMap, type MapMarker } from "../components/LiveMap";
+import { LiveMap, type MapMarker, type MapMode } from "../components/LiveMap";
+import { LivePulse } from "../components/LivePulse";
+import { LiveTicker } from "../components/LiveTicker";
 import { SignalDrawer } from "../components/SignalDrawer";
 import { jitter } from "../lib/geo";
 import { geocode, preloadGeo } from "../lib/geocode";
 import { CATEGORIES, categoryColor, categoryLabel, domainOf } from "../lib/categories";
+import { isBreaking, newBreaking, recencyOpacity } from "../lib/liveMarkers";
+import { getCached, mergeCached } from "../lib/signalCache";
 
 const POLL_MS = 4000;
-const MAX_MARKERS = 500;
+const MAX_MARKERS = 2000;
 const WORLD_CENTER: [number, number] = [20, 0];
+
+const VIEWS: { value: MapMode; label: string }[] = [
+  { value: "pins", label: "Pins" },
+  { value: "cluster", label: "Clusters" },
+  { value: "heat", label: "Heat" },
+];
+const isMode = (v: string | null): v is MapMode => v === "cluster" || v === "heat";
+
+/** Toast for newly-arrived breaking (HIGH/CRITICAL) signals, aggregated so a
+ * burst is one notification. The first one is clickable to open its drawer. */
+function notifyBreaking(brk: LiveSignal[], onOpen: (id: string) => void) {
+  const first = brk[0];
+  notifications.show({
+    color: "red",
+    icon: <IconAlertTriangle size={16} />,
+    title: brk.length === 1 ? "Breaking signal" : `${brk.length} breaking signals`,
+    message: (
+      <Anchor size="sm" onClick={() => onOpen(first.id)}>
+        {brk.length === 1 ? first.title : brk.slice(0, 3).map((b) => b.title).join(" · ")}
+      </Anchor>
+    ),
+    autoClose: 8000,
+  });
+}
 
 // Time windows merge past events with live ones; markers age out as time passes.
 const WINDOWS = [
@@ -24,7 +53,7 @@ const WINDOWS = [
   { value: "1440", label: "Last 24 hours" },
 ];
 
-type MarkerRec = MapMarker & { country: string; category: string; leaf: string };
+type MarkerRec = MapMarker & { country: string; category: string; leaf: string; lastSeenMs: number };
 
 function setOrDelete(p: URLSearchParams, key: string, value: string) {
   if (value) p.set(key, value);
@@ -61,6 +90,8 @@ export function LiveDashboard() {
   const setOne = (key: string, value: string) => update((p) => setOrDelete(p, key, value));
   const setCountry = (v: string | null) => setOne("country", v ?? "");
   const setWindowMin = (v: string) => setOne("w", v === "60" ? "" : v); // 60 = default → omit
+  const view: MapMode = isMode(params.get("view")) ? (params.get("view") as MapMode) : "pins";
+  const setView = (v: string) => setOne("view", v === "pins" ? "" : v); // pins = default → omit
 
   const toggleDomain = (code: string) =>
     update((p) => {
@@ -87,6 +118,14 @@ export function LiveDashboard() {
   const [lastUpdate, setLastUpdate] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(true);
+  const [pulseOpen, setPulseOpen] = useState(true);
+  const [flyTo, setFlyTo] = useState<{ lat: number; lng: number; nonce: number } | null>(null);
+  const flyNonce = useRef(0);
+  // Clicking a ticker row opens the signal and flies the map to its marker.
+  const pickMarker = (r: MarkerRec) => {
+    setSelectedId(r.id);
+    setFlyTo({ lat: r.lat, lng: r.lng, nonce: ++flyNonce.current });
+  };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleExpand = (code: string) =>
     setExpanded((prev) => {
@@ -97,6 +136,20 @@ export function LiveDashboard() {
     });
   const prevIdsRef = useRef<Set<string>>(new Set());
   const coordRef = useRef<Map<string, [number, number]>>(new Map());
+  const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
+
+  // Track connectivity so the header can show an offline indicator (the map
+  // still renders from the tile cache + IndexedDB while offline).
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
 
   useEffect(() => {
     if (list.length === 0) return; // wait until country coordinates are loaded
@@ -105,15 +158,12 @@ export function LiveDashboard() {
     const windowMs = Number(windowMin) * 60_000;
     let active = true;
     let first = true;
-    async function poll() {
-      const since = new Date(Date.now() - windowMs).toISOString();
-      let signals;
-      try {
-        signals = await api.liveSignals(since, country, MAX_MARKERS);
-      } catch {
-        return; // transient; keep polling
-      }
-      if (!active) return;
+
+    // Turn a batch of live signals into map markers: geolocate, color by
+    // category, size by severity, and fade by recency. `flagNew` marks events
+    // unseen last poll so they ripple (suppressed on the very first paint).
+    function buildRecs(signals: LiveSignal[], flagNew: boolean): { recs: MarkerRec[]; ids: Set<string> } {
+      const now = Date.now();
       const prev = prevIdsRef.current;
       const recs: MarkerRec[] = [];
       const ids = new Set<string>();
@@ -135,17 +185,47 @@ export function LiveDashboard() {
         }
         if (!pos) continue;
         const category = domainOf(s.eventType);
-        recs.push({ id: s.id, lat: pos[0], lng: pos[1], title: s.title, color: categoryColor(category), country: s.country, category, leaf: s.eventType ?? "", isNew: !first && !prev.has(s.id) });
+        recs.push({
+          id: s.id, lat: pos[0], lng: pos[1], title: s.title, color: categoryColor(category),
+          country: s.country, category, leaf: s.eventType ?? "",
+          severity: s.severity, opacity: recencyOpacity(s.lastSeenAt, now, windowMs),
+          breaking: isBreaking(s.severity), isNew: flagNew && !prev.has(s.id),
+          lastSeenMs: Date.parse(s.lastSeenAt ?? "") || 0,
+        });
         ids.add(s.id);
       }
+      return { recs, ids };
+    }
+
+    async function paintFromCache() {
+      const cached = await getCached(Date.now() - windowMs);
+      if (!active || cached.length === 0) return;
+      const { recs } = buildRecs(cached, false); // cache paint never ripples
+      setMarkers(recs);
+    }
+
+    async function poll() {
+      const since = new Date(Date.now() - windowMs).toISOString();
+      let signals;
+      try {
+        signals = await api.liveSignals(since, country, MAX_MARKERS);
+      } catch {
+        return; // transient; keep polling
+      }
       if (!active) return;
+      const { recs, ids } = buildRecs(signals, !first);
+      if (!active) return;
+      const breaking = newBreaking(signals, prevIdsRef.current, first);
       const freshly = recs.filter((r) => r.isNew).length;
       prevIdsRef.current = ids;
       first = false;
       setMarkers(recs);
       if (freshly) setLastUpdate(new Date().toLocaleTimeString());
+      if (breaking.length) notifyBreaking(breaking, setSelectedId);
+      void mergeCached(signals); // keep the offline/instant-load cache fresh
     }
-    void poll();
+
+    void paintFromCache().then(() => poll());
     const t = setInterval(() => void poll(), POLL_MS);
     return () => {
       active = false;
@@ -165,21 +245,53 @@ export function LiveDashboard() {
     if (m.leaf) leafCount[m.leaf] = (leafCount[m.leaf] ?? 0) + 1;
   }
   const shown = inCountry.filter((m) => !disabledDomains.has(m.category) && !disabledLeaves.has(m.leaf));
+  const windowMs = Number(windowMin) * 60_000;
 
   return (
     <div style={{ height: "calc(100dvh - 56px)", display: "flex", flexDirection: "column" }} data-testid="live-dashboard">
       <Group justify="space-between" px="md" py="xs" style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
         <Group gap="xs">
           <Badge color="blue" variant="light" leftSection={<IconBroadcast size={12} />} data-testid="live-indicator">Live</Badge>
+          {!online && (
+            <Badge color="orange" variant="light" leftSection={<IconWifiOff size={12} />} data-testid="live-offline">Offline</Badge>
+          )}
           <Text size="sm" c="dimmed">{shown.length} events on map{lastUpdate && ` · updated ${lastUpdate}`}</Text>
         </Group>
         <Group gap="xs">
+          <SegmentedControl size="xs" data={VIEWS} value={view} onChange={setView} data-testid="live-view" />
           <Select data={WINDOWS} value={windowMin} onChange={(v) => setWindowMin(v ?? "60")} allowDeselect={false} w={150} data-testid="live-window" />
           <CountrySelect placeholder="Whole world" value={country} onChange={setCountry} data-testid="live-country" />
         </Group>
       </Group>
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} />
+        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} flyTo={flyTo} />
+        <Paper
+          withBorder
+          shadow="md"
+          radius="md"
+          p="xs"
+          style={{ position: "absolute", top: 12, left: 12, zIndex: 1000, width: 260, maxHeight: "calc(100% - 24px)", display: "flex", flexDirection: "column" }}
+          data-testid="live-pulse-panel"
+        >
+          <Group justify="space-between" wrap="nowrap" mb={pulseOpen ? 6 : 0}>
+            <Group gap={6} wrap="nowrap">
+              <IconActivity size={15} />
+              <Text size="xs" fw={700}>Live pulse</Text>
+            </Group>
+            <ActionIcon variant="subtle" size="sm" onClick={() => setPulseOpen((o) => !o)} aria-label="Toggle pulse" data-testid="pulse-toggle">
+              {pulseOpen ? <IconChevronUp size={15} /> : <IconChevronDown size={15} />}
+            </ActionIcon>
+          </Group>
+          {pulseOpen && (
+            <>
+              <LivePulse recs={inCountry} windowMs={windowMs} byCode={byCode} />
+              <Text size="xs" tt="uppercase" c="dimmed" fw={700} mt={8} mb={2}>Latest</Text>
+              <div style={{ overflowY: "auto", minHeight: 0 }}>
+                <LiveTicker recs={shown} onPick={pickMarker} />
+              </div>
+            </>
+          )}
+        </Paper>
         <Paper
           withBorder
           shadow="md"
