@@ -114,6 +114,25 @@ describe("LiveDashboard", () => {
     await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
   });
 
+  it("selects and clears all category layers at once", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+      { id: "s2", title: "FR AI", country: "FR", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    const map = await screen.findByTestId("map");
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
+
+    // Clear all → every category off → nothing shows.
+    fireEvent.click(screen.getByTestId("layer-all"));
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "0"));
+    expect(screen.getByText("Select all")).toBeInTheDocument();
+    // Select all → everything returns.
+    fireEvent.click(screen.getByTestId("layer-all"));
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
+    expect(screen.getByText("All categories")).toBeInTheDocument();
+  });
+
   it("drills into subcategories to filter at the leaf level", async () => {
     apiMock.liveSignals.mockResolvedValue([
       { id: "s1", title: "Quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },

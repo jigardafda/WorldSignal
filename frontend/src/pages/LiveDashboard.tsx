@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ActionIcon, Badge, Center, Checkbox, ColorSwatch, Group, Loader, Paper, SegmentedControl, Select, Stack, Text } from "@mantine/core";
+import { ActionIcon, Badge, Center, Checkbox, ColorSwatch, Divider, Group, Loader, Paper, SegmentedControl, Select, Stack, Text } from "@mantine/core";
 import { IconActivity, IconBroadcast, IconChevronDown, IconChevronUp, IconMoodSmile, IconPlayerPlay, IconStack2, IconWifiOff } from "@tabler/icons-react";
 import { api, type LiveSignal, type TaxonomyNode } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
@@ -142,6 +142,15 @@ export function LiveDashboard() {
       else leaves.add(code);
       setOrDelete(p, "offsub", [...leaves].join(","));
     });
+  // Select-all / clear-all for the category layers: enabling clears every
+  // exclusion; clearing disables every domain (and drops per-subcategory state).
+  const setAllLayers = (on: boolean) =>
+    update((p) => {
+      setOrDelete(p, "off", on ? "" : CATEGORIES.map((c) => c.code).join(","));
+      setOrDelete(p, "offsub", "");
+    });
+  const allLayersOn = disabledDomains.size === 0 && disabledLeaves.size === 0;
+  const allLayersOff = disabledDomains.size >= CATEGORIES.length;
 
   const [markers, setMarkers] = useState<MarkerRec[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string>("");
@@ -482,6 +491,15 @@ export function LiveDashboard() {
           </Group>
           {legendOpen && (
             <Stack gap={2}>
+              <Checkbox
+                size="xs"
+                checked={allLayersOn}
+                indeterminate={!allLayersOn && !allLayersOff}
+                onChange={() => setAllLayers(!allLayersOn)}
+                data-testid="layer-all"
+                label={<Text size="xs" fw={600}>{allLayersOn ? "All categories" : "Select all"}</Text>}
+              />
+              <Divider my={2} />
               {CATEGORIES.map((c) => {
                 const children = leavesByDomain.get(c.code) ?? [];
                 const domainOff = disabledDomains.has(c.code);
