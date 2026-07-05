@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/worldsignal/backend/internal/cuid"
 )
 
 // StreamSubscription is the minimal view a streaming/polling client needs to
@@ -29,6 +30,38 @@ func (d *DB) GetStreamSubscription(ctx context.Context, id string) (*StreamSubsc
 		return nil, err
 	}
 	return &s, nil
+}
+
+// SendTestDelivery creates (or refreshes) a delivery for a subscription using
+// the most recent real signal, marked as a test event, so the owner can verify
+// their client end to end without waiting for a live match. It references an
+// existing signal (no synthetic rows) and bumps seq on conflict so streaming
+// cursors treat it as new. Returns the delivery id, or "" if there are no
+// signals yet.
+func (d *DB) SendTestDelivery(ctx context.Context, subID string) (string, error) {
+	var id string
+	err := d.Pool.QueryRow(ctx, `
+WITH sig AS (SELECT * FROM "Signal" ORDER BY "lastSeenAt" DESC LIMIT 1)
+INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload","createdAt")
+SELECT $2::text, $1::text, sig.id, (SELECT "channel" FROM "Subscription" WHERE "id"=$1), 'SENT',
+  jsonb_build_object(
+    'schema_version','2026-06-01', 'event_type','signal.test', 'event_id',$2::text,
+    'created_at', to_char(now() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+    'subscription_id',$1::text, 'test',true,
+    'data', jsonb_build_object(
+      'signal_id',sig.id,'title','[TEST] '||sig."title",'summary',sig."summary",
+      'status',sig."status",'severity',sig."severity",'confidence',sig."confidence",
+      'country',sig."country",'source_count',sig."sourceCount")
+  ), now()
+FROM sig
+ON CONFLICT ("subscriptionId","signalId") DO UPDATE
+  SET "seq"=nextval('"DeliveryEvent_seq_seq"'), "payload"=EXCLUDED."payload",
+      "createdAt"=now(), "status"='SENT'
+RETURNING "id"`, subID, cuid.New()).Scan(&id)
+	if err == pgx.ErrNoRows {
+		return "", nil // no signals to test with yet
+	}
+	return id, err
 }
 
 // MaxDeliverySeq returns the highest delivery seq for a subscription (0 if none)

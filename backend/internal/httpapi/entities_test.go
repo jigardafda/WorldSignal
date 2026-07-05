@@ -104,6 +104,14 @@ func TestEntityMutations(t *testing.T) {
 	if b := gql(t, base, tok, `{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateSubscription(id:$id,input:$i){name enabled}}","variables":{"id":"sub1","i":{"name":"Renamed","enabled":false,"filter":{"tags":["X"]},"config":{"url":"u"}}}}`); !strings.Contains(b, `"name":"Renamed"`) {
 		t.Fatalf("updateSubscription: %s", b)
 	}
+	// testSubscription pushes a test event built from the latest signal.
+	if b := gql(t, base, tok, `{"query":"mutation($id:ID!){testSubscription(id:$id){ok channel message}}","variables":{"id":"sub1"}}`); !strings.Contains(b, `"ok":true`) || !strings.Contains(b, `"channel":"POLLING"`) {
+		t.Fatalf("testSubscription: %s", b)
+	}
+	// testSubscription on a missing subscription errors.
+	if b := gql(t, base, tok, `{"query":"mutation($id:ID!){testSubscription(id:$id){ok}}","variables":{"id":"nope"}}`); !strings.Contains(b, "not found") {
+		t.Fatalf("testSubscription missing: %s", b)
+	}
 	// retryDelivery resets + enqueues.
 	if b := gql(t, base, tok, `{"query":"mutation($id:ID!){retryDelivery(id:$id)}","variables":{"id":"d1"}}`); !strings.Contains(b, `"retryDelivery":true`) {
 		t.Fatalf("retryDelivery: %s", b)
@@ -131,6 +139,39 @@ func TestEntityMutations(t *testing.T) {
 	}
 }
 
+func TestTestSubscriptionBranches(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	ctx := context.Background()
+	ex := func(q string, a ...any) {
+		if _, err := d.Pool.Exec(ctx, q, a...); err != nil {
+			t.Fatalf("seed: %v\n%s", err, q)
+		}
+	}
+	ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','Default',now())`)
+	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('hook','__default__','Hook','WEBHOOK','{}','{"url":"https://x/y"}',now())`)
+	enq := &recordEnqueuer{}
+	base := newServerWith(t, d, enq)
+	tok, _ := dbtest.AuthToken(t, d, auth.RoleAdmin)
+
+	// No signals yet → ok:false, nothing enqueued.
+	if b := gql(t, base, tok, `{"query":"mutation($id:ID!){testSubscription(id:$id){ok message}}","variables":{"id":"hook"}}`); !strings.Contains(b, `"ok":false`) {
+		t.Fatalf("no-signal testSubscription: %s", b)
+	}
+	if len(enq.deliveryIDs) != 0 {
+		t.Fatalf("no delivery should be enqueued yet, got %v", enq.deliveryIDs)
+	}
+
+	// With a signal → ok:true and the webhook delivery is enqueued for sending.
+	ex(`INSERT INTO "Signal" ("id","title","summary","status","severity","confidence","country","sourceCount","firstSeenAt","lastSeenAt","createdAt","updatedAt") VALUES ('sig','T','S','CONFIRMED','HIGH',0.9,'US',1,now(),now(),now(),now())`)
+	if b := gql(t, base, tok, `{"query":"mutation($id:ID!){testSubscription(id:$id){ok channel}}","variables":{"id":"hook"}}`); !strings.Contains(b, `"ok":true`) {
+		t.Fatalf("testSubscription: %s", b)
+	}
+	if len(enq.deliveryIDs) != 1 {
+		t.Fatalf("webhook test should enqueue one delivery, got %v", enq.deliveryIDs)
+	}
+}
+
 func TestEntityAuthz(t *testing.T) {
 	d := dbtest.Connect(t)
 	dbtest.Reset(t, d)
@@ -153,6 +194,7 @@ func TestEntityAuthz(t *testing.T) {
 		`{"query":"mutation($id:ID!){deleteSubscriber(id:$id)}","variables":{"id":"__default__"}}`,
 		`{"query":"mutation($id:ID!){deleteSubscription(id:$id)}","variables":{"id":"sub1"}}`,
 		`{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateSubscription(id:$id,input:$i){id}}","variables":{"id":"sub1","i":{"name":"x"}}}`,
+		`{"query":"mutation($id:ID!){testSubscription(id:$id){ok}}","variables":{"id":"sub1"}}`,
 	} {
 		if b := gql(t, ht, viewerTok, op); !strings.Contains(b, "forbidden") {
 			t.Fatalf("viewer should be forbidden: op=%s got=%s", op, b)
@@ -212,7 +254,7 @@ func TestEntityResolverDBErrors(t *testing.T) {
 		{"DeliveryEvent", []string{`{"query":"{deliveries{total}}"}`, `{"query":"query($id:ID!){delivery(id:$id){id}}","variables":{"id":"d1"}}`, `{"query":"mutation($id:ID!){retryDelivery(id:$id)}","variables":{"id":"d1"}}`, `{"query":"{analytics}"}`}},
 		{"Source", []string{`{"query":"{sources{id}}"}`, `{"query":"query($id:ID!){source(id:$id){id}}","variables":{"id":"src1"}}`, `{"query":"mutation($id:ID!,$i:UpdateSourceInput!){updateSource(id:$id,input:$i){id}}","variables":{"id":"src1","i":{"name":"x"}}}`, `{"query":"mutation($id:ID!){deleteSource(id:$id)}","variables":{"id":"src1"}}`, `{"query":"{analytics}"}`}},
 		{"Signal", []string{`{"query":"{signalCount}"}`, `{"query":"{analytics}"}`}},
-		{"Subscription", []string{`{"query":"{subscriptions{id}}"}`, `{"query":"query($id:ID!){subscription(id:$id){id}}","variables":{"id":"sub1"}}`, `{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateSubscription(id:$id,input:$i){id}}","variables":{"id":"sub1","i":{"name":"x"}}}`, `{"query":"mutation($id:ID!){deleteSubscription(id:$id)}","variables":{"id":"sub1"}}`}},
+		{"Subscription", []string{`{"query":"{subscriptions{id}}"}`, `{"query":"query($id:ID!){subscription(id:$id){id}}","variables":{"id":"sub1"}}`, `{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateSubscription(id:$id,input:$i){id}}","variables":{"id":"sub1","i":{"name":"x"}}}`, `{"query":"mutation($id:ID!){deleteSubscription(id:$id)}","variables":{"id":"sub1"}}`, `{"query":"mutation($id:ID!){testSubscription(id:$id){ok}}","variables":{"id":"sub1"}}`}},
 		{"Subscriber", []string{`{"query":"{subscribers{id}}"}`, `{"query":"mutation{createSubscriber(name:\"x\"){id}}"}`, `{"query":"mutation($id:ID!){deleteSubscriber(id:$id)}","variables":{"id":"__default__"}}`}},
 		{"TaxonomyTag", []string{`{"query":"{taxonomyStats{code count}}"}`}},
 		{"ws_jobs", []string{`{"query":"{jobs{total}}"}`, `{"query":"{jobCounts{key count}}"}`, `{"query":"mutation($id:ID!){retryJob(id:$id)}","variables":{"id":"j1"}}`}},

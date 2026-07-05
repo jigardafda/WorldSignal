@@ -146,6 +146,12 @@ query { signals(filter: { severity: "HIGH" }, limit: 10) { title country severit
 
 See [docs/API.md](docs/API.md) for the full GraphQL/REST surface.
 
+To **consume** matched signals from your own service, [`example-clients/`](example-clients/)
+has runnable subscription clients for every delivery channel (SSE, WebSocket, Polling,
+Webhook) in seven languages — Python, TypeScript, Node.js, Go, Ruby, PHP and Shell.
+[`example-clients/GUIDE.md`](example-clients/GUIDE.md) walks through how delivery works
+and what each file does; the code matches what the **Subscriptions** console generates.
+
 ## Testing
 
 ```bash
@@ -179,7 +185,7 @@ More: [docs/RUNBOOK.md](docs/RUNBOOK.md).
 
 [Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) · [Database](docs/DATABASE.md) ·
 [Configuration](docs/CONFIGURATION.md) · [Email & digests](docs/EMAIL.md) · [Deployment](docs/DEPLOYMENT.md) ·
-[Runbook](docs/RUNBOOK.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md)
+[Runbook](docs/RUNBOOK.md) · [Example clients](example-clients/GUIDE.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md)
 
 ## Contributing
 

@@ -83,6 +83,42 @@ if command -v node >/dev/null 2>&1; then
   check "ts  ws"   "$(cd "$HERE/typescript" && run_to 20 npx tsx ws_client.ts   2>/dev/null)" "$MARKER"
 else echo "  … TypeScript skipped (node not found)"; fi
 
+# --- Node.js clients (dependency-free, Node 21+ for the WebSocket global) -----
+if command -v node >/dev/null 2>&1; then
+  say "Node.js clients (dependency-free)"
+  check "node  sse"  "$(run_to 15 node "$HERE/node/sse_client.mjs"  2>/dev/null)" "$MARKER"
+  check "node  poll" "$(WS_INTERVAL=1 run_to 15 node "$HERE/node/poll_client.mjs" 2>/dev/null)" "$MARKER"
+  check "node  ws"   "$(run_to 15 node "$HERE/node/ws_client.mjs"   2>/dev/null)" "$MARKER"
+else echo "  … Node.js skipped (node not found)"; fi
+
+# --- Go clients (stdlib only) ------------------------------------------------
+if command -v go >/dev/null 2>&1; then
+  say "Go clients (stdlib only)"
+  check "go  sse"  "$(cd "$HERE/go" && run_to 40 go run ./sse  2>/dev/null)" "$MARKER"
+  check "go  poll" "$(cd "$HERE/go" && WS_INTERVAL=1 run_to 40 go run ./poll 2>/dev/null)" "$MARKER"
+else echo "  … Go skipped (go not found)"; fi
+
+# --- Ruby clients (stdlib only) ----------------------------------------------
+if command -v ruby >/dev/null 2>&1; then
+  say "Ruby clients (stdlib only)"
+  check "ruby  sse"  "$(run_to 15 ruby "$HERE/ruby/sse_client.rb"  2>/dev/null)" "$MARKER"
+  check "ruby  poll" "$(WS_INTERVAL=1 run_to 15 ruby "$HERE/ruby/poll_client.rb" 2>/dev/null)" "$MARKER"
+else echo "  … Ruby skipped (ruby not found)"; fi
+
+# --- PHP clients -------------------------------------------------------------
+if command -v php >/dev/null 2>&1; then
+  say "PHP clients"
+  check "php  sse"  "$(run_to 15 php "$HERE/php/sse_client.php"  2>/dev/null)" "$MARKER"
+  check "php  poll" "$(WS_INTERVAL=1 run_to 15 php "$HERE/php/poll_client.php" 2>/dev/null)" "$MARKER"
+else echo "  … PHP skipped (php not found)"; fi
+
+# --- Shell clients (curl + jq) -----------------------------------------------
+if command -v jq >/dev/null 2>&1; then
+  say "Shell clients (curl + jq)"
+  check "shell  sse"  "$(run_to 15 bash "$HERE/shell/sse_client.sh"  2>/dev/null)" "$MARKER"
+  check "shell  poll" "$(WS_INTERVAL=1 run_to 15 bash "$HERE/shell/poll_client.sh" 2>/dev/null)" "$MARKER"
+else echo "  … Shell skipped (jq not found)"; fi
+
 # --- Result ------------------------------------------------------------------
 printf '\n\033[1m%d passed, %d failed\033[0m\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

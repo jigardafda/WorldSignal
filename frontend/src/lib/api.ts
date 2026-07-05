@@ -270,6 +270,8 @@ export const api = {
     gql<{ createSubscription: Subscription }>(`mutation($i:CreateSubscriptionInput!){createSubscription(input:$i){id name channel enabled filter config createdAt}}`, { i: input }).then((d) => d.createSubscription),
   updateSubscription: (id: string, input: Record<string, unknown>) =>
     gql<{ updateSubscription: Subscription }>(`mutation($id:ID!,$i:UpdateSubscriptionInput!){updateSubscription(id:$id,input:$i){id name channel enabled filter config createdAt}}`, { id, i: input }).then((d) => d.updateSubscription),
+  testSubscription: (id: string) =>
+    gql<{ testSubscription: { ok: boolean; channel: string; message: string } }>(`mutation($id:ID!){testSubscription(id:$id){ok channel message}}`, { id }).then((d) => d.testSubscription),
   deleteSubscription: (id: string) => gql<{ deleteSubscription: boolean }>(`mutation($id:ID!){deleteSubscription(id:$id)}`, { id }).then((d) => d.deleteSubscription),
   subscribers: () => gql<{ subscribers: Subscriber[] }>(`{subscribers{id name status createdAt subscriptionCount}}`).then((d) => d.subscribers),
   createSubscriber: (name: string) => gql<{ createSubscriber: Subscriber }>(`mutation($n:String!){createSubscriber(name:$n){id name status createdAt subscriptionCount}}`, { n: name }).then((d) => d.createSubscriber),

@@ -1,14 +1,23 @@
 # WorldSignal example clients
 
 Runnable, minimal clients for every WorldSignal subscription delivery channel, in
-**Python** and **TypeScript**. Point them at a running server and a subscription.
+**seven languages**. Point them at a running server and a subscription id. Each
+file is the same code the **Subscriptions** console shows in its "Consume it"
+panel, so what you copy from the UI is what runs here.
 
-| Channel   | What it is                        | Python                 | TypeScript             |
-|-----------|-----------------------------------|------------------------|------------------------|
-| SSE       | live stream, replay + resume      | `python/sse_client.py` | `typescript/sse_client.ts` |
-| WebSocket | live stream, bidirectional        | `python/ws_client.py`  | `typescript/ws_client.ts`  |
-| Polling   | cursor pull, no open connection   | `python/poll_client.py`| `typescript/poll_client.ts`|
-| Webhook   | receive + verify signed POSTs     | `python/webhook_receiver.py` | `typescript/webhook_receiver.ts` |
+**👉 See [GUIDE.md](GUIDE.md) for a full walkthrough** of how delivery works, what
+every file does, and how to run each language.
+
+| Channel   | What it is                      | Languages |
+|-----------|---------------------------------|-----------|
+| SSE       | live stream, replay + resume    | Python · TypeScript · Node.js · Go · Ruby · PHP · Shell · Browser |
+| WebSocket | live stream, bidirectional      | Python · TypeScript · Node.js · Browser |
+| Polling   | cursor pull, no open connection | Python · TypeScript · Node.js · Go · Ruby · PHP · Shell |
+| Webhook   | receive + verify signed POSTs   | Python · TypeScript · Node.js |
+
+Go, Ruby, PHP and Shell use only their standard library (Shell needs `jq`); no
+package install. Directory layout is identical per language: `sse_client.*`,
+`poll_client.*`, and where present `ws_client.*` / `webhook_receiver.*`.
 
 ## Configure (env)
 
@@ -19,22 +28,26 @@ Runnable, minimal clients for every WorldSignal subscription delivery channel, i
 | `WS_SUBSCRIPTION` | `demo-stream` | subscription id to consume |
 | `WS_SINCE` | `0` | resume cursor (`0` = from the start) |
 | `WS_MAX` | `0` | exit after N events (`0` = run forever) |
+| `WS_INTERVAL` | `3` | seconds between polls (polling clients) |
 | `WS_WEBHOOK_SECRET` | — | must equal the server's `WEBHOOK_SIGNING_SECRET` (webhook receiver) |
 
-Get a key + subscription from the **Subscriptions** console page, or via GraphQL
-(`createApiKey`, `createSubscription`).
+Get a key + subscription from the **Subscriptions** console page (its "Send test
+event" button pushes one event so you can watch a client receive it), or via the
+`createApiKey` / `createSubscription` GraphQL mutations.
 
 ## Run
 
 ```bash
-# Python (SSE/poll/webhook use only the stdlib; WS needs `websockets`)
-pip install -r python/requirements.txt
-WS_API_KEY=wsk_... python3 python/sse_client.py
-
-# TypeScript (Node 18+)
-cd typescript && npm install
-WS_API_KEY=wsk_... npm run sse
+WS_API_KEY=wsk_… WS_SUBSCRIPTION=cmr… python3 python/sse_client.py   # Python
+WS_API_KEY=wsk_… WS_SUBSCRIPTION=cmr… node    node/sse_client.mjs    # Node.js
+( cd typescript && npm install && WS_API_KEY=wsk_… npm run sse )      # TypeScript
+( cd go && WS_API_KEY=wsk_… go run ./sse )                            # Go
+WS_API_KEY=wsk_… WS_SUBSCRIPTION=cmr… ruby    ruby/sse_client.rb      # Ruby
+WS_API_KEY=wsk_… WS_SUBSCRIPTION=cmr… php     php/sse_client.php      # PHP
+WS_API_KEY=wsk_… WS_SUBSCRIPTION=cmr… bash    shell/sse_client.sh     # Shell
 ```
+
+Swap `sse` → `poll` (or `ws`, where present). See [GUIDE.md](GUIDE.md) for details.
 
 ## Auth note
 
@@ -45,5 +58,7 @@ prefer the header where you can, since proxies/history may retain URLs.
 ## Test
 
 `./test.sh` provisions a throwaway subscription, injects one known delivery, and
-asserts every client receives it against a live server (`WS_API_BASE`). Run the
-server first (`./dev.sh` or `ROLE=all` binary).
+asserts every client (in every installed language) receives it against a live
+server (`WS_API_BASE`). Run the server first (`./dev.sh` or a `ROLE=all` binary).
+Languages whose runtime isn't installed are skipped. A green run ends with
+`N passed, 0 failed`.

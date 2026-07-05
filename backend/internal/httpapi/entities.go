@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/worldsignal/backend/internal/auth"
@@ -44,6 +45,7 @@ func (s *Server) registerEntityResolvers(q, m map[string]gql.FieldResolver) {
 	m["revalidateSource"] = s.mutRevalidateSource
 	m["updateSubscription"] = s.mutUpdateSubscription
 	m["deleteSubscription"] = s.mutDeleteSubscription
+	m["testSubscription"] = s.mutTestSubscription
 	m["createSubscriber"] = s.mutCreateSubscriber
 	m["deleteSubscriber"] = s.mutDeleteSubscriber
 	m["retryDelivery"] = s.mutRetryDelivery
@@ -430,6 +432,37 @@ func (s *Server) mutDeleteSubscription(ctx context.Context, args map[string]any)
 		return nil, err
 	}
 	return s.DB.DeleteSubscription(ctx, strVal(args["id"]))
+}
+
+// mutTestSubscription delivers a one-off test event to a subscription so its
+// owner can verify their client end to end: it wakes streaming clients and, for
+// webhooks, POSTs to the configured URL.
+func (s *Server) mutTestSubscription(ctx context.Context, args map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSubscriptionsWrite); err != nil {
+		return nil, err
+	}
+	id := strVal(args["id"])
+	sub, err := s.DB.GetStreamSubscription(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if sub == nil {
+		return nil, fmt.Errorf("subscription not found")
+	}
+	deliveryID, err := s.DB.SendTestDelivery(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if deliveryID == "" {
+		return map[string]any{"ok": false, "message": "No signals available yet to build a test event."}, nil
+	}
+	if s.Hub != nil {
+		s.Hub.Notify(id) // wake SSE/WebSocket clients
+	}
+	if sub.Channel == "WEBHOOK" && s.Enqueue != nil {
+		_ = s.Enqueue.EnqueueSendDelivery(deliveryID) // POST to the webhook URL
+	}
+	return map[string]any{"ok": true, "channel": sub.Channel, "message": "Test event sent to “" + sub.Name + "”."}, nil
 }
 
 func (s *Server) mutCreateSubscriber(ctx context.Context, args map[string]any) (any, error) {

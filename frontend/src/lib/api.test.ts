@@ -23,7 +23,7 @@ const RESP: Record<string, unknown> = {
   rawItems: { items: [], total: 0 }, rawItem: { id: "r" },
   deliveries: { items: [], total: 0 }, delivery: { id: "d" }, retryDelivery: true,
   subscriptions: [{ id: "x" }], subscription: { id: "x" }, createSubscription: { id: "x" },
-  updateSubscription: { id: "x" }, deleteSubscription: true,
+  updateSubscription: { id: "x" }, deleteSubscription: true, testSubscription: { ok: true, channel: "SSE", message: "sent" },
   subscribers: [{ id: "sb" }], createSubscriber: { id: "sb" }, deleteSubscriber: true,
   emailConnectors: [{ id: "c" }], emailProviders: [{ code: "GMAIL" }], createEmailConnector: { id: "c" },
   updateEmailConnector: { id: "c" }, setActiveEmailConnector: { id: "c" }, testEmailConnector: { ok: true },
@@ -104,6 +104,8 @@ describe("api wrappers", () => {
     expect(await api.createSubscription({ name: "n" })).toEqual(RESP.createSubscription);
     expect(await api.updateSubscription("x", { name: "n" })).toEqual(RESP.updateSubscription);
     expect(await api.deleteSubscription("x")).toBe(true);
+    expect(await api.testSubscription("x")).toEqual(RESP.testSubscription);
+    expect(mockGql.mock.calls.at(-1)?.[1]).toEqual({ id: "x" });
     expect(await api.subscribers()).toEqual(RESP.subscribers);
     expect(await api.createSubscriber("n")).toEqual(RESP.createSubscriber);
     expect(await api.deleteSubscriber("sb")).toBe(true);
