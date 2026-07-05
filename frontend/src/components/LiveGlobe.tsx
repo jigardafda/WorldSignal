@@ -78,6 +78,28 @@ export default function LiveGlobe({ markers, onSelect, sentimentTint = false, fo
     if (focusLatLng) globeRef.current?.pointOfView({ lat: focusLatLng[0], lng: focusLatLng[1], altitude: 1.8 }, 800);
   }, [focusLatLng]);
 
+  // Release the WebGL context on unmount. globe.gl's destructor disposes GPU
+  // resources but does NOT force-release the context; without this, switching
+  // to/from the globe leaks one context per mount and crashes low-context-limit
+  // devices (mobile) after a few view changes. The renderer is captured while
+  // mounted because React nulls the ref before this passive cleanup runs.
+  const rendererRef = useRef<{ forceContextLoss?: () => void; dispose?: () => void } | null>(null);
+  useEffect(() => {
+    const renderer = globeRef.current?.renderer() as { forceContextLoss?: () => void; dispose?: () => void } | undefined;
+    if (renderer) rendererRef.current = renderer;
+  });
+  useEffect(
+    () => () => {
+      try {
+        rendererRef.current?.forceContextLoss?.();
+        rendererRef.current?.dispose?.();
+      } catch {
+        /* best-effort cleanup */
+      }
+    },
+    [],
+  );
+
   const points = useMemo(() => toPoints(markers, sentimentTint), [markers, sentimentTint]);
   const arcs = useMemo(() => toArcs(markers), [markers]);
   const rings = useMemo(() => toRings(markers), [markers]);

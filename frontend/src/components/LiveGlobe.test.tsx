@@ -12,9 +12,10 @@ interface GlobeProps {
   onPointClick?: (d: unknown) => void;
   polygonCapColor?: (d: unknown) => string;
 }
+const { rendererStub } = vi.hoisted(() => ({ rendererStub: { forceContextLoss: vi.fn(), dispose: vi.fn() } }));
 vi.mock("react-globe.gl", () => {
   const Globe = forwardRef<unknown, GlobeProps>((props, ref) => {
-    useImperativeHandle(ref, () => ({ controls: () => ({}), pointOfView: vi.fn() }));
+    useImperativeHandle(ref, () => ({ controls: () => ({}), pointOfView: vi.fn(), renderer: () => rendererStub }));
     return (
       <div
         data-testid="globe-canvas"
@@ -59,6 +60,15 @@ describe("LiveGlobe", () => {
   it("rings breaking arrivals", () => {
     render(<LiveGlobe markers={[marker("a", { breaking: true, isNew: true }), marker("b")]} />);
     expect(screen.getByTestId("globe-canvas")).toHaveAttribute("data-rings", "1");
+  });
+
+  it("releases the WebGL context on unmount (guards the mobile context-leak crash)", () => {
+    rendererStub.forceContextLoss.mockClear();
+    rendererStub.dispose.mockClear();
+    const { unmount } = render(<LiveGlobe markers={[marker("a")]} />);
+    unmount();
+    expect(rendererStub.forceContextLoss).toHaveBeenCalled();
+    expect(rendererStub.dispose).toHaveBeenCalled();
   });
 
   it("colors country polygons from the choropleth fill and hides points", async () => {
