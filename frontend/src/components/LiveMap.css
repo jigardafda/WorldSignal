@@ -1,3 +1,12 @@
+/* Live-ticker rows: subtle hover affordance (they're clickable → fly-to). */
+.ws-ticker-row {
+  width: 100%;
+  transition: background-color 120ms ease;
+}
+.ws-ticker-row:hover {
+  background-color: var(--mantine-color-default-hover);
+}
+
 /* Leaflet's panes/controls use z-index up to ~700; without its own stacking
    context the map covers portaled UI (e.g. the country dropdown). Pinning the
    container to z-index 0 confines that stacking so dropdowns/menus layer above. */
