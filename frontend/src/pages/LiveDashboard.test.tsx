@@ -15,6 +15,13 @@ const { cacheMock, notifyMock } = vi.hoisted(() => ({
   cacheMock: { getCached: vi.fn(), mergeCached: vi.fn() },
   notifyMock: vi.fn(),
 }));
+// The 3D globe is lazy-loaded (three.js) — stub it so the view can be exercised.
+vi.mock("../components/LiveGlobe", () => ({
+  default: ({ markers, sentimentTint }: { markers: { id: string }[]; sentimentTint?: boolean }) => (
+    <div data-testid="live-globe-mock" data-count={markers.length} data-tint={sentimentTint ? "1" : ""} />
+  ),
+}));
+
 vi.mock("../lib/signalCache", () => cacheMock);
 vi.mock("@mantine/notifications", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@mantine/notifications")>();
@@ -355,6 +362,20 @@ describe("LiveDashboard", () => {
     fireEvent.click(screen.getByTestId("live-metric"));
     fireEvent.click(await screen.findByRole("option", { name: "By sentiment", hidden: true }));
     await waitFor(() => expect(screen.getByTestId("choropleth-legend")).toHaveTextContent("Net sentiment"));
+  });
+
+  it("switches to the 3D Globe view (lazy) and unmounts the 2D map", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+      { id: "s2", title: "FR AI", country: "FR", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "2"));
+
+    fireEvent.click(screen.getByRole("radio", { name: "Globe" }));
+    // The lazy globe resolves and receives the same displayMarkers; the 2D map unmounts.
+    expect(await screen.findByTestId("live-globe-mock")).toHaveAttribute("data-count", "2");
+    expect(screen.queryByTestId("map")).toBeNull();
   });
 
   it("collapses the live pulse panel", async () => {

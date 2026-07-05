@@ -18,9 +18,9 @@ export default defineConfig({
       devOptions: { enabled: true, type: "module" },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
-        // The lazy geo/boundary chunk is multi-MB; keep it out of precache and
-        // cache it at runtime on first use instead (see runtimeCaching below).
-        globIgnores: ["**/maps-*.js"],
+        // The lazy geo/boundary and 3D-globe (three.js) chunks are multi-MB; keep
+        // them out of precache and cache at runtime on first use (runtimeCaching).
+        globIgnores: ["**/maps-*.js", "**/globe-*.js"],
         // SPA offline: serve the shell for navigations, but never for the API.
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/v1/, /^\/graphql/],
@@ -36,12 +36,12 @@ export default defineConfig({
             },
           },
           {
-            // The large boundary/geocoding chunk, cached on demand after first load.
-            urlPattern: /\/assets\/maps-.*\.js$/,
+            // The large boundary/geocoding and 3D-globe chunks, cached on demand.
+            urlPattern: /\/assets\/(maps|globe)-.*\.js$/,
             handler: "CacheFirst",
             options: {
               cacheName: "geo-data",
-              expiration: { maxEntries: 3, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              expiration: { maxEntries: 5, maxAgeSeconds: 30 * 24 * 60 * 60 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
@@ -70,6 +70,9 @@ export default defineConfig({
           // Boundary geometry/converter/ISO map are only dynamically imported by
           // the live map's country outline — keep them in a lazily-loaded chunk.
           if (id.includes("world-atlas") || id.includes("topojson") || id.includes("i18n-iso-countries") || id.includes("country-state-city")) return "maps";
+          // three.js / globe.gl are only used by the lazily-loaded 3D globe view —
+          // keep them out of the eager vendor chunk so 2D-map users never pay for them.
+          if (id.includes("/three") || id.includes("globe.gl") || id.includes("react-globe.gl") || id.includes("kapsule") || id.includes("accessor-fn") || id.includes("three-")) return "globe";
           if (id.includes("recharts") || id.includes("d3-") || id.includes("@mantine/charts")) return "charts";
           if (id.includes("@tabler")) return "icons";
           if (id.includes("@mantine")) return "mantine";

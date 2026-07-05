@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ActionIcon, Anchor, Badge, Checkbox, ColorSwatch, Group, Paper, SegmentedControl, Select, Stack, Text } from "@mantine/core";
+import { ActionIcon, Anchor, Badge, Center, Checkbox, ColorSwatch, Group, Loader, Paper, SegmentedControl, Select, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconActivity, IconAlertTriangle, IconBroadcast, IconChevronDown, IconChevronUp, IconMoodSmile, IconPlayerPlay, IconStack2, IconWifiOff } from "@tabler/icons-react";
 import { api, type LiveSignal, type TaxonomyNode } from "../lib/api";
@@ -27,13 +27,18 @@ const POLL_MS = 4000;
 const MAX_MARKERS = 2000;
 const WORLD_CENTER: [number, number] = [20, 0];
 
-const VIEWS: { value: MapMode; label: string }[] = [
+// three.js is heavy — only load the globe when the user opens that view.
+const LiveGlobe = lazy(() => import("../components/LiveGlobe"));
+
+type View = MapMode | "globe";
+const VIEWS: { value: View; label: string }[] = [
   { value: "pins", label: "Pins" },
   { value: "cluster", label: "Clusters" },
   { value: "heat", label: "Heat" },
   { value: "regions", label: "Regions" },
+  { value: "globe", label: "Globe" },
 ];
-const isMode = (v: string | null): v is MapMode => v === "cluster" || v === "heat" || v === "regions";
+const isView = (v: string | null): v is View => v === "cluster" || v === "heat" || v === "regions" || v === "globe";
 
 const METRIC_OPTIONS = [
   { value: "count", label: "By count" },
@@ -112,7 +117,7 @@ export function LiveDashboard() {
   const setOne = (key: string, value: string) => update((p) => setOrDelete(p, key, value));
   const setCountry = (v: string | null) => setOne("country", v ?? "");
   const setWindowMin = (v: string) => setOne("w", v === "60" ? "" : v); // 60 = default → omit
-  const view: MapMode = isMode(params.get("view")) ? (params.get("view") as MapMode) : "pins";
+  const view: View = isView(params.get("view")) ? (params.get("view") as View) : "pins";
   const setView = (v: string) => setOne("view", v === "pins" ? "" : v); // pins = default → omit
   const sentimentTint = params.get("sent") === "1";
   const setSentimentTint = (on: boolean) => setOne("sent", on ? "1" : "");
@@ -329,6 +334,7 @@ export function LiveDashboard() {
   // During replay the map shows the frozen window up to the playhead; otherwise
   // the live set. Layer/country filters apply either way (they shape `shown`).
   const displayMarkers = replay.on ? frameMarkers(shown, replayCtl.playheadMs, windowMs, replayCtl.prevPlayheadMs) : shown;
+  const focusLatLng: [number, number] | null = sel && (sel.capitalLat || sel.capitalLng) ? [sel.capitalLat, sel.capitalLng] : null;
 
   return (
     <div style={{ height: "calc(100dvh - 56px)", display: "flex", flexDirection: "column" }} data-testid="live-dashboard">
@@ -376,7 +382,13 @@ export function LiveDashboard() {
         </Group>
       </Group>
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        <LiveMap markers={displayMarkers} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} flyTo={flyTo} sentimentTint={sentimentTint} regions={regions} />
+        {view === "globe" ? (
+          <Suspense fallback={<Center h="100%" data-testid="globe-loading"><Loader /></Center>}>
+            <LiveGlobe markers={displayMarkers} onSelect={setSelectedId} sentimentTint={sentimentTint} focusLatLng={focusLatLng} flyTo={flyTo} />
+          </Suspense>
+        ) : (
+          <LiveMap markers={displayMarkers} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} flyTo={flyTo} sentimentTint={sentimentTint} regions={regions} />
+        )}
         {view === "regions" && <ChoroplethLegend metric={metric} max={metricMax(aggregateByCountry(shown).values(), metric)} />}
         {replay.on && (
           <ReplayBar
