@@ -16,7 +16,7 @@ func TestCreateSubscriptionSubscriber(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// An explicit subscriber id is honoured.
+	// An explicit subscriber id is honored.
 	s, err := d.CreateSubscription(ctx, db.CreateSubscriptionInput{Name: "stream", Channel: "SSE", SubscriberID: "acme"})
 	if err != nil {
 		t.Fatal(err)
