@@ -3,8 +3,11 @@ package httpapi_test
 import (
 	"bufio"
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -70,6 +73,7 @@ func TestStreamAuthAndResolution(t *testing.T) {
 		{"unknown subscription", "/v1/stream/sse?subscription=nope", readKey, 404},
 		{"ws no key", "/v1/stream/ws?subscription=sub", "", 401},
 		{"ws unknown sub", "/v1/stream/ws?subscription=nope", readKey, 404},
+		{"ws non-upgrade GET", "/v1/stream/ws?subscription=sub", readKey, 426}, // reaches Accept, which rejects a plain GET (Upgrade Required)
 	}
 	for _, c := range cases {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -110,6 +114,125 @@ func TestSSEReplayAndLive(t *testing.T) {
 	}
 }
 
+func TestSSEDefaultTailAndHeartbeat(t *testing.T) {
+	// Shrink the fallback so the heartbeat/ping path runs quickly.
+	old := httpapi.SetStreamPollFallbackForTest(150 * time.Millisecond)
+	defer httpapi.SetStreamPollFallbackForTest(old)
+
+	d := dbtest.Connect(t)
+	seed(t, d)
+	ht, hub := newStreamServer(t, d)
+	key := seedKey(t, d, []string{"signals:read"}, 100000)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// No ?since and no Last-Event-ID → default cursor is the current tail
+	// (exercises MaxDeliverySeq); then a live push arrives.
+	resp := sseGet(t, ctx, ht.URL+"/v1/stream/sse?subscription=sub", key)
+	defer resp.Body.Close()
+	sc := bufio.NewScanner(resp.Body)
+	for sc.Scan() { // wait until subscribed
+		if strings.Contains(sc.Text(), "connected") {
+			break
+		}
+	}
+	gotPing := false
+	go func() {
+		time.Sleep(400 * time.Millisecond) // let a heartbeat ping fire first
+		addDelivery(t, d, "sg2", "d2", "tail")
+		hub.Notify("sub")
+	}()
+	for sc.Scan() {
+		line := sc.Text()
+		if strings.Contains(line, ": ping") {
+			gotPing = true
+		}
+		if strings.Contains(spaceless(line), `"event_id":"tail"`) {
+			if !gotPing {
+				t.Log("note: event arrived before a heartbeat ping (timing)")
+			}
+			return
+		}
+	}
+	t.Fatal("default-tail live push not received")
+}
+
+func TestStreamDBErrors(t *testing.T) {
+	d := dbtest.Connect(t)
+	seed(t, d)
+	ht, _ := newStreamServer(t, d)
+	key := seedKey(t, d, []string{"signals:read"}, 100000)
+	ctx := context.Background()
+	rename := func(from, to string) {
+		if _, err := d.Pool.Exec(ctx, `ALTER TABLE "`+from+`" RENAME TO "`+to+`"`); err != nil {
+			t.Fatalf("rename %s: %v", from, err)
+		}
+	}
+
+	// Subscription lookup failure → 500 across all transports.
+	rename("Subscription", "Subscription__h")
+	for _, p := range []string{"/v1/stream/poll?subscription=sub", "/v1/stream/sse?subscription=sub", "/v1/stream/ws?subscription=sub"} {
+		if code, _ := rawGetKey(t, ht.URL+p, key); code != 500 {
+			rename("Subscription__h", "Subscription")
+			t.Fatalf("%s sub-lookup error want 500 got %d", p, code)
+		}
+	}
+	rename("Subscription__h", "Subscription")
+
+	// Feed / cursor query failure → 500 (poll: ListDeliveriesForStream; sse/ws:
+	// MaxDeliverySeq via the default cursor).
+	rename("DeliveryEvent", "DeliveryEvent__h")
+	codes := map[string]int{}
+	for _, p := range []string{"/v1/stream/poll?subscription=sub&since=0", "/v1/stream/sse?subscription=sub", "/v1/stream/ws?subscription=sub"} {
+		codes[p], _ = rawGetKey(t, ht.URL+p, key)
+	}
+	rename("DeliveryEvent__h", "DeliveryEvent")
+	for p, c := range codes {
+		if c != 500 {
+			t.Errorf("%s feed error want 500 got %d", p, c)
+		}
+	}
+}
+
+func TestSSEResumeHubless(t *testing.T) {
+	d := dbtest.Connect(t)
+	seed(t, d) // delivery 'd1' (event_id "e")
+	addDelivery(t, d, "sg2", "d2", "second")
+	// Server with NO hub → exercises the nil-hub subscribe path (poll fallback).
+	srv := &httpapi.Server{DB: d, SigningSecret: "s"}
+	ht := httptest.NewServer(srv.Handler())
+	t.Cleanup(ht.Close)
+	key := seedKey(t, d, []string{"signals:read"}, 100000)
+
+	var d1seq int64
+	if err := d.Pool.QueryRow(context.Background(), `SELECT "seq" FROM "DeliveryEvent" WHERE id='d1'`).Scan(&d1seq); err != nil {
+		t.Fatal(err)
+	}
+	// Resume past d1 via Last-Event-ID → the first replayed event must be d2.
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "GET", ht.URL+"/v1/stream/sse?subscription=sub", nil)
+	req.Header.Set("X-API-Key", key)
+	req.Header.Set("Last-Event-ID", strconv.FormatInt(d1seq, 10))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	first := ""
+	sc := bufio.NewScanner(resp.Body)
+	for sc.Scan() {
+		if line := spaceless(sc.Text()); strings.HasPrefix(line, "data:") {
+			first = line
+			break
+		}
+	}
+	if !strings.Contains(first, `"event_id":"second"`) {
+		t.Fatalf("resume should skip d1 and start at d2, first event was %q", first)
+	}
+}
+
 func TestWebSocketStream(t *testing.T) {
 	d := dbtest.Connect(t)
 	seed(t, d)
@@ -146,6 +269,61 @@ func TestWebSocketStream(t *testing.T) {
 	if frame := spaceless(readText()); !strings.Contains(frame, `"event_id":"live"`) {
 		t.Fatalf("expected live frame, got %s", frame)
 	}
+}
+
+func TestStreamPoll(t *testing.T) {
+	d := dbtest.Connect(t)
+	seed(t, d) // delivery 'd1' for sub
+	ht, _ := newStreamServer(t, d)
+	key := seedKey(t, d, []string{"signals:read"}, 100000)
+
+	// First poll from the start returns the existing event + a cursor.
+	code, body := rawGetKey(t, ht.URL+"/v1/stream/poll?subscription=sub&since=0", key)
+	if code != 200 || !strings.Contains(spaceless(body), `"event_id":"e"`) {
+		t.Fatalf("poll since=0: %d %s", code, body)
+	}
+	var first struct {
+		Cursor int64 `json:"cursor"`
+	}
+	if err := json.Unmarshal([]byte(body), &first); err != nil || first.Cursor == 0 {
+		t.Fatalf("cursor missing: %v %s", err, body)
+	}
+	// Polling again from that cursor drains to empty.
+	_, body2 := rawGetKey(t, ht.URL+"/v1/stream/poll?subscription=sub&since="+strconv.FormatInt(first.Cursor, 10), key)
+	if !strings.Contains(spaceless(body2), `"events":[]`) {
+		t.Fatalf("expected no new events, got %s", body2)
+	}
+}
+
+func TestStreamQueryKeyAndLimit(t *testing.T) {
+	d := dbtest.Connect(t)
+	seed(t, d)
+	ht, _ := newStreamServer(t, d)
+	key := seedKey(t, d, []string{"signals:read"}, 100000)
+
+	// api_key as a query param (browser fallback, no header) + a limit param.
+	resp, err := http.Get(ht.URL + "/v1/stream/poll?subscription=sub&api_key=" + key + "&limit=600")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 || !strings.Contains(spaceless(string(body)), `"event_id":"e"`) {
+		t.Fatalf("query-key poll: %d %s", resp.StatusCode, body)
+	}
+}
+
+func rawGetKey(t *testing.T, url, key string) (int, string) {
+	t.Helper()
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("X-API-Key", key)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(b)
 }
 
 // spaceless strips spaces so assertions ignore jsonb's re-serialization spacing

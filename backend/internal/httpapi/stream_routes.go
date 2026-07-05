@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -13,11 +14,45 @@ import (
 // streamPollFallback re-queries the delivery feed even without a hub wakeup, so
 // streams still progress if a notification is missed (or in a split api/worker
 // deployment where the in-process hub isn't shared). Doubles as an idle ping.
-const streamPollFallback = 15 * time.Second
+// A var (not const) so tests can shrink it to exercise the heartbeat path.
+var streamPollFallback = 15 * time.Second
 
 func (s *Server) registerStreamRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/stream/sse", s.streamAuth("signals:read", s.streamSSE))
 	mux.HandleFunc("GET /v1/stream/ws", s.streamAuth("signals:read", s.streamWS))
+	mux.HandleFunc("GET /v1/stream/poll", s.streamAuth("signals:read", s.streamPoll))
+}
+
+// streamPoll is the stateless pull transport: one request returns the events
+// after ?since=<cursor> (default 0 = from the start) plus the next cursor. The
+// client persists the cursor and polls again — no connection held open.
+func (s *Server) streamPoll(w http.ResponseWriter, r *http.Request) {
+	sub := s.resolveStreamSub(w, r)
+	if sub == nil {
+		return
+	}
+	var since int64
+	if v := r.URL.Query().Get("since"); v != "" {
+		since, _ = strconv.ParseInt(v, 10, 64)
+	}
+	limit := 100
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+	rows, err := s.DB.ListDeliveriesForStream(r.Context(), sub.ID, since, limit)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	cursor := since
+	events := make([]map[string]any, 0, len(rows))
+	for _, e := range rows {
+		events = append(events, map[string]any{"seq": e.Seq, "payload": json.RawMessage(e.Payload)})
+		cursor = e.Seq
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"cursor": cursor, "events": events})
 }
 
 // streamAuth is requireAPIKey plus a browser convenience: EventSource and the
@@ -80,6 +115,61 @@ func (s *Server) subscribeHub(subID string) (<-chan struct{}, func()) {
 	return s.Hub.Subscribe(subID)
 }
 
+// streamBatch caps one feed query; a full batch means more may be buffered, so
+// the loop drains again before waiting.
+const streamBatch = 200
+
+// streamCore is the transport-agnostic feed loop shared by SSE and WebSocket. It
+// drains rows after `cursor` via feed, emits each via emit, then blocks on a
+// wake / heartbeat tick / ctx cancel and repeats. It returns when a query fails,
+// emit or heartbeat errors, or ctx is done. Kept free of HTTP/DB types so it can
+// be unit-tested with fakes.
+func streamCore(
+	ctx context.Context,
+	cursor int64,
+	feed func(cursor int64) ([]db.StreamDelivery, error),
+	emit func(db.StreamDelivery) error,
+	heartbeat func() error,
+	wake <-chan struct{},
+	interval time.Duration,
+) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		rows, err := feed(cursor)
+		if err != nil {
+			return
+		}
+		for _, e := range rows {
+			if err := emit(e); err != nil {
+				return
+			}
+			cursor = e.Seq
+		}
+		if len(rows) == streamBatch {
+			continue // more may be buffered; drain before waiting
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-wake:
+		case <-ticker.C:
+			if heartbeat != nil {
+				if err := heartbeat(); err != nil {
+					return
+				}
+			}
+		}
+	}
+}
+
+// feedFor binds a subscription's keyset feed query for streamCore.
+func (s *Server) feedFor(ctx context.Context, subID string) func(int64) ([]db.StreamDelivery, error) {
+	return func(cursor int64) ([]db.StreamDelivery, error) {
+		return s.DB.ListDeliveriesForStream(ctx, subID, cursor, streamBatch)
+	}
+}
+
 // streamSSE serves a subscription's delivery feed as Server-Sent Events: replay
 // from the cursor, then live. Each event carries `id: <seq>` so a reconnecting
 // client resumes via Last-Event-ID.
@@ -112,43 +202,26 @@ func (s *Server) streamSSE(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	wake, cancel := s.subscribeHub(sub.ID)
 	defer cancel()
-	ticker := time.NewTicker(streamPollFallback)
-	defer ticker.Stop()
-
-	for {
-		rows, err := s.DB.ListDeliveriesForStream(ctx, sub.ID, cursor, 200)
-		if err != nil {
-			return
+	emit := func(e db.StreamDelivery) error {
+		if _, err := w.Write([]byte("id: " + strconv.FormatInt(e.Seq, 10) + "\nevent: signal\ndata: " + string(e.Payload) + "\n\n")); err != nil {
+			return err
 		}
-		for _, e := range rows {
-			if _, err := w.Write([]byte("id: " + strconv.FormatInt(e.Seq, 10) + "\nevent: signal\ndata: " + string(e.Payload) + "\n\n")); err != nil {
-				return
-			}
-			cursor = e.Seq
-		}
-		if len(rows) > 0 {
-			flusher.Flush()
-		}
-		if len(rows) == 200 {
-			continue // more may be buffered; drain before waiting
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-wake:
-		case <-ticker.C:
-			if _, err := w.Write([]byte(": ping\n\n")); err != nil {
-				return
-			}
-			flusher.Flush()
-		}
+		flusher.Flush()
+		return nil
 	}
+	heartbeat := func() error {
+		if _, err := w.Write([]byte(": ping\n\n")); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+	streamCore(ctx, cursor, s.feedFor(ctx, sub.ID), emit, heartbeat, wake, streamPollFallback)
 }
 
 // streamWS serves the same feed over a WebSocket. Frames are
-// {"seq":<n>,"payload":<envelope>}; clients may send {"ack":<seq>} (advisory —
-// the server already advances as it writes). The read loop also detects
-// disconnects and answers pings.
+// {"seq":<n>,"payload":<envelope>}; a reader goroutine surfaces disconnects and
+// processes control frames while the write loop streams.
 func (s *Server) streamWS(w http.ResponseWriter, r *http.Request) {
 	sub := s.resolveStreamSub(w, r)
 	if sub == nil {
@@ -171,8 +244,6 @@ func (s *Server) streamWS(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancelCtx := context.WithCancel(r.Context())
 	defer cancelCtx()
-
-	// Reader: surfaces disconnects (cancels ctx) and processes control frames.
 	go func() {
 		for {
 			if _, _, err := c.Read(ctx); err != nil {
@@ -184,36 +255,10 @@ func (s *Server) streamWS(w http.ResponseWriter, r *http.Request) {
 
 	wake, cancel := s.subscribeHub(sub.ID)
 	defer cancel()
-	ticker := time.NewTicker(streamPollFallback)
-	defer ticker.Stop()
-
 	_ = c.Write(ctx, websocket.MessageText, []byte(`{"type":"connected","subscription":"`+sub.ID+`"}`))
-
-	for {
-		rows, err := s.DB.ListDeliveriesForStream(ctx, sub.ID, cursor, 200)
-		if err != nil {
-			return
-		}
-		for _, e := range rows {
-			frame := append([]byte(`{"seq":`+strconv.FormatInt(e.Seq, 10)+`,"payload":`), e.Payload...)
-			frame = append(frame, '}')
-			if err := c.Write(ctx, websocket.MessageText, frame); err != nil {
-				return
-			}
-			cursor = e.Seq
-		}
-		if len(rows) == 200 {
-			continue
-		}
-		select {
-		case <-ctx.Done():
-			_ = c.Close(websocket.StatusNormalClosure, "")
-			return
-		case <-wake:
-		case <-ticker.C:
-			if err := c.Ping(ctx); err != nil {
-				return
-			}
-		}
+	emit := func(e db.StreamDelivery) error {
+		frame := append([]byte(`{"seq":`+strconv.FormatInt(e.Seq, 10)+`,"payload":`), e.Payload...)
+		return c.Write(ctx, websocket.MessageText, append(frame, '}'))
 	}
+	streamCore(ctx, cursor, s.feedFor(ctx, sub.ID), emit, func() error { return c.Ping(ctx) }, wake, streamPollFallback)
 }
