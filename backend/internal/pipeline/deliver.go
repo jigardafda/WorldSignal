@@ -99,8 +99,9 @@ func matchesFilter(f subscriptionFilter, s *db.SignalForMatch) bool {
 }
 
 // MatchSubscriptions matches a signal against enabled subscriptions and creates
-// PENDING delivery rows. Mirrors matchSubscriptions in deliver.ts.
-func MatchSubscriptions(ctx context.Context, d *db.DB, signalID string, now time.Time) ([]string, error) {
+// PENDING delivery rows. `notify`, when non-nil, is called with the subscription
+// id for each new delivery so streaming (SSE/WebSocket) clients wake immediately.
+func MatchSubscriptions(ctx context.Context, d *db.DB, signalID string, now time.Time, notify func(subID string)) ([]string, error) {
 	sig, err := d.LoadSignalForMatch(ctx, signalID)
 	if err != nil || sig == nil {
 		return nil, err
@@ -134,6 +135,9 @@ func MatchSubscriptions(ctx context.Context, d *db.DB, signalID string, now time
 		}
 		if id != "" {
 			ids = append(ids, id)
+			if notify != nil {
+				notify(sub.ID)
+			}
 		}
 	}
 	return ids, nil
@@ -207,7 +211,10 @@ func SendDelivery(ctx context.Context, d *db.DB, client *http.Client, secret, de
 		return err
 	}
 
-	if del.Channel == "POLLING" {
+	// Pull-family channels (polling + the streaming transports) aren't pushed by
+	// the worker; the delivery row IS the delivery. Mark it sent so it surfaces
+	// in the durable feed that clients poll / stream.
+	if del.Channel == "POLLING" || del.Channel == "SSE" || del.Channel == "WEBSOCKET" {
 		return d.MarkDeliverySent(ctx, deliveryID, now)
 	}
 

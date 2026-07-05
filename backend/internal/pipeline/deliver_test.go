@@ -100,7 +100,7 @@ func TestMatchSubscriptionsCreatesDeliveries(t *testing.T) {
 	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('m','__default__','match','POLLING','{"tags":["DISASTER"]}','{}',now())`)
 	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('nm','__default__','nomatch','WEBHOOK','{"tags":["ECONOMY"]}','{}',now())`)
 
-	ids, err := MatchSubscriptions(ctx, d, "sg", time.Now())
+	ids, err := MatchSubscriptions(ctx, d, "sg", time.Now(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

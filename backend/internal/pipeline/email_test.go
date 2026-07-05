@@ -203,7 +203,7 @@ func TestMatchSubscriptionsDigestQueue(t *testing.T) {
 	// Digest-mode email subscription → queued, not delivered immediately.
 	mustExec(t, d, `INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('dig','__default__','digest','EMAIL','{"tags":["DISASTER"]}','{"mode":"digest","interval":"daily","to":"r@x.com"}',now())`)
 
-	ids, err := MatchSubscriptions(ctx, d, "sg", time.Now())
+	ids, err := MatchSubscriptions(ctx, d, "sg", time.Now(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

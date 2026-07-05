@@ -11,6 +11,7 @@ import (
 	"github.com/worldsignal/backend/internal/llm"
 	"github.com/worldsignal/backend/internal/logging"
 	"github.com/worldsignal/backend/internal/pipeline"
+	"github.com/worldsignal/backend/internal/stream"
 )
 
 // Queue names, mirroring queues.ts.
@@ -32,7 +33,10 @@ type Workers struct {
 	Crawler pipeline.PageCrawler
 	Client  *http.Client
 	Secret  string
-	log     *logging.Logger
+	// Hub, when set, is notified per subscription as deliveries are created so
+	// streaming (SSE/WebSocket) clients wake immediately. Optional (nil = no-op).
+	Hub *stream.Hub
+	log *logging.Logger
 	// Source failure handling: after FailureThreshold consecutive fetch
 	// failures, a source is placed in cooldown for Cooldown.
 	FailureThreshold int
@@ -67,6 +71,13 @@ func (w *Workers) enqueueMatchSignal(ctx context.Context, signalID string) error
 func (w *Workers) enqueueSendDelivery(ctx context.Context, deliveryID string) error {
 	return w.Q.Send(ctx, QSendDelivery, map[string]string{"deliveryId": deliveryID},
 		SendOptions{RetryLimit: deliveryRetryLimit, RetryDelay: 5, RetryBackoff: true})
+}
+
+// notifyStream wakes streaming clients for a subscription (no-op if no hub).
+func (w *Workers) notifyStream(subID string) {
+	if w.Hub != nil {
+		w.Hub.Notify(subID)
+	}
 }
 
 // EnqueueSendDelivery enqueues a delivery send (used by the API retry action).
@@ -133,7 +144,7 @@ func (w *Workers) Register() {
 		if err := jsonx.Unmarshal(data, &j); err != nil {
 			return err
 		}
-		ids, err := pipeline.MatchSubscriptions(ctx, w.DB, j.SignalID, time.Now())
+		ids, err := pipeline.MatchSubscriptions(ctx, w.DB, j.SignalID, time.Now(), w.notifyStream)
 		if err != nil {
 			return err
 		}

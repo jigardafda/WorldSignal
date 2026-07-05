@@ -240,7 +240,7 @@ func TestMatchAndSendEdges(t *testing.T) {
 	now := time.Now()
 
 	// Missing signal → nil result, no error.
-	if ids, err := MatchSubscriptions(ctx, d, "nope", now); err != nil || ids != nil {
+	if ids, err := MatchSubscriptions(ctx, d, "nope", now, nil); err != nil || ids != nil {
 		t.Fatalf("missing signal match: %v %v", ids, err)
 	}
 	// Missing delivery → no-op.
@@ -295,7 +295,7 @@ func TestClosedDBErrors(t *testing.T) {
 	if err := EnrichSignal(ctx, d, gw, nil, "x", now); err == nil {
 		t.Fatal("Enrich should error")
 	}
-	if _, err := MatchSubscriptions(ctx, d, "x", now); err == nil {
+	if _, err := MatchSubscriptions(ctx, d, "x", now, nil); err == nil {
 		t.Fatal("Match should error")
 	}
 	if err := SendDelivery(ctx, d, nil, "s", "x", false, now); err == nil {

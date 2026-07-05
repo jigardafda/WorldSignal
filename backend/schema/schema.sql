@@ -8,7 +8,9 @@
 CREATE TYPE public."DeliveryChannel" AS ENUM (
     'WEBHOOK',
     'POLLING',
-    'EMAIL'
+    'EMAIL',
+    'SSE',
+    'WEBSOCKET'
 );
 CREATE TYPE public."DeliveryStatus" AS ENUM (
     'PENDING',
