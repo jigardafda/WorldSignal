@@ -11,27 +11,48 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { LogoMark } from "./Logo";
 
 interface NavItem { to: string; label: string; icon: React.ReactNode; perm?: string }
+interface NavSection { title?: string; items: NavItem[] }
 
-const NAV: NavItem[] = [
-  { to: "/", label: "Dashboard", icon: <IconGauge size={18} /> },
-  { to: "/signals", label: "Signals", icon: <IconActivity size={18} />, perm: "signals:read" },
-  { to: "/entities", label: "Entities", icon: <IconUserSearch size={18} />, perm: "signals:read" },
-  { to: "/analytics", label: "Analytics", icon: <IconChartBar size={18} />, perm: "analytics:read" },
-  { to: "/sources", label: "Sources", icon: <IconBroadcast size={18} />, perm: "sources:read" },
-  { to: "/coverage", label: "Coverage", icon: <IconChartBar size={18} />, perm: "sources:read" },
-  { to: "/articles", label: "Articles", icon: <IconArticle size={18} />, perm: "signals:read" },
-  { to: "/raw-items", label: "Raw Items", icon: <IconFileText size={18} />, perm: "signals:read" },
-  { to: "/subscriptions", label: "Subscriptions", icon: <IconBell size={18} />, perm: "subscriptions:read" },
-  { to: "/subscribers", label: "Subscribers", icon: <IconUsersGroup size={18} />, perm: "subscriptions:read" },
-  { to: "/deliveries", label: "Deliveries", icon: <IconDatabase size={18} />, perm: "deliveries:read" },
-  { to: "/taxonomy", label: "Taxonomy", icon: <IconSitemap size={18} />, perm: "signals:read" },
-  { to: "/jobs", label: "Jobs", icon: <IconListCheck size={18} />, perm: "jobs:read" },
-  { to: "/users", label: "Users", icon: <IconUsers size={18} />, perm: "users:manage" },
-  { to: "/teams", label: "Teams", icon: <IconUsersGroup size={18} />, perm: "teams:manage" },
-  { to: "/settings", label: "Settings", icon: <IconSettings size={18} />, perm: "settings:manage" },
-  { to: "/connectors", label: "Connectors", icon: <IconMail size={18} />, perm: "settings:manage" },
-  { to: "/api-keys", label: "API Keys", icon: <IconKey size={18} />, perm: "settings:manage" },
-  { to: "/audit", label: "Audit Log", icon: <IconListCheck size={18} />, perm: "settings:manage" },
+const NAV: NavSection[] = [
+  { items: [{ to: "/", label: "Dashboard", icon: <IconGauge size={18} /> }] },
+  {
+    title: "Intelligence",
+    items: [
+      { to: "/signals", label: "Signals", icon: <IconActivity size={18} />, perm: "signals:read" },
+      { to: "/entities", label: "Entities", icon: <IconUserSearch size={18} />, perm: "signals:read" },
+      { to: "/analytics", label: "Analytics", icon: <IconChartBar size={18} />, perm: "analytics:read" },
+      { to: "/taxonomy", label: "Taxonomy", icon: <IconSitemap size={18} />, perm: "signals:read" },
+    ],
+  },
+  {
+    title: "Ingestion",
+    items: [
+      { to: "/sources", label: "Sources", icon: <IconBroadcast size={18} />, perm: "sources:read" },
+      { to: "/coverage", label: "Coverage", icon: <IconChartBar size={18} />, perm: "sources:read" },
+      { to: "/articles", label: "Articles", icon: <IconArticle size={18} />, perm: "signals:read" },
+      { to: "/raw-items", label: "Raw Items", icon: <IconFileText size={18} />, perm: "signals:read" },
+    ],
+  },
+  {
+    title: "Distribution",
+    items: [
+      { to: "/subscriptions", label: "Subscriptions", icon: <IconBell size={18} />, perm: "subscriptions:read" },
+      { to: "/subscribers", label: "Subscribers", icon: <IconUsersGroup size={18} />, perm: "subscriptions:read" },
+      { to: "/deliveries", label: "Deliveries", icon: <IconDatabase size={18} />, perm: "deliveries:read" },
+      { to: "/connectors", label: "Connectors", icon: <IconMail size={18} />, perm: "settings:manage" },
+    ],
+  },
+  {
+    title: "Administration",
+    items: [
+      { to: "/jobs", label: "Jobs", icon: <IconListCheck size={18} />, perm: "jobs:read" },
+      { to: "/users", label: "Users", icon: <IconUsers size={18} />, perm: "users:manage" },
+      { to: "/teams", label: "Teams", icon: <IconUsersGroup size={18} />, perm: "teams:manage" },
+      { to: "/settings", label: "Settings", icon: <IconSettings size={18} />, perm: "settings:manage" },
+      { to: "/api-keys", label: "API Keys", icon: <IconKey size={18} />, perm: "settings:manage" },
+      { to: "/audit", label: "Audit Log", icon: <IconListCheck size={18} />, perm: "settings:manage" },
+    ],
+  },
 ];
 
 export function Layout() {
@@ -41,7 +62,10 @@ export function Layout() {
   const location = useLocation();
   const live = location.pathname === "/live"; // URL-driven so it survives reloads
 
-  const visible = NAV.filter((n) => !n.perm || hasPerm(n.perm));
+  // Filter each section by permission, dropping sections that end up empty.
+  const sections = NAV
+    .map((s) => ({ ...s, items: s.items.filter((n) => !n.perm || hasPerm(n.perm)) }))
+    .filter((s) => s.items.length > 0);
 
   return (
     <AppShell
@@ -88,16 +112,25 @@ export function Layout() {
 
       <AppShell.Navbar p="xs">
         <ScrollArea>
-          {visible.map((n) => (
-            <NavLink
-              key={n.to}
-              component={RouterLink}
-              to={n.to}
-              label={n.label}
-              leftSection={n.icon}
-              active={n.to === "/" ? location.pathname === "/" : location.pathname.startsWith(n.to)}
-              onClick={() => opened && toggle()}
-            />
+          {sections.map((section, si) => (
+            <div key={section.title ?? "top"}>
+              {section.title && (
+                <Text size="xs" fw={700} tt="uppercase" c="dimmed" px="xs" mt={si === 0 ? 4 : "md"} mb={4}>
+                  {section.title}
+                </Text>
+              )}
+              {section.items.map((n) => (
+                <NavLink
+                  key={n.to}
+                  component={RouterLink}
+                  to={n.to}
+                  label={n.label}
+                  leftSection={n.icon}
+                  active={n.to === "/" ? location.pathname === "/" : location.pathname.startsWith(n.to)}
+                  onClick={() => opened && toggle()}
+                />
+              ))}
+            </div>
           ))}
         </ScrollArea>
       </AppShell.Navbar>
