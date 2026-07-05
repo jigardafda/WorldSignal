@@ -19,38 +19,62 @@ type SignalForMatch struct {
 	Severity    string
 	Confidence  float64
 	Country     *string
+	Region      *string
+	Sentiment   *string
+	Influence   *string
+	Relevance   *float64
 	SourceCount int
 	FirstSeenAt time.Time
 	LastSeenAt  time.Time
 	TagCodes    []string
+	Entities    []string
 }
 
 // LoadSignalForMatch loads a signal and its tag codes (nil if absent).
 func (d *DB) LoadSignalForMatch(ctx context.Context, signalID string) (*SignalForMatch, error) {
 	var s SignalForMatch
 	err := d.Pool.QueryRow(ctx,
-		`SELECT "id","title","summary","status","severity","confidence","country","sourceCount","firstSeenAt","lastSeenAt" FROM "Signal" WHERE "id"=$1`, signalID).
-		Scan(&s.ID, &s.Title, &s.Summary, &s.Status, &s.Severity, &s.Confidence, &s.Country, &s.SourceCount, &s.FirstSeenAt, &s.LastSeenAt)
+		`SELECT "id","title","summary","status","severity","confidence","country","region","sentiment","influence","relevance","sourceCount","firstSeenAt","lastSeenAt" FROM "Signal" WHERE "id"=$1`, signalID).
+		Scan(&s.ID, &s.Title, &s.Summary, &s.Status, &s.Severity, &s.Confidence, &s.Country, &s.Region, &s.Sentiment, &s.Influence, &s.Relevance, &s.SourceCount, &s.FirstSeenAt, &s.LastSeenAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	rows, err := d.Pool.Query(ctx,
+	tagRows, err := d.Pool.Query(ctx,
 		`SELECT tt."code" FROM "SignalTag" st JOIN "TaxonomyTag" tt ON tt."id"=st."tagId" WHERE st."signalId"=$1 ORDER BY st."tagId" ASC`, signalID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	for rows.Next() {
+	for tagRows.Next() {
 		var c string
-		if err := rows.Scan(&c); err != nil {
+		if err := tagRows.Scan(&c); err != nil {
+			tagRows.Close()
 			return nil, err
 		}
 		s.TagCodes = append(s.TagCodes, c)
 	}
-	return &s, rows.Err()
+	tagRows.Close()
+	if err := tagRows.Err(); err != nil {
+		return nil, err
+	}
+	// Entity names (for entity filters) come from the extracted attributes.
+	entRows, err := d.Pool.Query(ctx,
+		`SELECT DISTINCT "valueText" FROM "SignalAttribute" WHERE "signalId"=$1 AND "key"='entity' AND "valueText" <> '' ORDER BY "valueText" ASC`, signalID)
+	if err != nil {
+		return nil, err
+	}
+	for entRows.Next() {
+		var e string
+		if err := entRows.Scan(&e); err != nil {
+			entRows.Close()
+			return nil, err
+		}
+		s.Entities = append(s.Entities, e)
+	}
+	entRows.Close()
+	return &s, entRows.Err()
 }
 
 // EnabledSubscription is a subscription eligible for delivery matching.
