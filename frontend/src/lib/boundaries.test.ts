@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { _resetBoundaryCache, countryOutline } from "./boundaries";
+import { _resetBoundaryCache, allCountryOutlines, countryOutline } from "./boundaries";
 
 afterEach(() => _resetBoundaryCache());
 
@@ -12,5 +12,14 @@ describe("countryOutline", () => {
   });
   it("returns null for an unknown code", async () => {
     expect(await countryOutline("ZZ")).toBeNull();
+  });
+});
+
+describe("allCountryOutlines", () => {
+  it("returns the full ISO-alpha2-indexed feature map (many countries incl. US/FR)", async () => {
+    const map = await allCountryOutlines();
+    expect(map.size).toBeGreaterThan(100);
+    expect(map.get("US")?.geometry.type).toMatch(/Polygon/);
+    expect(map.get("FR")).toBeTruthy();
   });
 });

@@ -36,6 +36,12 @@ export async function countryOutline(alpha2: string): Promise<GeoJSON.Feature | 
   return map.get(alpha2.toUpperCase()) ?? null;
 }
 
+/** All country boundaries indexed by ISO alpha-2 (shared cached map — treat as
+ * read-only). Used by the choropleth to paint every country at once. */
+export async function allCountryOutlines(): Promise<FeatureMap> {
+  return loadFeatureMap();
+}
+
 /** Test hook: drop the cached boundary index. */
 export function _resetBoundaryCache() {
   cache = null;
