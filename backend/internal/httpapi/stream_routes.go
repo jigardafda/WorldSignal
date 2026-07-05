@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
 	"github.com/worldsignal/backend/internal/db"
 )
 
@@ -240,7 +241,7 @@ func (s *Server) streamWS(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	defer c.CloseNow()
+	defer func() { _ = c.CloseNow() }()
 
 	ctx, cancelCtx := context.WithCancel(r.Context())
 	defer cancelCtx()
