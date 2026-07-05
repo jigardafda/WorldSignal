@@ -2,10 +2,32 @@ package db
 
 import (
 	"context"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/worldsignal/backend/internal/jsonx"
 )
+
+// validText strips invalid UTF-8 byte sequences from text bound for a Postgres
+// text column. Upstream feed titles and crawled bodies can be cut mid-character
+// (e.g. a partial Devanagari/Cyrillic multi-byte rune); Postgres then rejects
+// the whole write with `invalid byte sequence for encoding "UTF8"`. This is most
+// visible on the translated path, which stores source-language originals.
+func validText(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	return strings.ToValidUTF8(s, "")
+}
+
+func validTextPtr(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	v := validText(*s)
+	return &v
+}
 
 // EnrichLink is one article/source backing a signal, for enrichment.
 type EnrichLink struct {
@@ -136,6 +158,22 @@ type SignalAttr struct {
 
 // ApplyEnrichment updates the signal and replaces its tags in one transaction.
 func (d *DB) ApplyEnrichment(ctx context.Context, signalID string, u EnrichmentUpdate) error {
+	// Guarantee valid UTF-8 for every text column so a truncated non-Latin rune
+	// upstream can't fail the whole enrichment write.
+	u.Title = validText(u.Title)
+	u.Summary = validText(u.Summary)
+	u.WhatHappened = validTextPtr(u.WhatHappened)
+	u.WhyItMatters = validTextPtr(u.WhyItMatters)
+	u.Region = validTextPtr(u.Region)
+	u.City = validTextPtr(u.City)
+	u.Locality = validTextPtr(u.Locality)
+	u.OriginalTitle = validTextPtr(u.OriginalTitle)
+	u.OriginalSummary = validTextPtr(u.OriginalSummary)
+	for i := range u.Attributes {
+		u.Attributes[i].ValueText = validText(u.Attributes[i].ValueText)
+		u.Attributes[i].ValueCode = validText(u.Attributes[i].ValueCode)
+	}
+
 	meta, err := jsonx.Marshal(u.Metadata)
 	if err != nil {
 		return err

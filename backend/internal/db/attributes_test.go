@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/worldsignal/backend/internal/db"
 	"github.com/worldsignal/backend/internal/dbtest"
@@ -27,6 +28,42 @@ func seedSignalWithArticle(t *testing.T, d *db.DB) string {
 	exec(`INSERT INTO "Article" ("id","sourceId","title","body") VALUES ('a','src','t','b')`)
 	exec(`INSERT INTO "SignalArticle" ("signalId","articleId","relationType","addedAt") VALUES ('sg','a','PRIMARY',now())`)
 	return "sg"
+}
+
+func TestApplyEnrichmentSanitizesInvalidUTF8(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	dbtest.SeedTaxonomy(t, d)
+	ctx := context.Background()
+	id := seedSignalWithArticle(t, d)
+
+	// Dangling bytes from source text cut mid multi-byte rune (partial Devanagari
+	// / Cyrillic / CJK). Postgres rejects these outright (SQLSTATE 22021), so
+	// before sanitizing, this whole enrichment write failed.
+	if err := d.ApplyEnrichment(ctx, id, db.EnrichmentUpdate{
+		Title:    "Clean title \xe0\xa4",
+		Summary:  "Summary \xd0",
+		Severity: "LOW", Confidence: 0.5, Status: "DEVELOPING",
+		PublishedAt: time.Now(), Metadata: map[string]any{},
+		WhatHappened:    ptrS("what \xe3"),
+		OriginalTitle:   ptrS("\xe0\xa4\xae\xe0\xa5 \xe0\xa5"), // valid Devanagari + a dangling byte
+		OriginalSummary: ptrS("orig \xcf"),
+		City:            ptrS("Delhi \xd8"),
+		Attributes:      []db.SignalAttr{{Key: "entity", ValueCode: "PERSON", ValueText: "Naam \xe0", Confidence: 1}},
+	}); err != nil {
+		t.Fatalf("enrichment with invalid utf-8 must not fail: %v", err)
+	}
+
+	agg, err := d.GetSignal(ctx, id)
+	if err != nil || agg == nil {
+		t.Fatalf("get signal: %v", err)
+	}
+	if !utf8.ValidString(agg.Title) {
+		t.Errorf("stored title is not valid utf-8: %q", agg.Title)
+	}
+	if agg.Title != "Clean title " { // dangling \xe0\xa4 dropped, valid prefix kept
+		t.Errorf("title should keep the valid prefix: %q", agg.Title)
+	}
 }
 
 func TestApplyEnrichmentPersistsAttributes(t *testing.T) {

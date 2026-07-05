@@ -109,7 +109,7 @@ func runAttrLLM(ctx context.Context, gw Gateway, in AttrInput) *AttributeResult 
 		body = in.Context // crawled page text is richer than the feed snippet
 	}
 	if len(body) > 6000 {
-		body = body[:6000]
+		body = strings.ToValidUTF8(body[:6000], "") // drop a rune split by the byte cut
 	}
 	publisher := in.Publisher
 	if publisher == "" {
