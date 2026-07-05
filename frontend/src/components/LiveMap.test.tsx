@@ -96,6 +96,26 @@ describe("LiveMap", () => {
     expect(markerOpts.opacity).toBe(0.5);
   });
 
+  it("draws a corroboration ring sized by sourceCount", () => {
+    render(<LiveMap markers={[m("multi", { sourceCount: 5 }), m("single", { sourceCount: 1 })]} center={[0, 0]} zoom={2} />);
+    const htmls = iconHtmls();
+    expect(htmls.some((h) => h.includes("--ws-ring:4px"))).toBe(true); // 5 sources ⇒ 4px
+    expect(htmls.some((h) => h.includes("--ws-ring"))).toBe(true);
+    // single-source marker gets no ring var
+    const single = htmls.find((h) => !h.includes("--ws-ring"));
+    expect(single).toBeTruthy();
+  });
+
+  it("tints marker borders by sentiment only when the sentiment layer is on", () => {
+    const { rerender } = render(<LiveMap markers={[m("neg", { sentiment: "NEGATIVE" })]} center={[0, 0]} zoom={2} />);
+    expect(iconHtmls().at(-1)).not.toContain("ws-tint");
+
+    rerender(<LiveMap markers={[m("neg", { sentiment: "NEGATIVE" })]} center={[0, 0]} zoom={2} sentimentTint />);
+    const html = iconHtmls().at(-1)!;
+    expect(html).toContain("ws-tint");
+    expect(html).toContain("--ws-a:#e03131"); // NEGATIVE ⇒ red
+  });
+
   it("uses a marker-cluster group in cluster mode", () => {
     render(<LiveMap markers={[m("a"), m("b")]} center={[0, 0]} zoom={2} mode="cluster" />);
     expect(vi.mocked(L.markerClusterGroup)).toHaveBeenCalledTimes(1);

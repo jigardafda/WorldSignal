@@ -15,7 +15,7 @@ export interface User {
 export interface SignalTag { code: string; confidence: number }
 export interface SignalSource { publisher: string; url: string | null; publishedAt: string | null }
 export interface SignalAttribute { key: string; valueCode: string; valueText: string; valueNum: number | null; confidence: number }
-export interface LiveSignal { id: string; title: string; country?: string | null; region?: string | null; city?: string | null; severity: string; eventType?: string | null; lastSeenAt: string }
+export interface LiveSignal { id: string; title: string; country?: string | null; region?: string | null; city?: string | null; severity: string; eventType?: string | null; lastSeenAt: string; sourceCount?: number; sentiment?: string | null; influence?: string | null; relevance?: number | null }
 export interface AttributeValue { code: string; label: string }
 export interface AttributeDefinition { key: string; label: string; kind: string; description: string; values: AttributeValue[] }
 export interface Signal {
@@ -213,7 +213,7 @@ export const api = {
     if (since) f.since = since;
     if (country) f.country = country;
     return gql<{ signals: LiveSignal[] }>(
-      `query($f:SignalFilter,$l:Int){signals(filter:$f,limit:$l){id title country region city severity eventType lastSeenAt}}`,
+      `query($f:SignalFilter,$l:Int){signals(filter:$f,limit:$l){id title country region city severity eventType lastSeenAt sourceCount sentiment influence relevance}}`,
       { f, l: limit },
     ).then((d) => d.signals);
   },

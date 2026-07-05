@@ -24,8 +24,8 @@ vi.mock("@mantine/notifications", async (importOriginal) => {
 // Stub the Leaflet map; expose a button to trigger onSelect for the first marker
 // and reflect the active view mode.
 vi.mock("../components/LiveMap", () => ({
-  LiveMap: ({ markers, center, zoom, onSelect, focus, mode, flyTo }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void; focus?: string | null; mode?: string; flyTo?: { lat: number; lng: number } | null }) => (
-    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")} data-focus={focus ?? ""} data-mode={mode ?? "pins"} data-flyto={flyTo ? `${flyTo.lat},${flyTo.lng}` : ""}>
+  LiveMap: ({ markers, center, zoom, onSelect, focus, mode, flyTo, sentimentTint }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void; focus?: string | null; mode?: string; flyTo?: { lat: number; lng: number } | null; sentimentTint?: boolean }) => (
+    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")} data-focus={focus ?? ""} data-mode={mode ?? "pins"} data-flyto={flyTo ? `${flyTo.lat},${flyTo.lng}` : ""} data-tint={sentimentTint ? "1" : ""}>
       {markers[0] && <button data-testid="map-pick" onClick={() => onSelect?.(markers[0].id)}>pick</button>}
     </div>
   ),
@@ -296,6 +296,41 @@ describe("LiveDashboard", () => {
     const listbox = document.getElementById(screen.getByTestId("live-country").getAttribute("aria-controls")!)!;
     fireEvent.click(await within(listbox).findByRole("option", { name: /France/, hidden: true }));
     await waitFor(() => expect(screen.queryByTestId("replay-bar")).toBeNull());
+  });
+
+  it("filters the map by influence (Medium+, then High only)", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "", influence: "HIGH" },
+      { id: "s2", title: "FR AI", country: "FR", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "", influence: "MEDIUM" },
+      { id: "s3", title: "US story", country: "US", severity: "LOW", eventType: "GENERAL", lastSeenAt: "", influence: null },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    const map = await screen.findByTestId("map");
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "3")); // all
+
+    const pickInfluence = async (label: string) => {
+      fireEvent.click(screen.getByTestId("live-influence"));
+      fireEvent.click(await screen.findByRole("option", { name: label, hidden: true }));
+    };
+    // Medium+ ⇒ drops the null-influence one (s3) ⇒ 2 remain.
+    await pickInfluence("Medium+");
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
+
+    // High only ⇒ just s1.
+    await pickInfluence("High only");
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "1"));
+  });
+
+  it("toggles the sentiment tint layer on the map", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "", sentiment: "NEGATIVE" },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    const map = await screen.findByTestId("map");
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "1"));
+    expect(map).toHaveAttribute("data-tint", ""); // off by default
+    fireEvent.click(screen.getByTestId("sentiment-toggle"));
+    await waitFor(() => expect(map).toHaveAttribute("data-tint", "1"));
   });
 
   it("collapses the live pulse panel", async () => {

@@ -27,6 +27,24 @@
   background: var(--ws-c);
   box-shadow: 0 0 10px 2px color-mix(in srgb, var(--ws-c) 75%, transparent);
   border: 2px solid rgba(255, 255, 255, 0.9);
+  position: relative;
+}
+
+/* Corroboration ring: an outer ring whose thickness (--ws-ring, px) encodes how
+   many sources back the signal. Single-source events set no --ws-ring ⇒ no ring. */
+.ws-pulse::after {
+  content: "";
+  position: absolute;
+  inset: calc(-2px - var(--ws-ring, 0px));
+  border-radius: 50%;
+  border: var(--ws-ring, 0px) solid rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+/* Sentiment tint layer (opt-in): color the marker border by sentiment (--ws-a),
+   keeping the category-colored fill. */
+.ws-pulse.ws-tint {
+  border-color: var(--ws-a, rgba(255, 255, 255, 0.9));
 }
 
 /* Newly ingested events ripple a few times in their category color. */

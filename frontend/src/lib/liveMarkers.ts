@@ -28,6 +28,34 @@ export function isBreaking(severity?: string | null): boolean {
   return severityRank(severity) >= SEVERITY_RANK.HIGH;
 }
 
+/** Corroboration ring thickness (px) from how many sources back the signal.
+ * 1 source ⇒ 0 (no ring); each extra source adds 1px, capped at 6. */
+export function ringWidth(sourceCount?: number | null): number {
+  const n = sourceCount ?? 1;
+  if (n <= 1) return 0;
+  return Math.min(6, n - 1);
+}
+
+const INFLUENCE_RANK: Record<string, number> = { NEGLIGIBLE: 0, LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 };
+
+/** Ordinal influence, 0 (unknown/negligible) … 4 (critical). Null ⇒ 0 so
+ * unenriched events fall out when filtering above "All". */
+export function influenceRank(influence?: string | null): number {
+  return influence ? (INFLUENCE_RANK[influence] ?? 0) : 0;
+}
+
+const SENTIMENT_HEX: Record<string, string> = {
+  POSITIVE: "#2f9e44", // green
+  NEGATIVE: "#e03131", // red
+  NEUTRAL: "#868e96", // gray
+  MIXED: "#f08c00", // amber
+};
+
+/** Hex accent for a sentiment code (matches the badge palette); unknown ⇒ gray. */
+export function sentimentColor(sentiment?: string | null): string {
+  return (sentiment && SENTIMENT_HEX[sentiment]) || "#868e96";
+}
+
 /**
  * Marker opacity as a freshness gradient. A just-seen event is fully opaque
  * (1.0); one at the far edge of the window fades to `floor` (0.35). Clamped so
