@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ActionIcon, Anchor, Badge, Checkbox, ColorSwatch, Group, Paper, SegmentedControl, Select, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconActivity, IconAlertTriangle, IconBroadcast, IconChevronDown, IconChevronUp, IconStack2, IconWifiOff } from "@tabler/icons-react";
+import { IconActivity, IconAlertTriangle, IconBroadcast, IconChevronDown, IconChevronUp, IconPlayerPlay, IconStack2, IconWifiOff } from "@tabler/icons-react";
 import { api, type LiveSignal, type TaxonomyNode } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useCountries } from "../lib/countries";
@@ -10,11 +10,14 @@ import { CountrySelect } from "../components/CountrySelect";
 import { LiveMap, type MapMarker, type MapMode } from "../components/LiveMap";
 import { LivePulse } from "../components/LivePulse";
 import { LiveTicker } from "../components/LiveTicker";
+import { ReplayBar } from "../components/ReplayBar";
 import { SignalDrawer } from "../components/SignalDrawer";
 import { jitter } from "../lib/geo";
 import { geocode, preloadGeo } from "../lib/geocode";
 import { CATEGORIES, categoryColor, categoryLabel, domainOf } from "../lib/categories";
 import { isBreaking, newBreaking, recencyOpacity } from "../lib/liveMarkers";
+import { frameMarkers } from "../lib/replay";
+import { useReplay } from "../lib/useReplay";
 import { getCached, mergeCached } from "../lib/signalCache";
 
 const POLL_MS = 4000;
@@ -126,6 +129,15 @@ export function LiveDashboard() {
     setSelectedId(r.id);
     setFlyTo({ lat: r.lat, lng: r.lng, nonce: ++flyNonce.current });
   };
+
+  // Timeline replay: entering freezes the loaded window (`end` = now) and pauses
+  // polling; the playhead sweeps [end − window, end]. Changing window/country
+  // exits replay (they need a fresh fetch).
+  const [replay, setReplay] = useState<{ on: boolean; end: number }>({ on: false, end: 0 });
+  const replayWindowMs = Number(windowMin) * 60_000;
+  const replayCtl = useReplay(replay.end - replayWindowMs, replay.end, replay.on);
+  const toggleReplay = () => setReplay((r) => (r.on ? { ...r, on: false } : { on: true, end: Date.now() }));
+  useEffect(() => { setReplay((r) => (r.on ? { ...r, on: false } : r)); }, [windowMin, country]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleExpand = (code: string) =>
     setExpanded((prev) => {
@@ -152,7 +164,7 @@ export function LiveDashboard() {
   }, []);
 
   useEffect(() => {
-    if (list.length === 0) return; // wait until country coordinates are loaded
+    if (list.length === 0 || replay.on) return; // paused while replaying (frozen window)
     void preloadGeo(); // warm the precise-geocoding DB in the background
     const coords = new Map(list.map((c) => [c.code, c]));
     const windowMs = Number(windowMin) * 60_000;
@@ -231,7 +243,7 @@ export function LiveDashboard() {
       active = false;
       clearInterval(t);
     };
-  }, [list, windowMin, country]);
+  }, [list, windowMin, country, replay.on]);
 
   const sel = country ? byCode[country] : null;
   const center: [number, number] = sel && (sel.capitalLat || sel.capitalLng) ? [sel.capitalLat, sel.capitalLng] : WORLD_CENTER;
@@ -246,25 +258,55 @@ export function LiveDashboard() {
   }
   const shown = inCountry.filter((m) => !disabledDomains.has(m.category) && !disabledLeaves.has(m.leaf));
   const windowMs = Number(windowMin) * 60_000;
+  // During replay the map shows the frozen window up to the playhead; otherwise
+  // the live set. Layer/country filters apply either way (they shape `shown`).
+  const displayMarkers = replay.on ? frameMarkers(shown, replayCtl.playheadMs, windowMs, replayCtl.prevPlayheadMs) : shown;
 
   return (
     <div style={{ height: "calc(100dvh - 56px)", display: "flex", flexDirection: "column" }} data-testid="live-dashboard">
       <Group justify="space-between" px="md" py="xs" style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
         <Group gap="xs">
           <Badge color="blue" variant="light" leftSection={<IconBroadcast size={12} />} data-testid="live-indicator">Live</Badge>
+          {replay.on && (
+            <Badge color="grape" variant="light" leftSection={<IconPlayerPlay size={12} />} data-testid="replay-indicator">Replay</Badge>
+          )}
           {!online && (
             <Badge color="orange" variant="light" leftSection={<IconWifiOff size={12} />} data-testid="live-offline">Offline</Badge>
           )}
-          <Text size="sm" c="dimmed">{shown.length} events on map{lastUpdate && ` · updated ${lastUpdate}`}</Text>
+          <Text size="sm" c="dimmed">{displayMarkers.length} events on map{!replay.on && lastUpdate && ` · updated ${lastUpdate}`}</Text>
         </Group>
         <Group gap="xs">
+          <ActionIcon
+            variant={replay.on ? "filled" : "default"}
+            color="grape"
+            size="lg"
+            onClick={toggleReplay}
+            disabled={markers.length === 0}
+            aria-label="Timeline replay"
+            data-testid="replay-toggle"
+          >
+            <IconPlayerPlay size={16} />
+          </ActionIcon>
           <SegmentedControl size="xs" data={VIEWS} value={view} onChange={setView} data-testid="live-view" />
           <Select data={WINDOWS} value={windowMin} onChange={(v) => setWindowMin(v ?? "60")} allowDeselect={false} w={150} data-testid="live-window" />
           <CountrySelect placeholder="Whole world" value={country} onChange={setCountry} data-testid="live-country" />
         </Group>
       </Group>
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} flyTo={flyTo} />
+        <LiveMap markers={displayMarkers} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} flyTo={flyTo} />
+        {replay.on && (
+          <ReplayBar
+            playing={replayCtl.playing}
+            playheadMs={replayCtl.playheadMs}
+            progress={replayCtl.progress}
+            speed={replayCtl.speed}
+            atEnd={replayCtl.atEnd}
+            onPlayPause={() => (replayCtl.playing ? replayCtl.pause() : replayCtl.play())}
+            onSeek={replayCtl.seekProgress}
+            onCycleSpeed={replayCtl.cycleSpeed}
+            onExit={toggleReplay}
+          />
+        )}
         <Paper
           withBorder
           shadow="md"
