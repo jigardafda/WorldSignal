@@ -54,16 +54,23 @@
     $("toggle").textContent = on ? "Disconnect" : "Connect";
     $("toggle").className = on ? "off" : "";
   }
+  function cell(cls, text) {
+    const s = document.createElement("span");
+    s.className = cls;
+    s.textContent = text; // textContent (never innerHTML) → no XSS from feed data
+    return s;
+  }
   function render(ev) {
     const d = (ev && ev.data) || {};
+    const sev = (d.severity || "LOW").toUpperCase().replace(/[^A-Z]/g, "");
     const row = document.createElement("div");
     row.className = "row";
-    const sev = (d.severity || "LOW").toUpperCase();
-    row.innerHTML =
-      `<span class="sev ${sev}">${sev}</span>` +
-      `<span class="cty">${d.country || "--"}</span>` +
-      `<span class="title">${(d.title || "").replace(/</g, "&lt;")}</span>` +
-      `<span class="time">${new Date().toLocaleTimeString()}</span>`;
+    row.append(
+      cell("sev " + sev, sev),
+      cell("cty", d.country || "--"),
+      cell("title", d.title || ""),
+      cell("time", new Date().toLocaleTimeString()),
+    );
     $("list").prepend(row);
     while ($("list").childElementCount > 200) $("list").lastChild.remove();
     $("count").textContent = ++count;
