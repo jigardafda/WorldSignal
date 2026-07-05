@@ -1,0 +1,3 @@
+# SSE, polling, and the webhook receiver use only the Python standard library.
+# Only the WebSocket client needs a third-party package:
+websockets>=12.0

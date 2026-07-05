@@ -78,6 +78,18 @@ SSE uses the standard `Last-Event-ID` header; WS clients send `{ack: seq}`.
 - **Browser**: a static demo page consumes SSE (fetch-stream with the auth
   header) and WS live, shown in-browser.
 
+## Security notes (accepted for Phase A)
+
+- **Authz is scope-based, not tenant-scoped** — matching the existing `/v1`
+  surface (e.g. `/v1/deliveries` lists all deliveries to any `deliveries:read`
+  key). Any `signals:read` key can stream any subscription by id (a high-entropy
+  cuid). Fine for a single-org console; a future multi-tenant deployment should
+  scope keys to subscribers.
+- **`?api_key=` on stream routes** is a browser-only fallback (EventSource /
+  WebSocket can't set headers). The server does no request-URL logging, so it
+  isn't logged by us; clients should prefer the `Authorization` header since
+  proxies/browser history may retain URLs.
+
 ## Out of scope (Phase B)
 
 The full-screen subscription modal, the visual filter builder, and the

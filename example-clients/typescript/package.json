@@ -1,0 +1,23 @@
+{
+  "name": "worldsignal-example-clients",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Runnable TypeScript clients for WorldSignal subscription delivery channels.",
+  "scripts": {
+    "sse": "tsx sse_client.ts",
+    "ws": "tsx ws_client.ts",
+    "poll": "tsx poll_client.ts",
+    "webhook": "tsx webhook_receiver.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
