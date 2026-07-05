@@ -6,12 +6,14 @@
 }
 
 /* Event marker rendered inside a Leaflet divIcon. Color is per-category via the
-   --ws-c custom property set inline on the span. */
+   --ws-c custom property; --ws-s (px) sizes the dot by severity. Both are set
+   inline on the span. */
 .ws-pulse {
   --ws-c: #2f6df6;
+  --ws-s: 14px;
   display: block;
-  width: 14px;
-  height: 14px;
+  width: var(--ws-s);
+  height: var(--ws-s);
   border-radius: 50%;
   background: var(--ws-c);
   box-shadow: 0 0 10px 2px color-mix(in srgb, var(--ws-c) 75%, transparent);
@@ -21,6 +23,24 @@
 /* Newly ingested events ripple a few times in their category color. */
 .ws-pulse-new {
   animation: ws-pulse-ring 1.8s ease-out 4;
+}
+
+/* New high-severity (HIGH/CRITICAL) events get a louder, larger, longer ripple
+   to read as "breaking". Overrides ws-pulse-new's animation. */
+.ws-pulse-breaking {
+  animation: ws-pulse-breaking 1.4s ease-out 6;
+}
+
+@keyframes ws-pulse-breaking {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ws-c) 90%, transparent), 0 0 14px 3px color-mix(in srgb, var(--ws-c) 85%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 40px color-mix(in srgb, var(--ws-c) 0%, transparent), 0 0 14px 3px color-mix(in srgb, var(--ws-c) 85%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ws-c) 0%, transparent), 0 0 14px 3px color-mix(in srgb, var(--ws-c) 85%, transparent);
+  }
 }
 
 @keyframes ws-pulse-ring {
