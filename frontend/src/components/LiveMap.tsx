@@ -6,10 +6,18 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import "leaflet.heat";
 import "./LiveMap.css";
-import { countryOutline } from "../lib/boundaries";
+import { allCountryOutlines, countryOutline } from "../lib/boundaries";
 import { markerSize, ringWidth, sentimentColor, severityRank } from "../lib/liveMarkers";
 
-export type MapMode = "pins" | "cluster" | "heat";
+export type MapMode = "pins" | "cluster" | "heat" | "regions";
+
+/** Choropleth inputs: fill color per country (null ⇒ no data), a tooltip, and a
+ * click handler. Supplied by the dashboard when `mode === "regions"`. */
+export interface RegionLayer {
+  fill: (alpha2: string) => string | null;
+  tooltip: (alpha2: string) => string;
+  onSelect?: (alpha2: string) => void;
+}
 
 export interface MapMarker {
   id: string;
@@ -70,6 +78,7 @@ export function LiveMap({
   mode = "pins",
   flyTo = null,
   sentimentTint = false,
+  regions = null,
 }: {
   markers: MapMarker[];
   center: [number, number];
@@ -80,6 +89,7 @@ export function LiveMap({
   mode?: MapMode;
   flyTo?: { lat: number; lng: number; nonce: number } | null; // pan/zoom to a marker (ticker click)
   sentimentTint?: boolean; // color marker borders by sentiment
+  regions?: RegionLayer | null; // choropleth fills when mode === "regions"
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -152,6 +162,27 @@ export function LiveMap({
       map.removeLayer(displayRef.current);
       displayRef.current = null;
     }
+    if (mode === "regions" && regions) {
+      // Choropleth: paint every country polygon by the metric fill. Markers are
+      // hidden. Boundaries load lazily (cached); guard against a stale group if
+      // the mode changed before they resolved.
+      const group = L.layerGroup();
+      displayRef.current = group.addTo(map);
+      void allCountryOutlines().then((fmap) => {
+        if (displayRef.current !== group) return;
+        for (const [alpha2, feature] of fmap) {
+          const fill = regions.fill(alpha2);
+          const layer = L.geoJSON(feature, {
+            style: { color: "#ffffff", weight: 0.5, opacity: fill ? 0.5 : 0.12, fillColor: fill ?? "#888888", fillOpacity: fill ? 0.72 : 0 },
+          });
+          if (fill) layer.bindTooltip(regions.tooltip(alpha2), { sticky: true });
+          const onSelectCountry = regions.onSelect;
+          if (onSelectCountry) layer.on("click", () => onSelectCountry(alpha2));
+          group.addLayer(layer);
+        }
+      });
+      return;
+    }
     if (mode === "heat") {
       const points = markers.map((m) => [m.lat, m.lng, heatWeight(m)] as [number, number, number]);
       displayRef.current = L.heatLayer(points, { radius: 25, blur: 18, maxZoom: 8, minOpacity: 0.3 }).addTo(map);
@@ -160,7 +191,7 @@ export function LiveMap({
     const group = mode === "cluster" ? L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 }) : L.layerGroup();
     for (const m of markers) group.addLayer(buildMarker(m, onSelect, sentimentTint));
     displayRef.current = group.addTo(map);
-  }, [markers, mode, onSelect, sentimentTint]);
+  }, [markers, mode, onSelect, sentimentTint, regions]);
 
   return <div ref={containerRef} data-testid="live-map" style={{ height, width: "100%", borderRadius: 8, overflow: "hidden" }} />;
 }

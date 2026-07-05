@@ -24,8 +24,8 @@ vi.mock("@mantine/notifications", async (importOriginal) => {
 // Stub the Leaflet map; expose a button to trigger onSelect for the first marker
 // and reflect the active view mode.
 vi.mock("../components/LiveMap", () => ({
-  LiveMap: ({ markers, center, zoom, onSelect, focus, mode, flyTo, sentimentTint }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void; focus?: string | null; mode?: string; flyTo?: { lat: number; lng: number } | null; sentimentTint?: boolean }) => (
-    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")} data-focus={focus ?? ""} data-mode={mode ?? "pins"} data-flyto={flyTo ? `${flyTo.lat},${flyTo.lng}` : ""} data-tint={sentimentTint ? "1" : ""}>
+  LiveMap: ({ markers, center, zoom, onSelect, focus, mode, flyTo, sentimentTint, regions }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void; focus?: string | null; mode?: string; flyTo?: { lat: number; lng: number } | null; sentimentTint?: boolean; regions?: unknown }) => (
+    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")} data-focus={focus ?? ""} data-mode={mode ?? "pins"} data-flyto={flyTo ? `${flyTo.lat},${flyTo.lng}` : ""} data-tint={sentimentTint ? "1" : ""} data-regions={regions ? "1" : ""}>
       {markers[0] && <button data-testid="map-pick" onClick={() => onSelect?.(markers[0].id)}>pick</button>}
     </div>
   ),
@@ -331,6 +331,30 @@ describe("LiveDashboard", () => {
     expect(map).toHaveAttribute("data-tint", ""); // off by default
     fireEvent.click(screen.getByTestId("sentiment-toggle"));
     await waitFor(() => expect(map).toHaveAttribute("data-tint", "1"));
+  });
+
+  it("switches to Regions (choropleth) mode with a metric select and legend", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "", sentiment: "NEGATIVE" },
+      { id: "s2", title: "FR AI", country: "FR", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "", sentiment: "POSITIVE" },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    const map = await screen.findByTestId("map");
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
+    // No choropleth chrome in pins mode.
+    expect(screen.queryByTestId("choropleth-legend")).toBeNull();
+    expect(screen.queryByTestId("live-metric")).toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Regions" }));
+    await waitFor(() => expect(map).toHaveAttribute("data-mode", "regions"));
+    expect(map).toHaveAttribute("data-regions", "1"); // region layer supplied
+    expect(screen.getByTestId("choropleth-legend")).toHaveTextContent("Signals per country"); // count default
+    expect(screen.getByTestId("live-metric")).toBeInTheDocument();
+
+    // Switch the metric → legend updates.
+    fireEvent.click(screen.getByTestId("live-metric"));
+    fireEvent.click(await screen.findByRole("option", { name: "By sentiment", hidden: true }));
+    await waitFor(() => expect(screen.getByTestId("choropleth-legend")).toHaveTextContent("Net sentiment"));
   });
 
   it("collapses the live pulse panel", async () => {

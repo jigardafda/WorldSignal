@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ActionIcon, Anchor, Badge, Checkbox, ColorSwatch, Group, Paper, SegmentedControl, Select, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
@@ -7,11 +7,14 @@ import { api, type LiveSignal, type TaxonomyNode } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useCountries } from "../lib/countries";
 import { CountrySelect } from "../components/CountrySelect";
-import { LiveMap, type MapMarker, type MapMode } from "../components/LiveMap";
+import { LiveMap, type MapMarker, type MapMode, type RegionLayer } from "../components/LiveMap";
 import { LivePulse } from "../components/LivePulse";
 import { LiveTicker } from "../components/LiveTicker";
 import { ReplayBar } from "../components/ReplayBar";
+import { ChoroplethLegend } from "../components/ChoroplethLegend";
 import { SignalDrawer } from "../components/SignalDrawer";
+import { aggregateByCountry, fillFor, metricMax, metricValue, type Metric } from "../lib/choropleth";
+import { countryDisplay } from "../lib/countries";
 import { jitter } from "../lib/geo";
 import { geocode, preloadGeo } from "../lib/geocode";
 import { CATEGORIES, categoryColor, categoryLabel, domainOf } from "../lib/categories";
@@ -28,8 +31,16 @@ const VIEWS: { value: MapMode; label: string }[] = [
   { value: "pins", label: "Pins" },
   { value: "cluster", label: "Clusters" },
   { value: "heat", label: "Heat" },
+  { value: "regions", label: "Regions" },
 ];
-const isMode = (v: string | null): v is MapMode => v === "cluster" || v === "heat";
+const isMode = (v: string | null): v is MapMode => v === "cluster" || v === "heat" || v === "regions";
+
+const METRIC_OPTIONS = [
+  { value: "count", label: "By count" },
+  { value: "severity", label: "By severity" },
+  { value: "sentiment", label: "By sentiment" },
+];
+const isMetric = (v: string | null): v is Metric => v === "count" || v === "severity" || v === "sentiment";
 
 const INFLUENCE_OPTIONS = [
   { value: "all", label: "All influence" },
@@ -84,8 +95,10 @@ export function LiveDashboard() {
   const [params, setParams] = useSearchParams();
   const windowMin = params.get("w") ?? "60";
   const country = params.get("country");
-  const disabledDomains = new Set((params.get("off") ?? "").split(",").filter(Boolean));
-  const disabledLeaves = new Set((params.get("offsub") ?? "").split(",").filter(Boolean));
+  const offParam = params.get("off") ?? "";
+  const offsubParam = params.get("offsub") ?? "";
+  const disabledDomains = useMemo(() => new Set(offParam.split(",").filter(Boolean)), [offParam]);
+  const disabledLeaves = useMemo(() => new Set(offsubParam.split(",").filter(Boolean)), [offsubParam]);
 
   const update = (mut: (p: URLSearchParams) => void) =>
     setParams(
@@ -106,6 +119,16 @@ export function LiveDashboard() {
   const influence = params.get("infl") ?? ""; // "" (all) | "MEDIUM" | "HIGH"
   const setInfluence = (v: string) => setOne("infl", v === "all" ? "" : v);
   const minInfluenceRank = influenceRank(influence);
+  const metric: Metric = isMetric(params.get("metric")) ? (params.get("metric") as Metric) : "count";
+  const setMetric = (v: string) => setOne("metric", v === "count" ? "" : v); // count = default → omit
+  // Stable refs so the memoized choropleth layer's click handler and tooltip use
+  // the latest country setter / lookup without re-running the memo each render.
+  const selectCountryRef = useRef<(v: string | null) => void>(() => {});
+  const byCodeRef = useRef(byCode);
+  useEffect(() => {
+    selectCountryRef.current = (v) => setOne("country", v ?? "");
+    byCodeRef.current = byCode;
+  });
 
   const toggleDomain = (code: string) =>
     update((p) => {
@@ -261,19 +284,47 @@ export function LiveDashboard() {
   const center: [number, number] = sel && (sel.capitalLat || sel.capitalLng) ? [sel.capitalLat, sel.capitalLng] : WORLD_CENTER;
   const zoom = sel ? 5 : 2;
 
-  const inCountry = country ? markers.filter((m) => m.country === country) : markers;
+  const inCountry = useMemo(() => (country ? markers.filter((m) => m.country === country) : markers), [markers, country]);
   const domainCount: Record<string, number> = {};
   const leafCount: Record<string, number> = {};
   for (const m of inCountry) {
     domainCount[m.category] = (domainCount[m.category] ?? 0) + 1;
     if (m.leaf) leafCount[m.leaf] = (leafCount[m.leaf] ?? 0) + 1;
   }
-  const shown = inCountry.filter(
-    (m) =>
-      !disabledDomains.has(m.category) &&
-      !disabledLeaves.has(m.leaf) &&
-      (minInfluenceRank === 0 || influenceRank(m.influence) >= minInfluenceRank),
+  const shown = useMemo(
+    () =>
+      inCountry.filter(
+        (m) =>
+          !disabledDomains.has(m.category) &&
+          !disabledLeaves.has(m.leaf) &&
+          (minInfluenceRank === 0 || influenceRank(m.influence) >= minInfluenceRank),
+      ),
+    [inCountry, disabledDomains, disabledLeaves, minInfluenceRank],
   );
+
+  // Choropleth layer (only in Regions mode): aggregate the visible set by country
+  // and derive per-country fill/tooltip. Memoized so it rebuilds only on data or
+  // metric change, not on every render (it repaints ~180 polygons).
+  const regions = useMemo<RegionLayer | null>(() => {
+    if (view !== "regions") return null;
+    const agg = aggregateByCountry(shown);
+    const max = metricMax(agg.values(), metric);
+    const label = (a: string) => countryDisplay(a, byCodeRef.current);
+    const valueText = (v: number) =>
+      metric === "count" ? `${v}` : metric === "severity" ? `${Math.round(v * 100)}% high` : `${v > 0 ? "+" : ""}${v.toFixed(2)}`;
+    return {
+      fill: (a) => {
+        const x = agg.get(a);
+        return x ? fillFor(metricValue(x, metric), metric, max) : null;
+      },
+      tooltip: (a) => {
+        const x = agg.get(a);
+        return x ? `${label(a)} — ${x.count} signal${x.count === 1 ? "" : "s"}, ${valueText(metricValue(x, metric))}` : label(a);
+      },
+      onSelect: (a) => selectCountryRef.current(a),
+    };
+  }, [view, shown, metric]);
+
   const windowMs = Number(windowMin) * 60_000;
   // During replay the map shows the frozen window up to the playhead; otherwise
   // the live set. Layer/country filters apply either way (they shape `shown`).
@@ -316,13 +367,17 @@ export function LiveDashboard() {
             <IconMoodSmile size={16} />
           </ActionIcon>
           <SegmentedControl size="xs" data={VIEWS} value={view} onChange={setView} data-testid="live-view" />
+          {view === "regions" && (
+            <Select data={METRIC_OPTIONS} value={metric} onChange={(v) => setMetric(v ?? "count")} allowDeselect={false} w={140} data-testid="live-metric" />
+          )}
           <Select data={INFLUENCE_OPTIONS} value={influence || "all"} onChange={(v) => setInfluence(v ?? "all")} allowDeselect={false} w={140} data-testid="live-influence" />
           <Select data={WINDOWS} value={windowMin} onChange={(v) => setWindowMin(v ?? "60")} allowDeselect={false} w={150} data-testid="live-window" />
           <CountrySelect placeholder="Whole world" value={country} onChange={setCountry} data-testid="live-country" />
         </Group>
       </Group>
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        <LiveMap markers={displayMarkers} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} flyTo={flyTo} sentimentTint={sentimentTint} />
+        <LiveMap markers={displayMarkers} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} flyTo={flyTo} sentimentTint={sentimentTint} regions={regions} />
+        {view === "regions" && <ChoroplethLegend metric={metric} max={metricMax(aggregateByCountry(shown).values(), metric)} />}
         {replay.on && (
           <ReplayBar
             playing={replayCtl.playing}

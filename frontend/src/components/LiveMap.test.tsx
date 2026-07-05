@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 
-vi.mock("../lib/boundaries", () => ({
-  countryOutline: vi.fn(async (code: string) =>
-    code === "FR" ? { type: "Feature", id: "250", properties: {}, geometry: { type: "Polygon", coordinates: [] } } : null,
-  ),
-}));
+vi.mock("../lib/boundaries", () => {
+  const f = (id: string) => ({ type: "Feature", id, properties: {}, geometry: { type: "Polygon", coordinates: [] } });
+  return {
+    countryOutline: vi.fn(async (code: string) => (code === "FR" ? f("250") : null)),
+    allCountryOutlines: vi.fn(async () => new Map([["US", f("840")], ["FR", f("250")]])),
+  };
+});
 
 // The Leaflet plugins attach to the real L at import time; in tests we stub them
 // out and expose markerClusterGroup / heatLayer on the mocked L instead.
@@ -41,7 +43,7 @@ vi.mock("leaflet", () => {
       marker: vi.fn(() => chain()),
       divIcon: vi.fn(() => ({})),
       geoJSON: vi.fn(() => {
-        const o: Record<string, unknown> = { remove: vi.fn(), getBounds: vi.fn(() => ({})) };
+        const o: Record<string, unknown> = { remove: vi.fn(), getBounds: vi.fn(() => ({})), bindTooltip: vi.fn(() => o), on: vi.fn(() => o) };
         o.addTo = vi.fn(() => o);
         return o;
       }),
@@ -114,6 +116,24 @@ describe("LiveMap", () => {
     const html = iconHtmls().at(-1)!;
     expect(html).toContain("ws-tint");
     expect(html).toContain("--ws-a:#e03131"); // NEGATIVE ⇒ red
+  });
+
+  it("paints country polygons (not markers) in regions mode", async () => {
+    const regions = {
+      fill: (a: string) => (a === "US" ? "#1c4ea8" : null), // US has data, FR does not
+      tooltip: (a: string) => `${a} tooltip`,
+      onSelect: vi.fn(),
+    };
+    render(<LiveMap markers={[m("a"), m("b")]} center={[0, 0]} zoom={2} mode="regions" regions={regions} />);
+    // A layer group is used; no pins are plotted.
+    expect(vi.mocked(L.layerGroup)).toHaveBeenCalled();
+    expect(vi.mocked(L.marker)).not.toHaveBeenCalled();
+    // Boundaries load async, then one geoJSON layer per country is created.
+    await waitFor(() => expect(vi.mocked(L.geoJSON)).toHaveBeenCalledTimes(2));
+    // The data country (US) gets a tooltip; a click handler is wired.
+    const layers = vi.mocked(L.geoJSON).mock.results.map((r) => r.value as Record<string, unknown>);
+    const tooltipped = layers.filter((l) => (l.bindTooltip as Mock).mock.calls.length > 0);
+    expect(tooltipped).toHaveLength(1);
   });
 
   it("uses a marker-cluster group in cluster mode", () => {
