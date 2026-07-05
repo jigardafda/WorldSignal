@@ -59,6 +59,7 @@ export function LiveMap({
   onSelect,
   focus = null,
   mode = "pins",
+  flyTo = null,
 }: {
   markers: MapMarker[];
   center: [number, number];
@@ -67,6 +68,7 @@ export function LiveMap({
   onSelect?: (id: string) => void;
   focus?: string | null; // ISO alpha-2 country code to outline, or null
   mode?: MapMode;
+  flyTo?: { lat: number; lng: number; nonce: number } | null; // pan/zoom to a marker (ticker click)
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -94,6 +96,14 @@ export function LiveMap({
   useEffect(() => {
     mapRef.current?.setView(center, zoom);
   }, [center, zoom]);
+
+  // Fly to a specific marker when asked (e.g. clicking a live-ticker row). The
+  // nonce makes repeated clicks on the same marker re-trigger the animation.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !flyTo) return;
+    map.flyTo([flyTo.lat, flyTo.lng], Math.max(map.getZoom(), 5), { duration: 0.8 });
+  }, [flyTo]);
 
   // Outline the selected country's actual border (lazy-loaded boundaries) and
   // frame the map to it. Clears when no country is selected.

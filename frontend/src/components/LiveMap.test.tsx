@@ -16,6 +16,8 @@ vi.mock("leaflet", () => {
   const mapObj: Record<string, unknown> = {};
   mapObj.setView = vi.fn(() => mapObj);
   mapObj.fitBounds = vi.fn(() => mapObj);
+  mapObj.flyTo = vi.fn(() => mapObj);
+  mapObj.getZoom = vi.fn(() => 2);
   mapObj.remove = vi.fn();
   mapObj.removeLayer = vi.fn();
   const groupFactory = () => {
@@ -116,6 +118,14 @@ describe("LiveMap", () => {
     expect(points).toHaveLength(2);
     expect(points[0][2]).toBeCloseTo(1, 5); // CRITICAL (rank 3 ⇒ (3+1)/4=1) × opacity 1
     expect(points[1][2]).toBeCloseTo(0.125, 5); // LOW (rank 0 ⇒ 1/4=0.25) × opacity 0.5
+  });
+
+  it("flies to a marker when flyTo changes", () => {
+    const { rerender } = render(<LiveMap markers={[]} center={[0, 0]} zoom={2} flyTo={null} />);
+    const map = vi.mocked(L.map).mock.results.at(-1)!.value as Record<string, unknown>;
+    expect(map.flyTo as Mock).not.toHaveBeenCalled();
+    rerender(<LiveMap markers={[]} center={[0, 0]} zoom={2} flyTo={{ lat: 48, lng: 2, nonce: 1 }} />);
+    expect(map.flyTo as Mock).toHaveBeenCalledWith([48, 2], 5, expect.objectContaining({ duration: 0.8 }));
   });
 
   it("invokes onSelect with the marker id on click", () => {

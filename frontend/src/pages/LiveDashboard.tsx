@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ActionIcon, Anchor, Badge, Checkbox, ColorSwatch, Group, Paper, SegmentedControl, Select, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconAlertTriangle, IconBroadcast, IconChevronDown, IconChevronUp, IconStack2, IconWifiOff } from "@tabler/icons-react";
+import { IconActivity, IconAlertTriangle, IconBroadcast, IconChevronDown, IconChevronUp, IconStack2, IconWifiOff } from "@tabler/icons-react";
 import { api, type LiveSignal, type TaxonomyNode } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useCountries } from "../lib/countries";
 import { CountrySelect } from "../components/CountrySelect";
 import { LiveMap, type MapMarker, type MapMode } from "../components/LiveMap";
+import { LivePulse } from "../components/LivePulse";
+import { LiveTicker } from "../components/LiveTicker";
 import { SignalDrawer } from "../components/SignalDrawer";
 import { jitter } from "../lib/geo";
 import { geocode, preloadGeo } from "../lib/geocode";
@@ -51,7 +53,7 @@ const WINDOWS = [
   { value: "1440", label: "Last 24 hours" },
 ];
 
-type MarkerRec = MapMarker & { country: string; category: string; leaf: string };
+type MarkerRec = MapMarker & { country: string; category: string; leaf: string; lastSeenMs: number };
 
 function setOrDelete(p: URLSearchParams, key: string, value: string) {
   if (value) p.set(key, value);
@@ -116,6 +118,14 @@ export function LiveDashboard() {
   const [lastUpdate, setLastUpdate] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(true);
+  const [pulseOpen, setPulseOpen] = useState(true);
+  const [flyTo, setFlyTo] = useState<{ lat: number; lng: number; nonce: number } | null>(null);
+  const flyNonce = useRef(0);
+  // Clicking a ticker row opens the signal and flies the map to its marker.
+  const pickMarker = (r: MarkerRec) => {
+    setSelectedId(r.id);
+    setFlyTo({ lat: r.lat, lng: r.lng, nonce: ++flyNonce.current });
+  };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleExpand = (code: string) =>
     setExpanded((prev) => {
@@ -180,6 +190,7 @@ export function LiveDashboard() {
           country: s.country, category, leaf: s.eventType ?? "",
           severity: s.severity, opacity: recencyOpacity(s.lastSeenAt, now, windowMs),
           breaking: isBreaking(s.severity), isNew: flagNew && !prev.has(s.id),
+          lastSeenMs: Date.parse(s.lastSeenAt ?? "") || 0,
         });
         ids.add(s.id);
       }
@@ -234,6 +245,7 @@ export function LiveDashboard() {
     if (m.leaf) leafCount[m.leaf] = (leafCount[m.leaf] ?? 0) + 1;
   }
   const shown = inCountry.filter((m) => !disabledDomains.has(m.category) && !disabledLeaves.has(m.leaf));
+  const windowMs = Number(windowMin) * 60_000;
 
   return (
     <div style={{ height: "calc(100dvh - 56px)", display: "flex", flexDirection: "column" }} data-testid="live-dashboard">
@@ -252,7 +264,34 @@ export function LiveDashboard() {
         </Group>
       </Group>
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} />
+        <LiveMap markers={shown} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} flyTo={flyTo} />
+        <Paper
+          withBorder
+          shadow="md"
+          radius="md"
+          p="xs"
+          style={{ position: "absolute", top: 12, left: 12, zIndex: 1000, width: 260, maxHeight: "calc(100% - 24px)", display: "flex", flexDirection: "column" }}
+          data-testid="live-pulse-panel"
+        >
+          <Group justify="space-between" wrap="nowrap" mb={pulseOpen ? 6 : 0}>
+            <Group gap={6} wrap="nowrap">
+              <IconActivity size={15} />
+              <Text size="xs" fw={700}>Live pulse</Text>
+            </Group>
+            <ActionIcon variant="subtle" size="sm" onClick={() => setPulseOpen((o) => !o)} aria-label="Toggle pulse" data-testid="pulse-toggle">
+              {pulseOpen ? <IconChevronUp size={15} /> : <IconChevronDown size={15} />}
+            </ActionIcon>
+          </Group>
+          {pulseOpen && (
+            <>
+              <LivePulse recs={inCountry} windowMs={windowMs} byCode={byCode} />
+              <Text size="xs" tt="uppercase" c="dimmed" fw={700} mt={8} mb={2}>Latest</Text>
+              <div style={{ overflowY: "auto", minHeight: 0 }}>
+                <LiveTicker recs={shown} onPick={pickMarker} />
+              </div>
+            </>
+          )}
+        </Paper>
         <Paper
           withBorder
           shadow="md"

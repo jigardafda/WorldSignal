@@ -24,8 +24,8 @@ vi.mock("@mantine/notifications", async (importOriginal) => {
 // Stub the Leaflet map; expose a button to trigger onSelect for the first marker
 // and reflect the active view mode.
 vi.mock("../components/LiveMap", () => ({
-  LiveMap: ({ markers, center, zoom, onSelect, focus, mode }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void; focus?: string | null; mode?: string }) => (
-    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")} data-focus={focus ?? ""} data-mode={mode ?? "pins"}>
+  LiveMap: ({ markers, center, zoom, onSelect, focus, mode, flyTo }: { markers: { id: string }[]; center: [number, number]; zoom: number; onSelect?: (id: string) => void; focus?: string | null; mode?: string; flyTo?: { lat: number; lng: number } | null }) => (
+    <div data-testid="map" data-count={markers.length} data-zoom={zoom} data-center={center.join(",")} data-focus={focus ?? ""} data-mode={mode ?? "pins"} data-flyto={flyTo ? `${flyTo.lat},${flyTo.lng}` : ""}>
       {markers[0] && <button data-testid="map-pick" onClick={() => onSelect?.(markers[0].id)}>pick</button>}
     </div>
   ),
@@ -229,6 +229,44 @@ describe("LiveDashboard", () => {
     expect(await screen.findByTestId("live-offline")).toBeInTheDocument();
     act(() => { window.dispatchEvent(new Event("online")); });
     await waitFor(() => expect(screen.queryByTestId("live-offline")).toBeNull());
+  });
+
+  it("renders the live ticker + pulse and flies to a marker on ticker click", async () => {
+    const iso = (secsAgo: number) => new Date(Date.now() - secsAgo * 1000).toISOString();
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "CRITICAL", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: iso(5) },
+      { id: "s2", title: "FR strike", country: "FR", severity: "LOW", eventType: "CONFLICT.PROTEST", lastSeenAt: iso(90) },
+    ]);
+    apiMock.signal.mockResolvedValue({
+      id: "s1", title: "US quake detail", summary: "Big one.", whatHappened: null, whyItMatters: null,
+      status: "CONFIRMED", severity: "CRITICAL", confidence: 0.9, eventType: "DISASTER.EARTHQUAKE",
+      country: "US", region: null, city: null, sentiment: null, influence: null, relevance: null,
+      language: "en", translated: false, originalTitle: null, originalSummary: null,
+      sourceCount: 1, firstSeenAt: "", lastSeenAt: "", tags: [], sources: [], attributes: [],
+    });
+    renderWithProviders(<LiveDashboard />);
+    await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "2"));
+
+    // Pulse velocity counts the event seen in the last 60s (s1 only).
+    expect(screen.getByTestId("pulse-velocity")).toHaveTextContent("1");
+    // Ticker lists newest-first; s1 (5s ago) before s2 (90s ago).
+    const ticker = screen.getByTestId("live-ticker");
+    const order = within(ticker).getAllByTestId(/^ticker-/).map((el) => el.getAttribute("data-testid"));
+    expect(order).toEqual(["ticker-s1", "ticker-s2"]);
+
+    // Clicking a ticker row opens the drawer and flies the map to that marker.
+    fireEvent.click(screen.getByTestId("ticker-s1"));
+    expect(await screen.findByText("US quake detail")).toBeInTheDocument();
+    expect(screen.getByTestId("map").getAttribute("data-flyto")).toMatch(/-?\d/); // coords set
+  });
+
+  it("collapses the live pulse panel", async () => {
+    apiMock.liveSignals.mockResolvedValue([]);
+    renderWithProviders(<LiveDashboard />);
+    await screen.findByTestId("live-pulse-panel");
+    expect(screen.getByTestId("pulse-velocity")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("pulse-toggle"));
+    await waitFor(() => expect(screen.queryByTestId("pulse-velocity")).toBeNull());
   });
 
   it("toasts newly-arrived breaking signals and caches each poll", async () => {
