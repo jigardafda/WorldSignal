@@ -10,6 +10,7 @@ interface GlobeProps {
   ringsData: unknown[];
   polygonsData: unknown[];
   onPointClick?: (d: unknown) => void;
+  polygonCapColor?: (d: unknown) => string;
 }
 vi.mock("react-globe.gl", () => {
   const Globe = forwardRef<unknown, GlobeProps>((props, ref) => {
@@ -21,6 +22,7 @@ vi.mock("react-globe.gl", () => {
         data-arcs={props.arcsData.length}
         data-rings={props.ringsData.length}
         data-polygons={props.polygonsData.length}
+        data-cap0={props.polygonsData[0] ? props.polygonCapColor?.(props.polygonsData[0]) : ""}
       >
         <button data-testid="globe-pick" onClick={() => props.onPointClick?.(props.pointsData[0])}>pick</button>
       </div>
@@ -57,5 +59,13 @@ describe("LiveGlobe", () => {
   it("rings breaking arrivals", () => {
     render(<LiveGlobe markers={[marker("a", { breaking: true, isNew: true }), marker("b")]} />);
     expect(screen.getByTestId("globe-canvas")).toHaveAttribute("data-rings", "1");
+  });
+
+  it("colors country polygons from the choropleth fill and hides points", async () => {
+    render(<LiveGlobe markers={[marker("a")]} polygonFill={(alpha2) => (alpha2 === "US" ? "#123456" : null)} hidePoints />);
+    const canvas = screen.getByTestId("globe-canvas");
+    expect(canvas).toHaveAttribute("data-points", "0"); // points hidden in choropleth sub-mode
+    // The US polygon (feature id 840 → alpha2 US) gets the fill color once boundaries load.
+    await waitFor(() => expect(canvas.getAttribute("data-cap0")).toBe("#123456"));
   });
 });

@@ -17,8 +17,8 @@ const { cacheMock, notifyMock } = vi.hoisted(() => ({
 }));
 // The 3D globe is lazy-loaded (three.js) — stub it so the view can be exercised.
 vi.mock("../components/LiveGlobe", () => ({
-  default: ({ markers, sentimentTint }: { markers: { id: string }[]; sentimentTint?: boolean }) => (
-    <div data-testid="live-globe-mock" data-count={markers.length} data-tint={sentimentTint ? "1" : ""} />
+  default: ({ markers, sentimentTint, polygonFill, hidePoints }: { markers: { id: string }[]; sentimentTint?: boolean; polygonFill?: unknown; hidePoints?: boolean }) => (
+    <div data-testid="live-globe-mock" data-count={markers.length} data-tint={sentimentTint ? "1" : ""} data-fill={polygonFill ? "1" : ""} data-hidepoints={hidePoints ? "1" : ""} />
   ),
 }));
 
@@ -374,8 +374,20 @@ describe("LiveDashboard", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: "Globe" }));
     // The lazy globe resolves and receives the same displayMarkers; the 2D map unmounts.
-    expect(await screen.findByTestId("live-globe-mock")).toHaveAttribute("data-count", "2");
+    const globe = await screen.findByTestId("live-globe-mock");
+    expect(globe).toHaveAttribute("data-count", "2");
     expect(screen.queryByTestId("map")).toBeNull();
+
+    // Default is the plain points globe — no choropleth fill, no legend.
+    expect(globe).toHaveAttribute("data-fill", "");
+    expect(screen.queryByTestId("choropleth-legend")).toBeNull();
+
+    // Choosing a metric colors the polygons, hides points, and shows the legend.
+    fireEvent.click(screen.getByTestId("globe-metric"));
+    fireEvent.click(await screen.findByRole("option", { name: "By count", hidden: true }));
+    await waitFor(() => expect(screen.getByTestId("live-globe-mock")).toHaveAttribute("data-fill", "1"));
+    expect(screen.getByTestId("live-globe-mock")).toHaveAttribute("data-hidepoints", "1");
+    expect(screen.getByTestId("choropleth-legend")).toHaveTextContent("Signals per country");
   });
 
   it("collapses the live pulse panel", async () => {

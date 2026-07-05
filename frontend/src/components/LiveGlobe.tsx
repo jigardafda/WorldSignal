@@ -9,9 +9,12 @@ export interface LiveGlobeProps {
   sentimentTint?: boolean;
   focusLatLng?: [number, number] | null; // rotate to a selected country
   flyTo?: { lat: number; lng: number; nonce: number } | null; // rotate to a ticker-picked marker
+  polygonFill?: ((alpha2: string) => string | null) | null; // choropleth: country → hex (Phase 2)
+  hidePoints?: boolean; // hide markers when the choropleth coloring is active
 }
 
 const BG = "#0b1220";
+const CAP_PLAIN = "rgba(56,78,120,0.35)";
 
 /** 3D globe view (react-globe.gl / three.js). Renders the world as country
  * polygons (no external texture — CSP/offline-safe), plots live signals as
@@ -19,11 +22,12 @@ const BG = "#0b1220";
  * activity thread as arcs, and pulses breaking arrivals as rings. Auto-rotates
  * until the user interacts. Lazy-loaded, so three only ships to Globe users.
  * WebGL doesn't run in jsdom, so this is browser-verified; tests mock the lib. */
-export default function LiveGlobe({ markers, onSelect, sentimentTint = false, focusLatLng = null, flyTo = null }: LiveGlobeProps) {
+export default function LiveGlobe({ markers, onSelect, sentimentTint = false, focusLatLng = null, flyTo = null, polygonFill = null, hidePoints = false }: LiveGlobeProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [polygons, setPolygons] = useState<GeoJSON.Feature[]>([]);
+  const [idAlpha2, setIdAlpha2] = useState<Map<string, string>>(new Map()); // feature.id → ISO alpha-2
 
   // Track the container size (react-globe.gl needs explicit width/height).
   useEffect(() => {
@@ -40,7 +44,15 @@ export default function LiveGlobe({ markers, onSelect, sentimentTint = false, fo
   useEffect(() => {
     let active = true;
     void allCountryOutlines().then((fmap) => {
-      if (active) setPolygons([...fmap.values()]);
+      if (!active) return;
+      const features: GeoJSON.Feature[] = [];
+      const idMap = new Map<string, string>();
+      for (const [alpha2, feature] of fmap) {
+        features.push(feature);
+        if (feature.id != null) idMap.set(String(feature.id), alpha2);
+      }
+      setPolygons(features);
+      setIdAlpha2(idMap);
     });
     return () => {
       active = false;
@@ -70,6 +82,13 @@ export default function LiveGlobe({ markers, onSelect, sentimentTint = false, fo
   const arcs = useMemo(() => toArcs(markers), [markers]);
   const rings = useMemo(() => toRings(markers), [markers]);
 
+  // Choropleth cap color for a polygon (null ⇒ plain), resolving feature id → alpha-2.
+  const capFor = (d: object): string | null => {
+    if (!polygonFill) return null;
+    const alpha2 = idAlpha2.get(String((d as GeoJSON.Feature).id));
+    return alpha2 ? polygonFill(alpha2) : null;
+  };
+
   return (
     <div ref={wrapRef} data-testid="live-globe" style={{ width: "100%", height: "100%", background: BG }}>
       <Globe
@@ -80,11 +99,11 @@ export default function LiveGlobe({ markers, onSelect, sentimentTint = false, fo
         showAtmosphere
         atmosphereColor="#3b6ea5"
         polygonsData={polygons}
-        polygonAltitude={0.006}
-        polygonCapColor={() => "rgba(56,78,120,0.35)"}
+        polygonAltitude={(d) => (capFor(d) ? 0.012 : 0.006)}
+        polygonCapColor={(d) => capFor(d) ?? CAP_PLAIN}
         polygonSideColor={() => "rgba(0,0,0,0)"}
         polygonStrokeColor={() => "rgba(150,175,220,0.45)"}
-        pointsData={points}
+        pointsData={hidePoints ? [] : points}
         pointLat="lat"
         pointLng="lng"
         pointColor="color"

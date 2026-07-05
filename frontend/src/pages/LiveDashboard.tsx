@@ -45,6 +45,7 @@ const METRIC_OPTIONS = [
   { value: "severity", label: "By severity" },
   { value: "sentiment", label: "By sentiment" },
 ];
+const GLOBE_METRIC_OPTIONS = [{ value: "points", label: "Points" }, ...METRIC_OPTIONS];
 const isMetric = (v: string | null): v is Metric => v === "count" || v === "severity" || v === "sentiment";
 
 const INFLUENCE_OPTIONS = [
@@ -126,6 +127,9 @@ export function LiveDashboard() {
   const minInfluenceRank = influenceRank(influence);
   const metric: Metric = isMetric(params.get("metric")) ? (params.get("metric") as Metric) : "count";
   const setMetric = (v: string) => setOne("metric", v === "count" ? "" : v); // count = default → omit
+  // Globe choropleth: null ⇒ plain points globe; a metric ⇒ color country polygons.
+  const globeMetric: Metric | null = isMetric(params.get("gmetric")) ? (params.get("gmetric") as Metric) : null;
+  const setGlobeMetric = (v: string) => setOne("gmetric", v === "points" ? "" : v); // points = default → omit
   // Stable refs so the memoized choropleth layer's click handler and tooltip use
   // the latest country setter / lookup without re-running the memo each render.
   const selectCountryRef = useRef<(v: string | null) => void>(() => {});
@@ -330,6 +334,17 @@ export function LiveDashboard() {
     };
   }, [view, shown, metric]);
 
+  // Globe choropleth fill: alpha-2 → hex, from the same metric aggregation.
+  const globePolygonFill = useMemo<((alpha2: string) => string | null) | null>(() => {
+    if (view !== "globe" || !globeMetric) return null;
+    const agg = aggregateByCountry(shown);
+    const max = metricMax(agg.values(), globeMetric);
+    return (alpha2) => {
+      const x = agg.get(alpha2);
+      return x ? fillFor(metricValue(x, globeMetric), globeMetric, max) : null;
+    };
+  }, [view, shown, globeMetric]);
+
   const windowMs = Number(windowMin) * 60_000;
   // During replay the map shows the frozen window up to the playhead; otherwise
   // the live set. Layer/country filters apply either way (they shape `shown`).
@@ -376,6 +391,9 @@ export function LiveDashboard() {
           {view === "regions" && (
             <Select data={METRIC_OPTIONS} value={metric} onChange={(v) => setMetric(v ?? "count")} allowDeselect={false} w={140} data-testid="live-metric" />
           )}
+          {view === "globe" && (
+            <Select data={GLOBE_METRIC_OPTIONS} value={globeMetric ?? "points"} onChange={(v) => setGlobeMetric(v ?? "points")} allowDeselect={false} w={140} data-testid="globe-metric" />
+          )}
           <Select data={INFLUENCE_OPTIONS} value={influence || "all"} onChange={(v) => setInfluence(v ?? "all")} allowDeselect={false} w={140} data-testid="live-influence" />
           <Select data={WINDOWS} value={windowMin} onChange={(v) => setWindowMin(v ?? "60")} allowDeselect={false} w={150} data-testid="live-window" />
           <CountrySelect placeholder="Whole world" value={country} onChange={setCountry} data-testid="live-country" />
@@ -384,12 +402,13 @@ export function LiveDashboard() {
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         {view === "globe" ? (
           <Suspense fallback={<Center h="100%" data-testid="globe-loading"><Loader /></Center>}>
-            <LiveGlobe markers={displayMarkers} onSelect={setSelectedId} sentimentTint={sentimentTint} focusLatLng={focusLatLng} flyTo={flyTo} />
+            <LiveGlobe markers={displayMarkers} onSelect={setSelectedId} sentimentTint={sentimentTint} focusLatLng={focusLatLng} flyTo={flyTo} polygonFill={globePolygonFill} hidePoints={!!globePolygonFill} />
           </Suspense>
         ) : (
           <LiveMap markers={displayMarkers} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} flyTo={flyTo} sentimentTint={sentimentTint} regions={regions} />
         )}
         {view === "regions" && <ChoroplethLegend metric={metric} max={metricMax(aggregateByCountry(shown).values(), metric)} />}
+        {view === "globe" && globeMetric && <ChoroplethLegend metric={globeMetric} max={metricMax(aggregateByCountry(shown).values(), globeMetric)} />}
         {replay.on && (
           <ReplayBar
             playing={replayCtl.playing}
