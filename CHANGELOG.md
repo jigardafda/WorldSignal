@@ -19,7 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Retry-After` headers. Managed in a new **API Keys** console page and via
   GraphQL (`apiKeys`, `apiScopes`, `createApiKey`, `setApiKeyEnabled`,
   `deleteApiKey`; `settings:manage`). See [docs/API.md](docs/API.md#authentication-api-keys).
-
+- **Live map upgrade.** The **Live** dashboard gains a richer, real-time picture:
+  markers are now **sized by severity** and **faded by recency**, with a louder
+  "breaking" ripple plus an aggregated toast for new HIGH/CRITICAL signals. A
+  **Pins · Clusters · Heat** view toggle (clustering via `leaflet.markercluster`,
+  a severity-weighted density surface via `leaflet.heat`) is persisted in the
+  URL. A new collapsible **Live pulse** side-rail shows a **newest-first ticker**
+  (click a row to open the signal and fly the map to its marker), an
+  **events/min velocity** counter, and **top movers** — the categories and
+  country hotspots surging in the recent half of the window. The map now
+  **loads instantly** from an IndexedDB cache (cleared on logout) and is
+  **offline-ready** via a service worker (`vite-plugin-pwa`) that precaches the
+  app shell and runtime-caches OpenStreetMap tiles; an offline indicator shows
+  when connectivity drops. The live-feed query cap was raised from 200 to 5000.
 - **Per-route permission guards.** Directly navigating to a route the current
   role can't access (e.g. `/users`, `/settings`) now renders an "Access denied"
   page instead of the component, via a `RequirePerm` wrapper in `App.tsx` — the

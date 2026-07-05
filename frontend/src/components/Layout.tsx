@@ -7,6 +7,7 @@ import {
 } from "@tabler/icons-react";
 import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { LogoMark } from "./Logo";
 
 interface NavItem { to: string; label: string; icon: React.ReactNode; perm?: string }
@@ -102,7 +103,11 @@ export function Layout() {
       </AppShell.Navbar>
 
       <AppShell.Main>
-        <Outlet />
+        {/* Isolate page crashes to the content area — the header/nav stay usable,
+            and navigating to another route clears the error. */}
+        <ErrorBoundary resetKey={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </AppShell.Main>
     </AppShell>
   );

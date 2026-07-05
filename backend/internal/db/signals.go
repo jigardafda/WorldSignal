@@ -190,8 +190,8 @@ func (d *DB) ListSignals(ctx context.Context, f SignalFilter) ([]*SignalAggregat
 	if limit <= 0 {
 		limit = 50
 	}
-	if limit > 200 {
-		limit = 200
+	if limit > 5000 {
+		limit = 5000
 	}
 	// Rank by text relevance when searching; otherwise most-recent first.
 	order := `ORDER BY "lastSeenAt" DESC`
