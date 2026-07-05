@@ -7,7 +7,7 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import "leaflet.heat";
 import "./LiveMap.css";
 import { countryOutline } from "../lib/boundaries";
-import { markerSize, severityRank } from "../lib/liveMarkers";
+import { markerSize, ringWidth, sentimentColor, severityRank } from "../lib/liveMarkers";
 
 export type MapMode = "pins" | "cluster" | "heat";
 
@@ -24,17 +24,26 @@ export interface MapMarker {
   opacity?: number;
   /** New + high-severity ⇒ a stronger "breaking" ripple. */
   breaking?: boolean;
+  /** Number of sources backing the signal — drives the corroboration ring. */
+  sourceCount?: number | null;
+  /** Sentiment code — colors the marker border when the tint layer is on. */
+  sentiment?: string | null;
 }
 
 const COLOR_RE = /[^#a-zA-Z0-9(),.% ]/g;
+const sanitize = (c: string) => c.replace(COLOR_RE, "");
 
-function buildMarker(m: MapMarker, onSelect?: (id: string) => void): L.Marker {
+function buildMarker(m: MapMarker, onSelect: ((id: string) => void) | undefined, tint: boolean): L.Marker {
   const size = markerSize(m.severity);
-  const color = (m.color ?? "#2f6df6").replace(COLOR_RE, "");
-  const cls = `ws-pulse${m.isNew ? " ws-pulse-new" : ""}${m.breaking && m.isNew ? " ws-pulse-breaking" : ""}`;
+  const ring = ringWidth(m.sourceCount);
+  const color = sanitize(m.color ?? "#2f6df6");
+  const cls = `ws-pulse${m.isNew ? " ws-pulse-new" : ""}${m.breaking && m.isNew ? " ws-pulse-breaking" : ""}${tint ? " ws-tint" : ""}`;
+  let style = `--ws-c:${color};--ws-s:${size}px`;
+  if (ring > 0) style += `;--ws-ring:${ring}px`;
+  if (tint) style += `;--ws-a:${sanitize(sentimentColor(m.sentiment))}`;
   const icon = L.divIcon({
     className: "ws-marker",
-    html: `<span class="${cls}" style="--ws-c:${color};--ws-s:${size}px"></span>`,
+    html: `<span class="${cls}" style="${style}"></span>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -60,6 +69,7 @@ export function LiveMap({
   focus = null,
   mode = "pins",
   flyTo = null,
+  sentimentTint = false,
 }: {
   markers: MapMarker[];
   center: [number, number];
@@ -69,6 +79,7 @@ export function LiveMap({
   focus?: string | null; // ISO alpha-2 country code to outline, or null
   mode?: MapMode;
   flyTo?: { lat: number; lng: number; nonce: number } | null; // pan/zoom to a marker (ticker click)
+  sentimentTint?: boolean; // color marker borders by sentiment
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -147,9 +158,9 @@ export function LiveMap({
       return;
     }
     const group = mode === "cluster" ? L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 }) : L.layerGroup();
-    for (const m of markers) group.addLayer(buildMarker(m, onSelect));
+    for (const m of markers) group.addLayer(buildMarker(m, onSelect, sentimentTint));
     displayRef.current = group.addTo(map);
-  }, [markers, mode, onSelect]);
+  }, [markers, mode, onSelect, sentimentTint]);
 
   return <div ref={containerRef} data-testid="live-map" style={{ height, width: "100%", borderRadius: 8, overflow: "hidden" }} />;
 }

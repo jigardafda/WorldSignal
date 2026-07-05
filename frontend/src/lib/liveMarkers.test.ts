@@ -1,5 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { isBreaking, markerSize, newBreaking, recencyOpacity, severityRank } from "./liveMarkers";
+import { influenceRank, isBreaking, markerSize, newBreaking, recencyOpacity, ringWidth, sentimentColor, severityRank } from "./liveMarkers";
+
+describe("ringWidth", () => {
+  it("is 0 for a single (or unknown) source and grows, capped at 6", () => {
+    expect(ringWidth(1)).toBe(0);
+    expect(ringWidth(0)).toBe(0);
+    expect(ringWidth(null)).toBe(0);
+    expect(ringWidth(undefined)).toBe(0);
+    expect(ringWidth(2)).toBe(1);
+    expect(ringWidth(5)).toBe(4);
+    expect(ringWidth(50)).toBe(6); // capped
+  });
+});
+
+describe("influenceRank", () => {
+  it("ranks influence and defaults null/unknown to 0", () => {
+    expect(influenceRank("LOW")).toBe(1);
+    expect(influenceRank("MEDIUM")).toBe(2);
+    expect(influenceRank("HIGH")).toBe(3);
+    expect(influenceRank("CRITICAL")).toBe(4);
+    expect(influenceRank("NEGLIGIBLE")).toBe(0);
+    expect(influenceRank(null)).toBe(0);
+    expect(influenceRank("WAT")).toBe(0);
+  });
+});
+
+describe("sentimentColor", () => {
+  it("maps sentiment codes to hex and falls back to gray", () => {
+    expect(sentimentColor("POSITIVE")).toBe("#2f9e44");
+    expect(sentimentColor("NEGATIVE")).toBe("#e03131");
+    expect(sentimentColor("NEUTRAL")).toBe("#868e96");
+    expect(sentimentColor("MIXED")).toBe("#f08c00");
+    expect(sentimentColor(null)).toBe("#868e96");
+    expect(sentimentColor("WAT")).toBe("#868e96");
+  });
+});
 
 describe("severityRank", () => {
   it("ranks the four levels and defaults unknown/empty to 0", () => {

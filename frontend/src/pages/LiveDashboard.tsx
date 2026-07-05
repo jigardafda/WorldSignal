@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ActionIcon, Anchor, Badge, Checkbox, ColorSwatch, Group, Paper, SegmentedControl, Select, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconActivity, IconAlertTriangle, IconBroadcast, IconChevronDown, IconChevronUp, IconPlayerPlay, IconStack2, IconWifiOff } from "@tabler/icons-react";
+import { IconActivity, IconAlertTriangle, IconBroadcast, IconChevronDown, IconChevronUp, IconMoodSmile, IconPlayerPlay, IconStack2, IconWifiOff } from "@tabler/icons-react";
 import { api, type LiveSignal, type TaxonomyNode } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useCountries } from "../lib/countries";
@@ -15,7 +15,7 @@ import { SignalDrawer } from "../components/SignalDrawer";
 import { jitter } from "../lib/geo";
 import { geocode, preloadGeo } from "../lib/geocode";
 import { CATEGORIES, categoryColor, categoryLabel, domainOf } from "../lib/categories";
-import { isBreaking, newBreaking, recencyOpacity } from "../lib/liveMarkers";
+import { influenceRank, isBreaking, newBreaking, recencyOpacity } from "../lib/liveMarkers";
 import { frameMarkers } from "../lib/replay";
 import { useReplay } from "../lib/useReplay";
 import { getCached, mergeCached } from "../lib/signalCache";
@@ -30,6 +30,12 @@ const VIEWS: { value: MapMode; label: string }[] = [
   { value: "heat", label: "Heat" },
 ];
 const isMode = (v: string | null): v is MapMode => v === "cluster" || v === "heat";
+
+const INFLUENCE_OPTIONS = [
+  { value: "all", label: "All influence" },
+  { value: "MEDIUM", label: "Medium+" },
+  { value: "HIGH", label: "High only" },
+];
 
 /** Toast for newly-arrived breaking (HIGH/CRITICAL) signals, aggregated so a
  * burst is one notification. The first one is clickable to open its drawer. */
@@ -56,7 +62,7 @@ const WINDOWS = [
   { value: "1440", label: "Last 24 hours" },
 ];
 
-type MarkerRec = MapMarker & { country: string; category: string; leaf: string; lastSeenMs: number };
+type MarkerRec = MapMarker & { country: string; category: string; leaf: string; lastSeenMs: number; influence?: string | null };
 
 function setOrDelete(p: URLSearchParams, key: string, value: string) {
   if (value) p.set(key, value);
@@ -95,6 +101,11 @@ export function LiveDashboard() {
   const setWindowMin = (v: string) => setOne("w", v === "60" ? "" : v); // 60 = default → omit
   const view: MapMode = isMode(params.get("view")) ? (params.get("view") as MapMode) : "pins";
   const setView = (v: string) => setOne("view", v === "pins" ? "" : v); // pins = default → omit
+  const sentimentTint = params.get("sent") === "1";
+  const setSentimentTint = (on: boolean) => setOne("sent", on ? "1" : "");
+  const influence = params.get("infl") ?? ""; // "" (all) | "MEDIUM" | "HIGH"
+  const setInfluence = (v: string) => setOne("infl", v === "all" ? "" : v);
+  const minInfluenceRank = influenceRank(influence);
 
   const toggleDomain = (code: string) =>
     update((p) => {
@@ -203,6 +214,7 @@ export function LiveDashboard() {
           severity: s.severity, opacity: recencyOpacity(s.lastSeenAt, now, windowMs),
           breaking: isBreaking(s.severity), isNew: flagNew && !prev.has(s.id),
           lastSeenMs: Date.parse(s.lastSeenAt ?? "") || 0,
+          sourceCount: s.sourceCount, sentiment: s.sentiment, influence: s.influence,
         });
         ids.add(s.id);
       }
@@ -256,7 +268,12 @@ export function LiveDashboard() {
     domainCount[m.category] = (domainCount[m.category] ?? 0) + 1;
     if (m.leaf) leafCount[m.leaf] = (leafCount[m.leaf] ?? 0) + 1;
   }
-  const shown = inCountry.filter((m) => !disabledDomains.has(m.category) && !disabledLeaves.has(m.leaf));
+  const shown = inCountry.filter(
+    (m) =>
+      !disabledDomains.has(m.category) &&
+      !disabledLeaves.has(m.leaf) &&
+      (minInfluenceRank === 0 || influenceRank(m.influence) >= minInfluenceRank),
+  );
   const windowMs = Number(windowMin) * 60_000;
   // During replay the map shows the frozen window up to the playhead; otherwise
   // the live set. Layer/country filters apply either way (they shape `shown`).
@@ -287,13 +304,25 @@ export function LiveDashboard() {
           >
             <IconPlayerPlay size={16} />
           </ActionIcon>
+          <ActionIcon
+            variant={sentimentTint ? "filled" : "default"}
+            color="teal"
+            size="lg"
+            onClick={() => setSentimentTint(!sentimentTint)}
+            aria-label="Toggle sentiment tint"
+            title="Color marker borders by sentiment"
+            data-testid="sentiment-toggle"
+          >
+            <IconMoodSmile size={16} />
+          </ActionIcon>
           <SegmentedControl size="xs" data={VIEWS} value={view} onChange={setView} data-testid="live-view" />
+          <Select data={INFLUENCE_OPTIONS} value={influence || "all"} onChange={(v) => setInfluence(v ?? "all")} allowDeselect={false} w={140} data-testid="live-influence" />
           <Select data={WINDOWS} value={windowMin} onChange={(v) => setWindowMin(v ?? "60")} allowDeselect={false} w={150} data-testid="live-window" />
           <CountrySelect placeholder="Whole world" value={country} onChange={setCountry} data-testid="live-country" />
         </Group>
       </Group>
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        <LiveMap markers={displayMarkers} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} flyTo={flyTo} />
+        <LiveMap markers={displayMarkers} center={center} zoom={zoom} height="100%" onSelect={setSelectedId} focus={country} mode={view} flyTo={flyTo} sentimentTint={sentimentTint} />
         {replay.on && (
           <ReplayBar
             playing={replayCtl.playing}
