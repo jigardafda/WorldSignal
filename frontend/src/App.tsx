@@ -29,6 +29,7 @@ import { Teams } from "./pages/Teams";
 import { Account } from "./pages/Account";
 import { Settings } from "./pages/Settings";
 import { Connectors } from "./pages/Connectors";
+import { ApiKeys } from "./pages/ApiKeys";
 import { AuditLog } from "./pages/AuditLog";
 
 function RequireAuth() {
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="/account" element={<Account />} />
         <Route path="/settings" element={<RequirePerm perm="settings:manage"><Settings /></RequirePerm>} />
         <Route path="/connectors" element={<RequirePerm perm="settings:manage"><Connectors /></RequirePerm>} />
+        <Route path="/api-keys" element={<RequirePerm perm="settings:manage"><ApiKeys /></RequirePerm>} />
         <Route path="/audit" element={<RequirePerm perm="settings:manage"><AuditLog /></RequirePerm>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -39,8 +39,10 @@ consume.
 
 - **Multi-tenant.** Tenant isolation so a single deployment can serve multiple
   independent workspaces with their own sources, roles, and data.
-- **Public/consumer APIs for Signals.** Stable, documented read APIs and feeds
-  for downstream consumers of Signals.
+- **Public/consumer APIs for Signals.** The REST `/v1/*` surface is now secured
+  with scoped, rate-limited API keys (see [docs/API.md](docs/API.md#authentication-api-keys)).
+  Still planned: stable read feeds/pagination cursors and per-key usage analytics
+  for downstream consumers.
 - **Extensibility.** A clearer extension surface for custom source connectors
   and post-processing.
 

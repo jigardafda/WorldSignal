@@ -13,8 +13,8 @@ idempotent migrations that run on every boot (`cmd/server/main.go`) and in tests
 - **`MigrateAuth`** — `User`, `Session`, `Team`, `TeamMember`.
 - **`MigrateContent`** — extends `Source` with rich metadata, and creates
   `SourceValidationLog`, `LLMKey`, `AuditLog`, `EmailConnector`, `DigestQueue`
-  (plus `Subscription.lastDigestAt`), the generated `searchVector` full-text
-  columns on `Signal`/`Article`, plus performance indexes.
+  (plus `Subscription.lastDigestAt`), `ApiKey`/`ApiKeyUsage`, the generated
+  `searchVector` full-text columns on `Signal`/`Article`, plus performance indexes.
 - **`MigrateSearch`** — best-effort `pg_trgm` extension + trigram indexes for
   fuzzy/substring search. Logged-and-skipped if the role can't `CREATE EXTENSION`
   (full-text search is unaffected).
@@ -35,6 +35,8 @@ Prisma schema file is kept in sync for documentation/ORM parity.
 | `SignalArticle`, `SignalTag` | Signal↔article and signal↔taxonomy joins. |
 | `Subscription`, `Subscriber`, `DeliveryEvent` | Delivery routing + history. |
 | `EmailConnector` | Admin-managed SMTP connectors for the email channel (secret ciphertext + last4). |
+| `ApiKey` | Public-REST-API credentials — SHA-256 key hash + display prefix, scopes[], per-minute rate limit, usage counters. |
+| `ApiKeyUsage` | Fixed-window (per-minute) request counters for API-key rate limiting. FK→ApiKey ON DELETE CASCADE. |
 | `DigestQueue` | Signals queued for a digest-mode email subscription, drained into one rollup delivery per interval. FK→Subscription/Signal ON DELETE CASCADE. |
 | `TaxonomyTag` | Closed classification vocabulary. |
 | `User`, `Session`, `Team`, `TeamMember` | Auth/RBAC. |

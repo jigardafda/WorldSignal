@@ -39,6 +39,7 @@ func authServer(t *testing.T) (*httptest.Server, *db.DB) {
 	srv := &httpapi.Server{DB: d, Enqueue: &recordEnqueuer{}, SigningSecret: "s"}
 	ht := httptest.NewServer(srv.Handler())
 	t.Cleanup(ht.Close)
+	seedFullAPIKey(t, d)
 	return ht, d
 }
 

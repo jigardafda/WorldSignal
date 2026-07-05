@@ -28,6 +28,8 @@ const RESP: Record<string, unknown> = {
   emailConnectors: [{ id: "c" }], emailProviders: [{ code: "GMAIL" }], createEmailConnector: { id: "c" },
   updateEmailConnector: { id: "c" }, setActiveEmailConnector: { id: "c" }, testEmailConnector: { ok: true },
   sendTestEmail: { ok: true }, deleteEmailConnector: true,
+  apiKeys: [{ id: "k" }], apiScopes: ["signals:read"], createApiKey: { id: "k", key: "wsk_x" },
+  setApiKeyEnabled: { id: "k" }, deleteApiKey: true,
   entities: [{ name: "Acme", type: "ORG", signalCount: 3 }],
   countries: [{ code: "US", name: "United States" }],
   taxonomy: [{ code: "C" }], taxonomyStats: [{ key: "C", count: 1 }],
@@ -114,6 +116,12 @@ describe("api wrappers", () => {
     expect(await api.testEmailConnector("c")).toEqual(RESP.testEmailConnector);
     expect(await api.sendTestEmail("c", "a@x.com")).toEqual(RESP.sendTestEmail);
     expect(await api.deleteEmailConnector("c")).toBe(true);
+
+    expect(await api.apiKeys()).toEqual(RESP.apiKeys);
+    expect(await api.apiScopes()).toEqual(RESP.apiScopes);
+    expect(await api.createApiKey({ name: "n", scopes: ["signals:read"], rateLimitPerMin: 60 })).toEqual(RESP.createApiKey);
+    expect(await api.setApiKeyEnabled("k", false)).toEqual(RESP.setApiKeyEnabled);
+    expect(await api.deleteApiKey("k")).toBe(true);
 
     expect(await api.entities({ search: "a", type: "ORG" }, 10)).toEqual(RESP.entities);
     expect(await api.entities()).toEqual(RESP.entities);

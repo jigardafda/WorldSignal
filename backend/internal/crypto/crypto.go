@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"io"
 )
@@ -72,4 +73,12 @@ func Last4(s string) string {
 		return s
 	}
 	return s[len(s)-4:]
+}
+
+// SHA256Hex returns the hex-encoded SHA-256 of s. Used to store API keys as a
+// one-way hash (the raw key is high-entropy, so a fast hash is appropriate — no
+// salt/bcrypt needed) and to look them up in constant DB time by hash.
+func SHA256Hex(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
 }

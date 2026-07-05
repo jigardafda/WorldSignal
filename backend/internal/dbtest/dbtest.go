@@ -26,7 +26,7 @@ func URL() string {
 var tables = []string{
 	"DigestQueue", "DeliveryEvent", "Subscription", "Subscriber", "SignalTag", "SignalArticle",
 	"Signal", "Article", "RawItem", "SourceValidationLog", "Source", "TaxonomyTag",
-	"LLMKey", "EmailConnector", "AuditLog", "Session", "TeamMember", "Team", "User",
+	"ApiKeyUsage", "ApiKey", "LLMKey", "EmailConnector", "AuditLog", "Session", "TeamMember", "Team", "User",
 }
 
 // Connect opens a pool to the test DB (ensuring auth tables exist), skipping the
