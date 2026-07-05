@@ -90,17 +90,22 @@ func (d *DB) UpsertDefaultSubscriber(ctx context.Context) error {
 
 // CreateSubscriptionInput captures createSubscription fields.
 type CreateSubscriptionInput struct {
-	Name    string
-	Channel string // defaults to WEBHOOK
-	Filter  RawJSON
-	Config  RawJSON
+	Name         string
+	Channel      string // defaults to WEBHOOK
+	Filter       RawJSON
+	Config       RawJSON
+	SubscriberID string // optional; defaults to the __default__ subscriber
 }
 
 // CreateSubscription inserts a Subscription under the default subscriber and
 // returns the scalar row.
 func (d *DB) CreateSubscription(ctx context.Context, in CreateSubscriptionInput) (*Subscription, error) {
-	if err := d.UpsertDefaultSubscriber(ctx); err != nil {
-		return nil, err
+	subID := in.SubscriberID
+	if subID == "" {
+		if err := d.UpsertDefaultSubscriber(ctx); err != nil {
+			return nil, err
+		}
+		subID = "__default__"
 	}
 	if in.Channel == "" {
 		in.Channel = "WEBHOOK"
@@ -116,9 +121,9 @@ func (d *DB) CreateSubscription(ctx context.Context, in CreateSubscriptionInput)
 	var filter, config []byte
 	err := d.Pool.QueryRow(ctx,
 		`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config")
-		 VALUES ($1,'__default__',$2,$3::"DeliveryChannel",$4,$5)
+		 VALUES ($1,$6,$2,$3::"DeliveryChannel",$4,$5)
 		 RETURNING `+subscriptionCols,
-		id, in.Name, in.Channel, []byte(in.Filter), []byte(in.Config)).
+		id, in.Name, in.Channel, []byte(in.Filter), []byte(in.Config), subID).
 		Scan(&s.ID, &s.SubscriberID, &s.Name, &s.Channel, &filter, &config, &s.Enabled, &s.CreatedAt)
 	if err != nil {
 		return nil, err
