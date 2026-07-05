@@ -19,6 +19,7 @@ import (
 	"github.com/worldsignal/backend/internal/llm"
 	"github.com/worldsignal/backend/internal/logging"
 	"github.com/worldsignal/backend/internal/pipeline"
+	"github.com/worldsignal/backend/internal/stream"
 )
 
 func main() {
@@ -69,9 +70,14 @@ func run() error {
 		DB: database, SigningSecret: cfg.WebhookSigningSecret,
 		OpenAIAPIKey: cfg.OpenAIAPIKey, OpenAIModel: cfg.OpenAIModel,
 	}
+	// Shared in-process hub: the match worker notifies it as deliveries land;
+	// the SSE/WebSocket handlers subscribe to wake connections in real time.
+	hub := stream.NewHub()
+	srv.Hub = hub
 	gateway := llm.NewDynamicGateway(srv.ResolveLLMKey)
 	queue := jobs.New(database.Pool)
 	workers := jobs.NewWorkers(queue, database, gateway, cfg.WebhookSigningSecret)
+	workers.Hub = hub
 	workers.FailureThreshold = cfg.SourceFailureThreshold
 	workers.Cooldown = time.Duration(cfg.SourceCooldownMinutes) * time.Minute
 	srv.Enqueue = workers

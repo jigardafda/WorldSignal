@@ -247,13 +247,29 @@ CREATE TABLE IF NOT EXISTS "DigestQueue" (
   "queuedAt"       timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("subscriptionId","signalId")
 );
-CREATE INDEX IF NOT EXISTS "DigestQueue_sub_idx" ON "DigestQueue"("subscriptionId","queuedAt");`
+CREATE INDEX IF NOT EXISTS "DigestQueue_sub_idx" ON "DigestQueue"("subscriptionId","queuedAt");
+
+-- Streaming subscriptions: SSE + WebSocket are pull-family channels. Delivery
+-- rows are the durable log clients tail; "seq" is the monotonic, resumable
+-- stream cursor. Adding it with a volatile default backfills existing rows.
+CREATE SEQUENCE IF NOT EXISTS "DeliveryEvent_seq_seq";
+ALTER TABLE "DeliveryEvent" ADD COLUMN IF NOT EXISTS "seq" bigint NOT NULL DEFAULT nextval('"DeliveryEvent_seq_seq"');
+CREATE INDEX IF NOT EXISTS "DeliveryEvent_sub_seq_idx" ON "DeliveryEvent"("subscriptionId","seq");`
 
 // MigrateContent ensures the extended source-metadata columns and the
 // SourceValidationLog table exist. Safe to run repeatedly.
 func (d *DB) MigrateContent(ctx context.Context) error {
-	_, err := d.Pool.Exec(ctx, contentSchema)
-	return err
+	if _, err := d.Pool.Exec(ctx, contentSchema); err != nil {
+		return err
+	}
+	// New enum values must be added one statement at a time (not inside a
+	// multi-command batch). Idempotent for DBs that already have them.
+	for _, v := range []string{"SSE", "WEBSOCKET"} {
+		if _, err := d.Pool.Exec(ctx, `ALTER TYPE "DeliveryChannel" ADD VALUE IF NOT EXISTS '`+v+`'`); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // trgmSchema enables trigram indexes for fuzzy/substring search. It is applied

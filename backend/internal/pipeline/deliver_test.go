@@ -20,7 +20,14 @@ func f64(v float64) *float64 { return &v }
 func sptr(s string) *string  { return &s }
 
 func TestMatchesFilter(t *testing.T) {
-	base := &db.SignalForMatch{Confidence: 0.7, Severity: "HIGH", Country: sptr("US"), TagCodes: []string{"DISASTER.EARTHQUAKE"}}
+	base := &db.SignalForMatch{
+		Confidence: 0.7, Severity: "HIGH", Country: sptr("US"),
+		Region: sptr("California"), Sentiment: sptr("NEGATIVE"), Influence: sptr("MEDIUM"),
+		Relevance: f64(0.8), TagCodes: []string{"DISASTER.EARTHQUAKE"},
+		Entities: []string{"FEMA", "Governor Smith"},
+		Title:    "Major quake hits coast", Summary: "A strong earthquake struck.",
+	}
+	bare := &db.SignalForMatch{Severity: "LOW"} // no optional attributes populated
 	cases := []struct {
 		name string
 		f    subscriptionFilter
@@ -34,10 +41,30 @@ func TestMatchesFilter(t *testing.T) {
 		{"minSeverity fail", subscriptionFilter{MinSeverity: sptr("CRITICAL")}, base, false},
 		{"country pass", subscriptionFilter{Countries: []string{"US", "GB"}}, base, true},
 		{"country fail", subscriptionFilter{Countries: []string{"IN"}}, base, false},
-		{"country nil signal", subscriptionFilter{Countries: []string{"US"}}, &db.SignalForMatch{Severity: "LOW"}, false},
+		{"country nil signal", subscriptionFilter{Countries: []string{"US"}}, bare, false},
 		{"tag exact", subscriptionFilter{Tags: []string{"DISASTER.EARTHQUAKE"}}, base, true},
 		{"tag prefix", subscriptionFilter{Tags: []string{"DISASTER"}}, base, true},
 		{"tag miss", subscriptionFilter{Tags: []string{"ECONOMY"}}, base, false},
+		{"minRelevance pass", subscriptionFilter{MinRelevance: f64(0.5)}, base, true},
+		{"minRelevance fail", subscriptionFilter{MinRelevance: f64(0.9)}, base, false},
+		{"minRelevance nil signal", subscriptionFilter{MinRelevance: f64(0.5)}, bare, false},
+		{"minInfluence pass", subscriptionFilter{MinInfluence: sptr("MEDIUM")}, base, true},
+		{"minInfluence fail", subscriptionFilter{MinInfluence: sptr("HIGH")}, base, false},
+		{"minInfluence nil signal", subscriptionFilter{MinInfluence: sptr("LOW")}, bare, false},
+		{"regions pass fold", subscriptionFilter{Regions: []string{"california"}}, base, true},
+		{"regions fail", subscriptionFilter{Regions: []string{"Texas"}}, base, false},
+		{"regions nil signal", subscriptionFilter{Regions: []string{"California"}}, bare, false},
+		{"sentiment pass", subscriptionFilter{Sentiment: []string{"NEGATIVE"}}, base, true},
+		{"sentiment fail", subscriptionFilter{Sentiment: []string{"POSITIVE"}}, base, false},
+		{"sentiment nil signal", subscriptionFilter{Sentiment: []string{"NEGATIVE"}}, bare, false},
+		{"entities pass fold", subscriptionFilter{Entities: []string{"fema"}}, base, true},
+		{"entities fail", subscriptionFilter{Entities: []string{"Acme"}}, base, false},
+		{"entities none on signal", subscriptionFilter{Entities: []string{"FEMA"}}, bare, false},
+		{"keyword in title", subscriptionFilter{Keyword: "quake"}, base, true},
+		{"keyword in summary", subscriptionFilter{Keyword: "earthquake"}, base, true},
+		{"keyword miss", subscriptionFilter{Keyword: "flood"}, base, false},
+		{"combined pass", subscriptionFilter{MinSeverity: sptr("HIGH"), Countries: []string{"US"}, Sentiment: []string{"NEGATIVE"}, MinRelevance: f64(0.5)}, base, true},
+		{"combined one fails", subscriptionFilter{MinSeverity: sptr("HIGH"), Countries: []string{"US"}, Sentiment: []string{"POSITIVE"}}, base, false},
 	}
 	for _, c := range cases {
 		if got := matchesFilter(c.f, c.sig); got != c.want {
@@ -73,7 +100,7 @@ func TestMatchSubscriptionsCreatesDeliveries(t *testing.T) {
 	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('m','__default__','match','POLLING','{"tags":["DISASTER"]}','{}',now())`)
 	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('nm','__default__','nomatch','WEBHOOK','{"tags":["ECONOMY"]}','{}',now())`)
 
-	ids, err := MatchSubscriptions(ctx, d, "sg", time.Now())
+	ids, err := MatchSubscriptions(ctx, d, "sg", time.Now(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

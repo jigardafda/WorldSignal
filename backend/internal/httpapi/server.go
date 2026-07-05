@@ -9,6 +9,7 @@ import (
 
 	"github.com/worldsignal/backend/internal/db"
 	"github.com/worldsignal/backend/internal/jsonx"
+	"github.com/worldsignal/backend/internal/stream"
 	"github.com/worldsignal/backend/internal/taxonomy"
 )
 
@@ -25,6 +26,9 @@ type Server struct {
 	Enqueue       Enqueuer
 	SigningSecret string
 	SessionTTL    time.Duration // session lifetime; defaults to 7 days when zero
+	// Hub wakes SSE/WebSocket connections when a delivery lands. Optional; when
+	// nil the stream endpoints fall back to periodic re-query only.
+	Hub *stream.Hub
 	// LLM: the system key/model from the environment. Admin-managed DB keys
 	// (encrypted with SigningSecret) take precedence at runtime.
 	OpenAIAPIKey string
@@ -53,6 +57,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/taxonomy", s.requireAPIKey("signals:read", s.taxonomy))
 	s.registerSignalRoutes(mux)
 	s.registerSourceRoutes(mux)
+	s.registerStreamRoutes(mux)
 	s.registerSubscriptionRoutes(mux)
 	s.registerGraphQL(mux)
 	return cors(mux)

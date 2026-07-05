@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WorldSignal · live stream demo</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, system-ui, sans-serif; background: #0b0f19; color: #e6e9ef; }
+  header { padding: 16px 20px; border-bottom: 1px solid #1f2635; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; font-weight: 700; }
+  header h1 span { color: #4b8bf4; }
+  input, select, button { font: inherit; background: #131a2a; color: #e6e9ef; border: 1px solid #263149; border-radius: 8px; padding: 7px 10px; }
+  input { min-width: 120px; }
+  button { cursor: pointer; background: #1e4fd8; border-color: #1e4fd8; font-weight: 600; }
+  button.off { background: #2a3244; border-color: #2a3244; }
+  .status { margin-left: auto; font-size: 12px; color: #8b93a7; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #556; margin-right: 6px; vertical-align: middle; }
+  .dot.live { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+  main { padding: 12px 20px; }
+  .row { display: grid; grid-template-columns: 74px 42px 1fr 92px; gap: 10px; align-items: baseline; padding: 8px 10px; border-radius: 8px; }
+  .row:nth-child(odd) { background: #0f1523; }
+  .sev { font-size: 11px; font-weight: 700; text-align: center; padding: 2px 0; border-radius: 999px; }
+  .LOW { background: #1f2937; color: #9aa4b2; } .MEDIUM { background: #78350f; color: #fcd34d; }
+  .HIGH { background: #7c2d12; color: #fdba74; } .CRITICAL { background: #7f1d1d; color: #fca5a5; }
+  .cty { color: #8b93a7; font-variant: tabular-nums; }
+  .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .time { color: #6b7280; font-size: 12px; text-align: right; font-variant: tabular-nums; }
+  .hint { color: #6b7280; font-size: 12px; padding: 8px 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>World<span>Signal</span> · live stream</h1>
+  <input id="base" value="http://localhost:4000" size="22" title="API base URL" />
+  <input id="sub" value="demo-stream" title="subscription id" />
+  <input id="key" type="password" placeholder="wsk_… (signals:read)" size="18" title="API key" />
+  <select id="transport"><option value="sse">SSE</option><option value="ws">WebSocket</option></select>
+  <button id="toggle">Connect</button>
+  <span class="status"><span id="dot" class="dot"></span><span id="stat">idle</span> · <span id="count">0</span></span>
+</header>
+<main>
+  <div class="hint" id="hint">Enter an API key and Connect. Events stream newest-last as signals are matched.</div>
+  <div id="list"></div>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let conn = null, count = 0;
+
+  function setLive(on, label) {
+    $("dot").className = "dot" + (on ? " live" : "");
+    $("stat").textContent = label;
+    $("toggle").textContent = on ? "Disconnect" : "Connect";
+    $("toggle").className = on ? "off" : "";
+  }
+  function cell(cls, text) {
+    const s = document.createElement("span");
+    s.className = cls;
+    s.textContent = text; // textContent (never innerHTML) → no XSS from feed data
+    return s;
+  }
+  function render(ev) {
+    const d = (ev && ev.data) || {};
+    const sev = (d.severity || "LOW").toUpperCase().replace(/[^A-Z]/g, "");
+    const row = document.createElement("div");
+    row.className = "row";
+    row.append(
+      cell("sev " + sev, sev),
+      cell("cty", d.country || "--"),
+      cell("title", d.title || ""),
+      cell("time", new Date().toLocaleTimeString()),
+    );
+    $("list").prepend(row);
+    while ($("list").childElementCount > 200) $("list").lastChild.remove();
+    $("count").textContent = ++count;
+    $("hint").style.display = "none";
+  }
+  function disconnect() {
+    if (conn) { conn.close(); conn = null; }
+    setLive(false, "idle");
+  }
+  function connect() {
+    const base = $("base").value.trim(), sub = encodeURIComponent($("sub").value.trim()), key = encodeURIComponent($("key").value.trim());
+    if (!key) { $("stat").textContent = "need a key"; return; }
+    // EventSource / WebSocket can't set headers in the browser → pass ?api_key=.
+    if ($("transport").value === "sse") {
+      const es = new EventSource(`${base}/v1/stream/sse?subscription=${sub}&api_key=${key}`);
+      es.addEventListener("signal", (e) => render(JSON.parse(e.data)));
+      es.onopen = () => setLive(true, "streaming (SSE)");
+      es.onerror = () => setLive(false, "error / reconnecting");
+      conn = es;
+    } else {
+      const url = base.replace(/^http/, "ws") + `/v1/stream/ws?subscription=${sub}&api_key=${key}`;
+      const ws = new WebSocket(url);
+      ws.onopen = () => setLive(true, "streaming (WS)");
+      ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.payload) render(m.payload); };
+      ws.onclose = () => setLive(false, "closed");
+      ws.onerror = () => setLive(false, "error");
+      conn = { close: () => ws.close() };
+    }
+  }
+  $("toggle").onclick = () => (conn ? disconnect() : connect());
+</script>
+</body>
+</html>

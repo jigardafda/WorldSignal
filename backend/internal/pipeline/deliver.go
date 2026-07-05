@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/worldsignal/backend/internal/db"
@@ -18,23 +19,48 @@ import (
 const isoLayout = "2006-01-02T15:04:05.000Z"
 
 var severityRank = map[string]int{"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+var influenceRank = map[string]int{"LOW": 0, "MEDIUM": 1, "HIGH": 2}
 
+// subscriptionFilter is the shared matcher schema used by every channel. A zero
+// value matches everything; each set field further narrows the match (AND).
 type subscriptionFilter struct {
-	Tags          []string `json:"tags"`
-	Countries     []string `json:"countries"`
+	Tags          []string `json:"tags"`      // hierarchical taxonomy codes (category or subcategory)
+	Countries     []string `json:"countries"` // ISO alpha-2, exact
+	Regions       []string `json:"regions"`   // region/state name, case-insensitive
+	Sentiment     []string `json:"sentiment"` // POSITIVE | NEUTRAL | NEGATIVE
+	Entities      []string `json:"entities"`  // entity names, case-insensitive
+	Keyword       string   `json:"keyword"`   // substring of title or summary
 	MinConfidence *float64 `json:"minConfidence"`
+	MinRelevance  *float64 `json:"minRelevance"`
 	MinSeverity   *string  `json:"minSeverity"`
+	MinInfluence  *string  `json:"minInfluence"`
 }
 
 func matchesFilter(f subscriptionFilter, s *db.SignalForMatch) bool {
 	if f.MinConfidence != nil && s.Confidence < *f.MinConfidence {
 		return false
 	}
+	if f.MinRelevance != nil && (s.Relevance == nil || *s.Relevance < *f.MinRelevance) {
+		return false
+	}
 	if f.MinSeverity != nil && severityRank[s.Severity] < severityRank[*f.MinSeverity] {
+		return false
+	}
+	if f.MinInfluence != nil && (s.Influence == nil || influenceRank[*s.Influence] < influenceRank[*f.MinInfluence]) {
 		return false
 	}
 	if len(f.Countries) > 0 {
 		if s.Country == nil || !contains(f.Countries, *s.Country) {
+			return false
+		}
+	}
+	if len(f.Regions) > 0 {
+		if s.Region == nil || !containsFold(f.Regions, *s.Region) {
+			return false
+		}
+	}
+	if len(f.Sentiment) > 0 {
+		if s.Sentiment == nil || !containsFold(f.Sentiment, *s.Sentiment) {
 			return false
 		}
 	}
@@ -51,12 +77,31 @@ func matchesFilter(f subscriptionFilter, s *db.SignalForMatch) bool {
 			return false
 		}
 	}
+	if len(f.Entities) > 0 {
+		hit := false
+		for _, e := range s.Entities {
+			if containsFold(f.Entities, e) {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			return false
+		}
+	}
+	if f.Keyword != "" {
+		kw := strings.ToLower(f.Keyword)
+		if !strings.Contains(strings.ToLower(s.Title), kw) && !strings.Contains(strings.ToLower(s.Summary), kw) {
+			return false
+		}
+	}
 	return true
 }
 
 // MatchSubscriptions matches a signal against enabled subscriptions and creates
-// PENDING delivery rows. Mirrors matchSubscriptions in deliver.ts.
-func MatchSubscriptions(ctx context.Context, d *db.DB, signalID string, now time.Time) ([]string, error) {
+// PENDING delivery rows. `notify`, when non-nil, is called with the subscription
+// id for each new delivery so streaming (SSE/WebSocket) clients wake immediately.
+func MatchSubscriptions(ctx context.Context, d *db.DB, signalID string, now time.Time, notify func(subID string)) ([]string, error) {
 	sig, err := d.LoadSignalForMatch(ctx, signalID)
 	if err != nil || sig == nil {
 		return nil, err
@@ -90,6 +135,9 @@ func MatchSubscriptions(ctx context.Context, d *db.DB, signalID string, now time
 		}
 		if id != "" {
 			ids = append(ids, id)
+			if notify != nil {
+				notify(sub.ID)
+			}
 		}
 	}
 	return ids, nil
@@ -163,7 +211,10 @@ func SendDelivery(ctx context.Context, d *db.DB, client *http.Client, secret, de
 		return err
 	}
 
-	if del.Channel == "POLLING" {
+	// Pull-family channels (polling + the streaming transports) aren't pushed by
+	// the worker; the delivery row IS the delivery. Mark it sent so it surfaces
+	// in the durable feed that clients poll / stream.
+	if del.Channel == "POLLING" || del.Channel == "SSE" || del.Channel == "WEBSOCKET" {
 		return d.MarkDeliverySent(ctx, deliveryID, now)
 	}
 
@@ -238,6 +289,16 @@ func finishDelivery(ctx context.Context, d *db.DB, id string, isFinal bool, now 
 func contains(s []string, v string) bool {
 	for _, x := range s {
 		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+// containsFold reports whether v equals any element of s, case-insensitively.
+func containsFold(s []string, v string) bool {
+	for _, x := range s {
+		if strings.EqualFold(x, v) {
 			return true
 		}
 	}
