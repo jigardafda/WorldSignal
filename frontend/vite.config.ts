@@ -26,11 +26,11 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/v1/, /^\/graphql/],
         runtimeCaching: [
           {
-            // OpenStreetMap basemap tiles — cache visited tiles for offline reuse.
-            urlPattern: /^https:\/\/[a-c]\.tile\.openstreetmap\.org\/.*/i,
+            // CARTO basemap tiles — cache visited tiles for offline reuse.
+            urlPattern: /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/.*/i,
             handler: "CacheFirst",
             options: {
-              cacheName: "osm-tiles",
+              cacheName: "basemap-tiles",
               expiration: { maxEntries: 1500, maxAgeSeconds: 30 * 24 * 60 * 60 },
               cacheableResponse: { statuses: [0, 200] },
             },

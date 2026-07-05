@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle } from "react";
+import { forwardRef, StrictMode, useImperativeHandle } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -62,13 +62,28 @@ describe("LiveGlobe", () => {
     expect(screen.getByTestId("globe-canvas")).toHaveAttribute("data-rings", "1");
   });
 
-  it("releases the WebGL context on unmount (guards the mobile context-leak crash)", () => {
+  it("releases the WebGL context after a real unmount (mobile context-leak guard)", async () => {
     rendererStub.forceContextLoss.mockClear();
     rendererStub.dispose.mockClear();
     const { unmount } = render(<LiveGlobe markers={[marker("a")]} />);
     unmount();
+    await new Promise((r) => setTimeout(r, 0)); // release is deferred a macrotask
     expect(rendererStub.forceContextLoss).toHaveBeenCalled();
     expect(rendererStub.dispose).toHaveBeenCalled();
+  });
+
+  it("keeps the context alive across a StrictMode remount (no black globe in dev)", async () => {
+    // StrictMode mounts→unmounts→remounts; force-losing the context on that fake
+    // unmount would leave the reused renderer dead. The deferred release must be
+    // cancelled by the remount.
+    rendererStub.forceContextLoss.mockClear();
+    render(
+      <StrictMode>
+        <LiveGlobe markers={[marker("a")]} />
+      </StrictMode>,
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rendererStub.forceContextLoss).not.toHaveBeenCalled();
   });
 
   it("colors country polygons from the choropleth fill and hides points", async () => {

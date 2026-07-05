@@ -114,6 +114,25 @@ describe("LiveDashboard", () => {
     await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
   });
 
+  it("selects and clears all category layers at once", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+      { id: "s2", title: "FR AI", country: "FR", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    const map = await screen.findByTestId("map");
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
+
+    // Clear all → every category off → nothing shows.
+    fireEvent.click(screen.getByTestId("layer-all"));
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "0"));
+    expect(screen.getByText("Select all")).toBeInTheDocument();
+    // Select all → everything returns.
+    fireEvent.click(screen.getByTestId("layer-all"));
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
+    expect(screen.getByText("All categories")).toBeInTheDocument();
+  });
+
   it("drills into subcategories to filter at the leaf level", async () => {
     apiMock.liveSignals.mockResolvedValue([
       { id: "s1", title: "Quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
@@ -399,7 +418,7 @@ describe("LiveDashboard", () => {
     await waitFor(() => expect(screen.queryByTestId("pulse-velocity")).toBeNull());
   });
 
-  it("toasts newly-arrived breaking signals and caches each poll", async () => {
+  it("shows a compact breaking-signal alert card and caches each poll", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       apiMock.liveSignals
@@ -410,12 +429,46 @@ describe("LiveDashboard", () => {
         ]);
       renderWithProviders(<LiveDashboard />);
       await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "1"));
-      expect(notifyMock).not.toHaveBeenCalled(); // first paint never alerts
+      expect(screen.queryByTestId("breaking-alert")).toBeNull(); // first paint never alerts
 
       await act(async () => { await vi.advanceTimersByTimeAsync(4000); }); // next poll
       await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "2"));
-      expect(notifyMock).toHaveBeenCalledTimes(1); // s2 (CRITICAL, new) → one aggregated toast
+      const alert = await screen.findByTestId("breaking-alert"); // s2 (CRITICAL, new) → one card
+      expect(within(alert).getByText("Major quake")).toBeInTheDocument();
       expect(cacheMock.mergeCached).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("mutes new breaking alerts when paused", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      apiMock.liveSignals
+        .mockResolvedValueOnce([{ id: "s1", title: "Calm", country: "US", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" }])
+        .mockResolvedValue([
+          { id: "s1", title: "Calm", country: "US", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" },
+          { id: "s2", title: "Major quake", country: "US", severity: "CRITICAL", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+        ]);
+      renderWithProviders(<LiveDashboard />);
+      await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "1"));
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+      await screen.findByTestId("breaking-alert");
+
+      // Pause: the card clears immediately and the muted note appears.
+      fireEvent.click(screen.getByTestId("breaking-pause"));
+      await waitFor(() => expect(screen.queryByTestId("breaking-alert")).toBeNull());
+      expect(screen.getByTestId("breaking-paused-note")).toBeInTheDocument();
+
+      // A fresh breaking signal on the next poll must not raise a new card.
+      apiMock.liveSignals.mockResolvedValue([
+        { id: "s1", title: "Calm", country: "US", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: "" },
+        { id: "s3", title: "Second quake", country: "US", severity: "CRITICAL", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: "" },
+      ]);
+      await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+      await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "2"));
+      expect(screen.queryByTestId("breaking-alert")).toBeNull();
     } finally {
       vi.useRealTimers();
     }

@@ -100,9 +100,15 @@ export function LiveMap({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current, { worldCopyJump: true, minZoom: 2 }).setView(center, zoom);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 18,
-      attribution: "&copy; OpenStreetMap contributors",
+    // CARTO "Voyager" basemap: crisp on hi-DPI screens (detectRetina requests the
+    // @2x tiles via {r}) with clear administrative borders at every zoom, unlike
+    // the standard OSM raster which blurs on retina and drops borders when zoomed
+    // out. subdomains a–d spread requests across CARTO's CDN.
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      subdomains: "abcd",
+      maxZoom: 20,
+      detectRetina: true,
+      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
     }).addTo(map);
     mapRef.current = map;
     return () => {

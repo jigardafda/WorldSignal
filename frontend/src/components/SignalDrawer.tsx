@@ -8,7 +8,7 @@ import { ConfidenceBar, InfluenceBadge, SentimentBadge, SeverityBadge, StatusBad
 import { ExtLink } from "./ExtLink";
 import { useCountries, countryDisplay } from "../lib/countries";
 import { categoryColor, domainOf } from "../lib/categories";
-import { languageName, pct } from "../lib/format";
+import { fmtDay, languageName, pct, timeAgo } from "../lib/format";
 
 /** A right-side drawer showing the full details of a signal, opened by clicking a
  * marker on the live map. Fetches the signal on open. */
@@ -62,6 +62,12 @@ export function SignalDrawer({ signalId, onClose }: { signalId: string | null; o
                   {s.geoScope && <Text size="sm"><b>Scope:</b> {s.geoScope}</Text>}
                 </Stack>
 
+                <Stack gap={2} data-testid="drawer-timing">
+                  <Text size="xs" tt="uppercase" c="dimmed" fw={600}>Timing</Text>
+                  <Text size="sm"><b>First seen:</b> {fmtDay(s.firstSeenAt)} <Text span c="dimmed" size="xs">({timeAgo(s.firstSeenAt)})</Text></Text>
+                  <Text size="sm"><b>Last seen:</b> {fmtDay(s.lastSeenAt)} <Text span c="dimmed" size="xs">({timeAgo(s.lastSeenAt)})</Text></Text>
+                </Stack>
+
                 {s.tags.length > 0 && (
                   <Group gap={4}>{s.tags.map((t) => <Badge key={t.code} variant="light" size="sm">{t.code}</Badge>)}</Group>
                 )}
@@ -72,7 +78,10 @@ export function SignalDrawer({ signalId, onClose }: { signalId: string | null; o
                 ) : (
                   <List spacing={2} size="sm">
                     {s.sources.slice(0, 8).map((src, i) => (
-                      <List.Item key={i}><ExtLink url={src.url}>{src.publisher}</ExtLink></List.Item>
+                      <List.Item key={i}>
+                        <ExtLink url={src.url}>{src.publisher}</ExtLink>
+                        {src.publishedAt && <Text span c="dimmed" size="xs"> · {fmtDay(src.publishedAt)}</Text>}
+                      </List.Item>
                     ))}
                   </List>
                 )}

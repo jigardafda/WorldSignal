@@ -88,17 +88,28 @@ export default function LiveGlobe({ markers, onSelect, sentimentTint = false, fo
     const renderer = globeRef.current?.renderer() as { forceContextLoss?: () => void; dispose?: () => void } | undefined;
     if (renderer) rendererRef.current = renderer;
   });
-  useEffect(
-    () => () => {
-      try {
-        rendererRef.current?.forceContextLoss?.();
-        rendererRef.current?.dispose?.();
-      } catch {
-        /* best-effort cleanup */
-      }
-    },
-    [],
-  );
+  // Defer the release: React StrictMode (dev) mounts → unmounts → remounts to
+  // surface effect bugs, and react-globe.gl reuses the SAME renderer across that
+  // cycle. Force-losing the context on the fake unmount would leave the remounted
+  // globe with a dead context (black canvas). So schedule the release and let a
+  // following mount cancel it — a real unmount has no remount, so it still fires.
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      const renderer = rendererRef.current;
+      setTimeout(() => {
+        if (aliveRef.current || !renderer) return; // remounted (StrictMode) → keep it
+        try {
+          renderer.forceContextLoss?.();
+          renderer.dispose?.();
+        } catch {
+          /* best-effort cleanup */
+        }
+      }, 0);
+    };
+  }, []);
 
   const points = useMemo(() => toPoints(markers, sentimentTint), [markers, sentimentTint]);
   const arcs = useMemo(() => toArcs(markers), [markers]);

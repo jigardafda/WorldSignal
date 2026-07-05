@@ -40,6 +40,22 @@ describe("SignalDrawer", () => {
     expect(apiMock.signal).toHaveBeenCalledWith("sg");
   });
 
+  it("shows a timing section and per-source publish times", async () => {
+    apiMock.signal.mockResolvedValue(signal({
+      firstSeenAt: "2026-07-04T09:00:00Z",
+      lastSeenAt: "2026-07-05T10:00:00Z",
+      sources: [{ publisher: "BBC", url: "https://bbc.example/a", publishedAt: "2026-07-05T08:30:00Z" }],
+    }));
+    renderWithProviders(<SignalDrawer signalId="sg" onClose={() => {}} />);
+    await screen.findByText("Quake hits coast");
+    const timing = screen.getByTestId("drawer-timing");
+    expect(timing).toHaveTextContent("First seen:");
+    expect(timing).toHaveTextContent("Last seen:");
+    expect(timing).toHaveTextContent("2026");
+    // The source's publish time renders alongside the publisher link.
+    expect(screen.getByRole("link", { name: "BBC" }).parentElement).toHaveTextContent("2026");
+  });
+
   it("does not fetch when closed (no signalId)", () => {
     renderWithProviders(<SignalDrawer signalId={null} onClose={() => {}} />);
     expect(apiMock.signal).not.toHaveBeenCalled();

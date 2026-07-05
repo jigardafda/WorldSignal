@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ActionIcon, Anchor, Badge, Center, Checkbox, ColorSwatch, Group, Loader, Paper, SegmentedControl, Select, Stack, Text } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
-import { IconActivity, IconAlertTriangle, IconBroadcast, IconChevronDown, IconChevronUp, IconMoodSmile, IconPlayerPlay, IconStack2, IconWifiOff } from "@tabler/icons-react";
+import { ActionIcon, Badge, Center, Checkbox, ColorSwatch, Divider, Group, Loader, Paper, SegmentedControl, Select, Stack, Text } from "@mantine/core";
+import { IconActivity, IconBroadcast, IconChevronDown, IconChevronUp, IconMoodSmile, IconPlayerPlay, IconStack2, IconWifiOff } from "@tabler/icons-react";
 import { api, type LiveSignal, type TaxonomyNode } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useCountries } from "../lib/countries";
+import { BreakingAlerts, type BreakingAlert } from "../components/BreakingAlerts";
 import { CountrySelect } from "../components/CountrySelect";
 import { LiveMap, type MapMarker, type MapMode, type RegionLayer } from "../components/LiveMap";
 import { LivePulse } from "../components/LivePulse";
@@ -53,23 +53,6 @@ const INFLUENCE_OPTIONS = [
   { value: "MEDIUM", label: "Medium+" },
   { value: "HIGH", label: "High only" },
 ];
-
-/** Toast for newly-arrived breaking (HIGH/CRITICAL) signals, aggregated so a
- * burst is one notification. The first one is clickable to open its drawer. */
-function notifyBreaking(brk: LiveSignal[], onOpen: (id: string) => void) {
-  const first = brk[0];
-  notifications.show({
-    color: "red",
-    icon: <IconAlertTriangle size={16} />,
-    title: brk.length === 1 ? "Breaking signal" : `${brk.length} breaking signals`,
-    message: (
-      <Anchor size="sm" onClick={() => onOpen(first.id)}>
-        {brk.length === 1 ? first.title : brk.slice(0, 3).map((b) => b.title).join(" · ")}
-      </Anchor>
-    ),
-    autoClose: 8000,
-  });
-}
 
 // Time windows merge past events with live ones; markers age out as time passes.
 const WINDOWS = [
@@ -159,12 +142,45 @@ export function LiveDashboard() {
       else leaves.add(code);
       setOrDelete(p, "offsub", [...leaves].join(","));
     });
+  // Select-all / clear-all for the category layers: enabling clears every
+  // exclusion; clearing disables every domain (and drops per-subcategory state).
+  const setAllLayers = (on: boolean) =>
+    update((p) => {
+      setOrDelete(p, "off", on ? "" : CATEGORIES.map((c) => c.code).join(","));
+      setOrDelete(p, "offsub", "");
+    });
+  const allLayersOn = disabledDomains.size === 0 && disabledLeaves.size === 0;
+  const allLayersOff = disabledDomains.size >= CATEGORIES.length;
 
   const [markers, setMarkers] = useState<MarkerRec[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(true);
   const [pulseOpen, setPulseOpen] = useState(true);
+
+  // Breaking-signal alerts: a compact bottom-right stack (max two shown) that the
+  // user can mute. `alertsPausedRef` lets the poll loop read the latest muted
+  // state without re-subscribing. New alerts self-expire; a 1s sweep prunes them.
+  const [alerts, setAlerts] = useState<BreakingAlert[]>([]);
+  const [alertsPaused, setAlertsPaused] = useState(false);
+  const alertsPausedRef = useRef(false);
+  const alertSeqRef = useRef(0);
+  useEffect(() => { alertsPausedRef.current = alertsPaused; }, [alertsPaused]);
+  useEffect(() => {
+    const t = setInterval(() => {
+      setAlerts((prev) => {
+        const next = prev.filter((a) => a.expiresAt > Date.now());
+        return next.length === prev.length ? prev : next;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+  const dismissAlert = (key: number) => setAlerts((prev) => prev.filter((a) => a.key !== key));
+  const toggleAlertsPause = () => {
+    const next = !alertsPaused;
+    setAlertsPaused(next);
+    if (next) setAlerts([]); // muting clears whatever is on screen for instant quiet
+  };
   const [flyTo, setFlyTo] = useState<{ lat: number; lng: number; nonce: number } | null>(null);
   const flyNonce = useRef(0);
   // Clicking a ticker row opens the signal and flies the map to its marker.
@@ -277,7 +293,14 @@ export function LiveDashboard() {
       first = false;
       setMarkers(recs);
       if (freshly) setLastUpdate(new Date().toLocaleTimeString());
-      if (breaking.length) notifyBreaking(breaking, setSelectedId);
+      if (breaking.length && !alertsPausedRef.current) {
+        const firstB = breaking[0];
+        const key = ++alertSeqRef.current;
+        setAlerts((prev) => [
+          { key, count: breaking.length, title: firstB.title, firstId: firstB.id, expiresAt: Date.now() + 8000 },
+          ...prev,
+        ].slice(0, 4));
+      }
       void mergeCached(signals); // keep the offline/instant-load cache fresh
     }
 
@@ -468,6 +491,15 @@ export function LiveDashboard() {
           </Group>
           {legendOpen && (
             <Stack gap={2}>
+              <Checkbox
+                size="xs"
+                checked={allLayersOn}
+                indeterminate={!allLayersOn && !allLayersOff}
+                onChange={() => setAllLayers(!allLayersOn)}
+                data-testid="layer-all"
+                label={<Text size="xs" fw={600}>{allLayersOn ? "All categories" : "Select all"}</Text>}
+              />
+              <Divider my={2} />
               {CATEGORIES.map((c) => {
                 const children = leavesByDomain.get(c.code) ?? [];
                 const domainOff = disabledDomains.has(c.code);
@@ -524,6 +556,13 @@ export function LiveDashboard() {
             </Stack>
           )}
         </Paper>
+        <BreakingAlerts
+          alerts={alerts}
+          paused={alertsPaused}
+          onTogglePause={toggleAlertsPause}
+          onOpen={setSelectedId}
+          onDismiss={dismissAlert}
+        />
       </div>
       <SignalDrawer signalId={selectedId} onClose={() => setSelectedId(null)} />
     </div>

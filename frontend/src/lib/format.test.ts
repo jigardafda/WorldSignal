@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtDate, languageName, pct, timeAgo } from "./format";
+import { fmtDate, fmtDay, languageName, pct, timeAgo } from "./format";
 
 describe("languageName", () => {
   it("maps known codes, falls back to upper-case, handles empty", () => {
@@ -17,6 +17,23 @@ describe("fmtDate", () => {
     expect(fmtDate("")).toBe("—");
     expect(fmtDate("not-a-date")).toBe("—");
     expect(fmtDate("2026-01-02T03:04:05.000Z")).not.toBe("—");
+  });
+});
+
+describe("fmtDay", () => {
+  it("returns a dash for empty/invalid input", () => {
+    expect(fmtDay(null)).toBe("—");
+    expect(fmtDay("")).toBe("—");
+    expect(fmtDay("not-a-date")).toBe("—");
+  });
+  it("formats as an ordinal day, month name, and year (no time)", () => {
+    // Use a midday UTC time so the local date is stable across timezones.
+    expect(fmtDay("2026-05-05T12:00:00Z")).toBe("5th May 2026");
+    expect(fmtDay("2026-05-01T12:00:00Z")).toBe("1st May 2026");
+    expect(fmtDay("2026-05-02T12:00:00Z")).toBe("2nd May 2026");
+    expect(fmtDay("2026-05-03T12:00:00Z")).toBe("3rd May 2026");
+    expect(fmtDay("2026-05-11T12:00:00Z")).toBe("11th May 2026");
+    expect(fmtDay("2026-05-21T12:00:00Z")).toBe("21st May 2026");
   });
 });
 
