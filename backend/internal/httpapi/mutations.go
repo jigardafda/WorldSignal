@@ -139,6 +139,9 @@ func (s *Server) mutCreateSubscription(ctx context.Context, args map[string]any)
 	if v, ok := input["config"]; ok && v != nil {
 		in.Config = jsonRaw(v)
 	}
+	if v, ok := input["subscriberId"].(string); ok && v != "" {
+		in.SubscriberID = v
+	}
 	sub, err := s.DB.CreateSubscription(ctx, in)
 	if err != nil {
 		return nil, err
