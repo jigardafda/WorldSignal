@@ -35,10 +35,17 @@ export function isBreaking(severity?: string | null): boolean {
  * in so the function is pure and testable.
  */
 export function recencyOpacity(lastSeenAt: string | null | undefined, now: number, windowMs: number, floor = 0.35): number {
-  if (!lastSeenAt || windowMs <= 0) return 1;
+  if (!lastSeenAt) return 1;
   const t = Date.parse(lastSeenAt);
   if (Number.isNaN(t)) return 1;
-  const age = now - t;
+  return recencyOpacityMs(t, now, windowMs, floor);
+}
+
+/** Same freshness gradient as {@link recencyOpacity} but from an epoch-ms value
+ * (used by the timeline replay, which already carries `lastSeenMs`). */
+export function recencyOpacityMs(lastSeenMs: number, now: number, windowMs: number, floor = 0.35): number {
+  if (windowMs <= 0) return 1;
+  const age = now - lastSeenMs;
   if (age <= 0) return 1;
   if (age >= windowMs) return floor;
   return 1 - (age / windowMs) * (1 - floor);

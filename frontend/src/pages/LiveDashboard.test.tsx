@@ -260,6 +260,44 @@ describe("LiveDashboard", () => {
     expect(screen.getByTestId("map").getAttribute("data-flyto")).toMatch(/-?\d/); // coords set
   });
 
+  it("enters timeline replay (freezes the window, sweeps from the start) and returns to live", async () => {
+    const iso = (secsAgo: number) => new Date(Date.now() - secsAgo * 1000).toISOString();
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: iso(10) },
+      { id: "s2", title: "FR AI", country: "FR", severity: "LOW", eventType: "TECHNOLOGY.AI", lastSeenAt: iso(20) },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    const map = await screen.findByTestId("map");
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "2")); // live
+
+    // Enter replay: control bar + indicator appear; playhead starts at the window
+    // start, so these recent events haven't been "reached" yet ⇒ none shown.
+    fireEvent.click(screen.getByTestId("replay-toggle"));
+    expect(await screen.findByTestId("replay-bar")).toBeInTheDocument();
+    expect(screen.getByTestId("replay-indicator")).toBeInTheDocument();
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "0"));
+
+    // Exit ⇒ bar gone, live set restored.
+    fireEvent.click(screen.getByTestId("replay-exit"));
+    await waitFor(() => expect(screen.queryByTestId("replay-bar")).toBeNull());
+    await waitFor(() => expect(map).toHaveAttribute("data-count", "2"));
+  });
+
+  it("exits replay when the country filter changes", async () => {
+    apiMock.liveSignals.mockResolvedValue([
+      { id: "s1", title: "US quake", country: "US", severity: "HIGH", eventType: "DISASTER.EARTHQUAKE", lastSeenAt: new Date().toISOString() },
+    ]);
+    renderWithProviders(<LiveDashboard />);
+    await waitFor(() => expect(screen.getByTestId("map")).toHaveAttribute("data-count", "1"));
+    fireEvent.click(screen.getByTestId("replay-toggle"));
+    expect(await screen.findByTestId("replay-bar")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("live-country"));
+    const listbox = document.getElementById(screen.getByTestId("live-country").getAttribute("aria-controls")!)!;
+    fireEvent.click(await within(listbox).findByRole("option", { name: /France/, hidden: true }));
+    await waitFor(() => expect(screen.queryByTestId("replay-bar")).toBeNull());
+  });
+
   it("collapses the live pulse panel", async () => {
     apiMock.liveSignals.mockResolvedValue([]);
     renderWithProviders(<LiveDashboard />);
