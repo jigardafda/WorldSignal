@@ -345,6 +345,13 @@ describe("LiveDashboard", () => {
     // High only ⇒ just s1.
     await pickInfluence("High only");
     await waitFor(() => expect(map).toHaveAttribute("data-count", "1"));
+
+    // The category-layer counts follow the same influence filter, so a category
+    // never advertises pins the map can't show (regression: "count but no pins").
+    const rowText = (code: string) =>
+      screen.getByTestId(`layer-${code}`).closest(".mantine-Checkbox-root")?.textContent ?? "";
+    expect(rowText("DISASTER")).toContain("1"); // s1 is HIGH → still counted
+    expect(rowText("TECHNOLOGY")).toContain("0"); // s2 is MEDIUM → filtered out of the count too
   });
 
   it("toggles the sentiment tint layer on the map", async () => {
