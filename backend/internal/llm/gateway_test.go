@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -86,9 +87,17 @@ func TestOpenAIGatewayConnError(t *testing.T) {
 	}
 }
 
-func TestBuildTaxonomyListNonEmpty(t *testing.T) {
-	if buildTaxonomyList() == "" {
-		t.Fatal("taxonomy list should not be empty")
+func TestBuildTaxonomyGuideGroupsDomains(t *testing.T) {
+	guide := buildTaxonomyGuide()
+	if guide == "" {
+		t.Fatal("taxonomy guide should not be empty")
+	}
+	// Domain headers and their leaves (incl. the .OTHER catch-all) must appear so
+	// the model sees the structure it should classify into.
+	for _, want := range []string{"POLITICS — Politics:", "POLITICS.ELECTIONS", "POLITICS.OTHER", "TRANSPORT.RAIL"} {
+		if !strings.Contains(guide, want) {
+			t.Errorf("taxonomy guide missing %q", want)
+		}
 	}
 }
 

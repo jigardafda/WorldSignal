@@ -122,15 +122,19 @@ func (g *DynamicGateway) JSONCompletion(ctx context.Context, system, user string
 	return g.current(ctx).JSONCompletion(ctx, system, user, maxTokens)
 }
 
-func buildTaxonomyList() string {
+// buildTaxonomyGuide renders the taxonomy grouped by domain so the model sees the
+// structure: each domain heads a block, its assignable leaves listed beneath,
+// including the `<DOMAIN>.OTHER` catch-all it should reach for when the story
+// clearly belongs to the domain but no specific leaf fits.
+func buildTaxonomyGuide() string {
 	var b strings.Builder
-	for i, t := range taxonomy.LeafTags() {
-		if i > 0 {
-			b.WriteByte('\n')
+	for _, d := range taxonomy.Taxonomy {
+		fmt.Fprintf(&b, "%s — %s:\n", d.Code, d.Label)
+		for _, leaf := range d.Children {
+			fmt.Fprintf(&b, "  %s (%s)\n", leaf.Code, leaf.Label)
 		}
-		fmt.Fprintf(&b, "- %s (%s)", t.Code, t.Label)
 	}
-	return b.String()
+	return strings.TrimRight(b.String(), "\n")
 }
 
 type llmRaw struct {
@@ -155,11 +159,21 @@ func runLLM(ctx context.Context, gw Gateway, in EnrichInput) *EnrichmentResult {
 		"and whyItMatters in ENGLISH, translating faithfully when the source is not",
 		"English. Set `language` to the ISO 639-1 code of the SOURCE language (e.g.",
 		"en, fr, es, de, hi, ar, zh, pt, ru, ja).",
-		"Choose tags ONLY from the provided taxonomy. Never create new tag codes.",
-		"If nothing fits, use GENERAL.OTHER.",
 		"",
-		"Taxonomy:",
-		buildTaxonomyList(),
+		"CATEGORIZATION — assign the article to the taxonomy below:",
+		"- Choose tags ONLY from these codes. Never invent codes.",
+		"- Pick the single MOST SPECIFIC leaf that fits (e.g. DISASTER.EARTHQUAKE, not DISASTER.OTHER).",
+		"- If the story clearly belongs to a domain but no specific leaf fits, use that",
+		"  domain's `.OTHER` leaf (e.g. POLITICS.OTHER) — NOT GENERAL.OTHER.",
+		"- Use GENERAL.OTHER ONLY as a last resort when NO domain applies at all. This",
+		"  should be rare; almost every real news item fits a domain above.",
+		"- The FIRST tag is the primary category and must be the best single fit.",
+		"Examples: a cabinet reshuffle → POLITICS.GOVERNMENT; a protest with no other",
+		"angle → POLITICS.PROTEST; a celebrity wedding → CULTURE.OTHER; a train crash →",
+		"TRANSPORT.RAIL; a university tuition hike → EDUCATION.HIGHER_ED.",
+		"",
+		"Taxonomy (domain — label, then its leaves):",
+		buildTaxonomyGuide(),
 	}, "\n")
 	body := in.Body
 	if len(body) > 6000 {

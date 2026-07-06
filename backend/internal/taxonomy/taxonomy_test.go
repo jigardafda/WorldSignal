@@ -9,7 +9,6 @@ import (
 
 func TestFlattenCountsDomainsAndLeaves(t *testing.T) {
 	all := Flatten(Taxonomy)
-	// 10 domains + their leaves.
 	if len(all) <= len(Taxonomy) {
 		t.Fatalf("flatten should expand children, got %d", len(all))
 	}
@@ -22,11 +21,27 @@ func TestFlattenCountsDomainsAndLeaves(t *testing.T) {
 			leaves++
 		}
 	}
-	if domains != 10 {
-		t.Fatalf("want 10 domains, got %d", domains)
+	// Domain count equals the number of top-level nodes (every top-level node is
+	// a domain with children).
+	if domains != len(Taxonomy) {
+		t.Fatalf("want %d domains, got %d", len(Taxonomy), domains)
 	}
 	if leaves != len(LeafTags()) {
 		t.Fatalf("leaf mismatch: flatten %d vs LeafTags %d", leaves, len(LeafTags()))
+	}
+}
+
+// Every topical (non-GENERAL) domain must expose a `<DOMAIN>.OTHER` leaf so a
+// story recognized at domain level never falls through to GENERAL.OTHER.
+func TestEveryDomainHasOtherLeaf(t *testing.T) {
+	for _, d := range Taxonomy {
+		if d.Code == "GENERAL" {
+			continue
+		}
+		want := d.Code + ".OTHER"
+		if _, ok := ValidCodes[want]; !ok {
+			t.Errorf("domain %s missing fallback leaf %s", d.Code, want)
+		}
 	}
 }
 

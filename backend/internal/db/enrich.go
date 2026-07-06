@@ -6,6 +6,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/worldsignal/backend/internal/jsonx"
 )
 
@@ -82,6 +83,123 @@ func (d *DB) LoadSignalForEnrich(ctx context.Context, signalID string) (*SignalF
 		return nil, nil
 	}
 	return &s, nil
+}
+
+// UncategorizedSignalIDs returns the ids of signals whose primary category is
+// missing or GENERAL (eventType is NULL or in the GENERAL domain) — the set that
+// benefits from re-enrichment after a taxonomy/classifier change. Newest first;
+// limit <= 0 means no limit.
+func (d *DB) UncategorizedSignalIDs(ctx context.Context, limit int) ([]string, error) {
+	q := `SELECT "id" FROM "Signal"
+	       WHERE "eventType" IS NULL OR "eventType" LIKE 'GENERAL%'
+	       ORDER BY "lastSeenAt" DESC`
+	if limit > 0 {
+		q += ` LIMIT $1`
+	}
+	var rows pgx.Rows
+	var err error
+	if limit > 0 {
+		rows, err = d.Pool.Query(ctx, q, limit)
+	} else {
+		rows, err = d.Pool.Query(ctx, q)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// SignalText is a signal's id and the narrative text used for reclassification.
+// Body is the longest linked-article body (richer than the summary), or empty.
+type SignalText struct {
+	ID      string
+	Title   string
+	Summary string
+	Body    string
+}
+
+// UncategorizedSignalTexts loads the id/title/summary and the richest linked
+// article body of signals whose primary category is missing or GENERAL — the
+// input for an in-place recategorization backfill. Newest first; limit <= 0 = all.
+func (d *DB) UncategorizedSignalTexts(ctx context.Context, limit int) ([]SignalText, error) {
+	q := `SELECT s."id", s."title", COALESCE(s."summary",''),
+	              COALESCE((
+	                SELECT a."body" FROM "SignalArticle" sa
+	                JOIN "Article" a ON a."id"=sa."articleId"
+	                WHERE sa."signalId"=s."id"
+	                ORDER BY length(COALESCE(a."body",'')) DESC LIMIT 1
+	              ),'')
+	       FROM "Signal" s
+	       WHERE s."eventType" IS NULL OR s."eventType" LIKE 'GENERAL%'
+	       ORDER BY s."lastSeenAt" DESC`
+	var rows pgx.Rows
+	var err error
+	if limit > 0 {
+		rows, err = d.Pool.Query(ctx, q+` LIMIT $1`, limit)
+	} else {
+		rows, err = d.Pool.Query(ctx, q)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SignalText
+	for rows.Next() {
+		var s SignalText
+		if err := rows.Scan(&s.ID, &s.Title, &s.Summary, &s.Body); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// CategoryTag is a taxonomy category code with a confidence, for recategorization.
+type CategoryTag struct {
+	Code       string
+	Confidence float64
+}
+
+// SetSignalCategory updates a signal's primary category (eventType) and replaces
+// its `category` SignalAttribute rows in one transaction, leaving other attribute
+// keys (industry, entity, …) untouched. tags[0] is the primary category.
+func (d *DB) SetSignalCategory(ctx context.Context, signalID string, tags []CategoryTag) error {
+	if len(tags) == 0 {
+		return nil
+	}
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE "Signal" SET "eventType"=$2,"updatedAt"=now() WHERE "id"=$1`, signalID, tags[0].Code); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM "SignalAttribute" WHERE "signalId"=$1 AND "key"='category'`, signalID); err != nil {
+		return err
+	}
+	for _, t := range tags {
+		// valueText is NOT NULL; category values live in valueCode, so store '' (as
+		// ApplyEnrichment does), not NULL.
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO "SignalAttribute" ("signalId","key","valueCode","valueText","valueNum","confidence")
+			 VALUES ($1,'category',$2,'',NULL,$3)`, signalID, t.Code, t.Confidence); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 // TagIDsByCodes resolves taxonomy tag ids by code.

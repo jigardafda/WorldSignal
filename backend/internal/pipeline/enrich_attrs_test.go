@@ -87,7 +87,9 @@ type dualGateway struct{}
 
 func (dualGateway) Enabled() bool { return true }
 func (dualGateway) JSONCompletion(_ context.Context, system, _ string, _ int) ([]byte, error) {
-	if strings.Contains(system, "Taxonomy:") {
+	// "canonical event Signal" is unique to the narrative/enrichment system prompt
+	// (the attribute-extraction prompt does not contain it).
+	if strings.Contains(system, "canonical event Signal") {
 		// Non-English source ("hi") → narrative is the English translation.
 		return []byte(`{"title":"Quake","summary":"S","whatHappened":"W","whyItMatters":"Y","severity":"HIGH","confidence":0.8,"language":"hi","tags":[{"code":"DISASTER.EARTHQUAKE","confidence":0.9}]}`), nil
 	}
