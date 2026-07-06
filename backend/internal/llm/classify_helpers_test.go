@@ -48,3 +48,41 @@ func TestClassifyHelpers(t *testing.T) {
 		}
 	}
 }
+
+// TestClassifyTextBranches exercises the fallback branches of ClassifyText: a
+// specific leaf subsuming its domain's `.OTHER`, an `.OTHER`-only match, and the
+// no-match GENERAL fallback.
+func TestClassifyTextBranches(t *testing.T) {
+	// Specific leaf (POLITICS.ELECTIONS via "election") plus domain-level noise
+	// ("political"): the specific tag wins and the domain's .OTHER is dropped.
+	tags := ClassifyText("election result as political parties react", "")
+	if tags[0].Code != "POLITICS.ELECTIONS" {
+		t.Fatalf("want POLITICS.ELECTIONS primary, got %s", tags[0].Code)
+	}
+	for _, tg := range tags {
+		if tg.Code == "POLITICS.OTHER" {
+			t.Fatal("POLITICS.OTHER should be dropped when a specific POLITICS leaf matched")
+		}
+	}
+
+	// Only domain-level keywords match → the domain's .OTHER catch-all, capped low.
+	only := ClassifyText("the politician and party leader addressed the opposition", "")
+	if only[0].Code != "POLITICS.OTHER" {
+		t.Fatalf("want POLITICS.OTHER, got %s", only[0].Code)
+	}
+	if only[0].Confidence > 0.6 {
+		t.Fatalf("OTHER-leaf confidence should be capped at 0.6, got %v", only[0].Confidence)
+	}
+
+	// Nothing matches → GENERAL.OTHER fallback.
+	none := ClassifyText("xyzzy plugh frobnicate", "")
+	if none[0].Code != "GENERAL.OTHER" {
+		t.Fatalf("want GENERAL.OTHER fallback, got %s", none[0].Code)
+	}
+
+	// More than three domains match → the result is capped at 3 tags.
+	many := ClassifyText("election earthquake stock market layoffs wildfire", "")
+	if len(many) != 3 {
+		t.Fatalf("expected at most 3 tags, got %d: %+v", len(many), many)
+	}
+}

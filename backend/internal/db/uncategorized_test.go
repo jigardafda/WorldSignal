@@ -166,4 +166,32 @@ func TestSetSignalCategory(t *testing.T) {
 	if err := d.SetSignalCategory(ctx, "g", nil); err != nil {
 		t.Fatalf("empty tags should be a no-op, got %v", err)
 	}
+
+	// Error path: an unknown signal id violates the SignalAttribute foreign key on
+	// insert, so the transaction fails and rolls back.
+	if err := d.SetSignalCategory(ctx, "does-not-exist",
+		[]db.CategoryTag{{Code: "POLITICS.OTHER", Confidence: 0.5}}); err == nil {
+		t.Fatal("expected a foreign-key error for an unknown signal id")
+	}
+}
+
+// TestRecategorizeQueriesCancelledContext covers the error-return branches of the
+// backfill queries/updates when the database call fails (here via a canceled
+// context), so the failure paths are exercised deterministically.
+func TestRecategorizeQueriesCancelledContext(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	cctx, cancel := context.WithCancel(context.Background())
+	cancel() // every DB call below fails immediately
+
+	if _, err := d.UncategorizedSignalIDs(cctx, 0); err == nil {
+		t.Error("UncategorizedSignalIDs should error on a canceled context")
+	}
+	if _, err := d.UncategorizedSignalTexts(cctx, 0); err == nil {
+		t.Error("UncategorizedSignalTexts should error on a canceled context")
+	}
+	if err := d.SetSignalCategory(cctx, "g",
+		[]db.CategoryTag{{Code: "POLITICS.OTHER", Confidence: 0.5}}); err == nil {
+		t.Error("SetSignalCategory should error on a canceled context")
+	}
 }

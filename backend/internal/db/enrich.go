@@ -6,8 +6,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/worldsignal/backend/internal/jsonx"
 )
 
@@ -94,16 +92,12 @@ func (d *DB) UncategorizedSignalIDs(ctx context.Context, limit int) ([]string, e
 	q := `SELECT "id" FROM "Signal"
 	       WHERE "eventType" IS NULL OR "eventType" LIKE 'GENERAL%'
 	       ORDER BY "lastSeenAt" DESC`
+	var args []any
 	if limit > 0 {
 		q += ` LIMIT $1`
+		args = append(args, limit)
 	}
-	var rows pgx.Rows
-	var err error
-	if limit > 0 {
-		rows, err = d.Pool.Query(ctx, q, limit)
-	} else {
-		rows, err = d.Pool.Query(ctx, q)
-	}
+	rows, err := d.Pool.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -142,13 +136,12 @@ func (d *DB) UncategorizedSignalTexts(ctx context.Context, limit int) ([]SignalT
 	       FROM "Signal" s
 	       WHERE s."eventType" IS NULL OR s."eventType" LIKE 'GENERAL%'
 	       ORDER BY s."lastSeenAt" DESC`
-	var rows pgx.Rows
-	var err error
+	var args []any
 	if limit > 0 {
-		rows, err = d.Pool.Query(ctx, q+` LIMIT $1`, limit)
-	} else {
-		rows, err = d.Pool.Query(ctx, q)
+		q += ` LIMIT $1`
+		args = append(args, limit)
 	}
+	rows, err := d.Pool.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
