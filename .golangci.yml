@@ -26,13 +26,20 @@ linters:
       checks: ["all", "-QF1002", "-QF1008", "-ST1003"]
     misspell:
       locale: US
-      # British spellings kept deliberately as normalization aliases in the
-      # attribute dictionary (so British-spelled input maps to canonical codes).
+      # British / non-US spellings kept deliberately: as normalization aliases in
+      # the attribute dictionary, and as classifier keywords in the taxonomy (so
+      # British-spelled article text still matches the right category).
       ignore-rules:
         - neighbourhood
         - favourable
         - organisation
         - defence
+        - labour
+        - theatre
+        - traveller
+        - archaeology
+        - archaeologist
+        - archaeologists
     revive:
       severity: warning
       rules:
