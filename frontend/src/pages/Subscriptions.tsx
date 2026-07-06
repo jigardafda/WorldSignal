@@ -1,8 +1,8 @@
-import { Alert, Anchor, Button, Divider, Group, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput } from "@mantine/core";
+import { Alert, Anchor, Button, Code, CopyButton, Divider, Group, Modal, Paper, ScrollArea, Select, Stack, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
-import { IconPlus } from "@tabler/icons-react";
+import { IconCheck, IconPlus, IconSend } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { api, type EmailConnector, type Subscriber, type Subscription } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
@@ -57,6 +57,8 @@ export function Subscriptions() {
   const [filter, setFilter] = useState<SubFilter>({});
   const [baseUrl, setBaseUrl] = useState("");
   const [subscriberId, setSubscriberId] = useState<string>("");
+  const [createdSub, setCreatedSub] = useState<Subscription | null>(null); // post-create view
+  const [testing, setTesting] = useState(false);
 
   // Default the base URL (shown in the code examples) and the subscriber picker.
   useEffect(() => {
@@ -89,13 +91,32 @@ export function Subscriptions() {
   function openNew() {
     form.reset();
     setFilter({});
+    setCreatedSub(null);
     open();
+  }
+
+  function closeModal() {
+    // Keep createdSub set through the close animation so the "ready" view doesn't
+    // flash back to the empty form on the way out; openNew() resets it next time.
+    close();
+  }
+
+  async function sendTest(id: string) {
+    setTesting(true);
+    try {
+      const r = await api.testSubscription(id);
+      notifications.show({ message: r.message, color: r.ok ? "green" : "orange" });
+    } catch (e) {
+      notifications.show({ message: e instanceof Error ? e.message : "Failed", color: "red" });
+    } finally {
+      setTesting(false);
+    }
   }
 
   async function create(v: typeof form.values) {
     setBusy(true);
     try {
-      await api.createSubscription({
+      const sub = await api.createSubscription({
         name: v.name,
         channel: v.channel,
         filter: cleanFilter(filter),
@@ -103,7 +124,7 @@ export function Subscriptions() {
         ...(subscriberId ? { subscriberId } : {}),
       });
       notifications.show({ message: "Subscription created", color: "green" });
-      close();
+      setCreatedSub(sub); // switch the modal into its post-create "studio" view
       state.reload();
     } catch (e) {
       notifications.show({ message: e instanceof Error ? e.message : "Failed", color: "red" });
@@ -142,6 +163,9 @@ export function Subscriptions() {
                 ...(canWrite ? [{
                   key: "actions", header: "", render: (r: Subscription) => (
                     <Group gap="xs" wrap="nowrap">
+                      <Button size="xs" variant="subtle" onClick={() => sendTest(r.id)} loading={testing} data-testid={`sub-test-${r.id}`}>
+                        Send test
+                      </Button>
                       <Button size="xs" variant="light" color={r.enabled ? "orange" : "green"} onClick={() => toggle(r)}>
                         {r.enabled ? "Disable" : "Enable"}
                       </Button>
@@ -155,8 +179,54 @@ export function Subscriptions() {
         </AsyncBoundary>
       </Paper>
 
-      <Modal opened={opened} onClose={close} title="New subscription" size="90%" data-testid="sub-modal"
+      <Modal opened={opened} onClose={closeModal} title={createdSub ? "Subscription ready" : "New subscription"} size="90%" data-testid="sub-modal"
         closeOnClickOutside={false} /* dropdowns portal outside the modal; don't treat those clicks as "close" */>
+        {createdSub ? (
+          <div style={{ display: "flex", gap: 24, minHeight: "72vh" }} data-testid="sub-created">
+            {/* Left: what was created + how to verify */}
+            <ScrollArea.Autosize style={{ flex: "0 0 420px" }} mah="74vh" pr="sm">
+              <Stack gap="sm">
+                <Alert color="green" icon={<IconCheck size={16} />} title={`“${createdSub.name}” is live`}>
+                  Signals matching your filter will be delivered over <strong>{createdSub.channel}</strong>. Wire up your client with the code on the right, then send a test event to see it flow end to end.
+                </Alert>
+                <div>
+                  <Text size="sm" fw={600} mb={4}>Subscription ID</Text>
+                  <Group gap="xs" wrap="nowrap">
+                    <Code style={{ flex: 1, overflowX: "auto" }} data-testid="created-sub-id">{createdSub.id}</Code>
+                    <CopyButton value={createdSub.id}>
+                      {({ copied, copy }) => (
+                        <Button size="xs" variant="light" color={copied ? "green" : "blue"} onClick={copy}>
+                          {copied ? "Copied" : "Copy"}
+                        </Button>
+                      )}
+                    </CopyButton>
+                  </Group>
+                </div>
+                <div>
+                  <Text size="sm" fw={600} mb={4}>Filter</Text>
+                  <Text size="sm" c="dimmed">{filterSummary(cleanFilter(filter))}</Text>
+                </div>
+                <Button leftSection={<IconSend size={16} />} onClick={() => sendTest(createdSub.id)} loading={testing} data-testid="created-send-test">
+                  Send test event
+                </Button>
+                <Text size="xs" c="dimmed">
+                  A test event reuses your most recent real signal, flagged <code>"test": true</code>, and is pushed to this subscription so a connected client receives it immediately.
+                </Text>
+              </Stack>
+            </ScrollArea.Autosize>
+
+            <Divider orientation="vertical" />
+
+            {/* Right: runnable code, now with the real subscription id */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Text fw={600} size="sm" mb="xs">Consume it</Text>
+              <CodeExamples channel={createdSub.channel as Channel} opts={{ baseUrl, subscriptionId: createdSub.id }} />
+              <Group justify="flex-end" mt="md">
+                <Button onClick={closeModal} data-testid="created-done">Done</Button>
+              </Group>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={form.onSubmit(create)}>
           <div style={{ display: "flex", gap: 24, minHeight: "72vh" }}>
             {/* Left: configuration */}
@@ -211,10 +281,11 @@ export function Subscriptions() {
           </div>
 
           <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={close}>Cancel</Button>
+            <Button variant="default" onClick={closeModal}>Cancel</Button>
             <Button type="submit" loading={busy} data-testid="sub-create">Create subscription</Button>
           </Group>
         </form>
+        )}
       </Modal>
     </>
   );

@@ -5,7 +5,7 @@ import { renderWithProviders } from "../test/utils";
 
 const { apiMock, authMock } = vi.hoisted(() => ({
   apiMock: {
-    subscriptions: vi.fn(), createSubscription: vi.fn(), updateSubscription: vi.fn(), deleteSubscription: vi.fn(),
+    subscriptions: vi.fn(), createSubscription: vi.fn(), updateSubscription: vi.fn(), deleteSubscription: vi.fn(), testSubscription: vi.fn(),
     emailConnectors: vi.fn(),
     subscribers: vi.fn(), createSubscriber: vi.fn(), deleteSubscriber: vi.fn(),
     users: vi.fn(), createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn(),
@@ -46,15 +46,39 @@ describe("Subscriptions", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(apiMock.deleteSubscription).toHaveBeenCalled());
   });
-  it("creates a subscription", async () => {
+  it("creates a subscription, then shows the ready view and sends a test event", async () => {
     apiMock.subscriptions.mockResolvedValue([]);
     apiMock.createSubscription.mockResolvedValue(sub);
+    apiMock.testSubscription.mockResolvedValue({ ok: true, channel: "POLLING", message: "Test event sent to “All”." });
     renderWithProviders(<Subscriptions />);
     await screen.findByTestId("empty");
     await userEvent.click(screen.getByRole("button", { name: "Add subscription" }));
     await userEvent.type(await screen.findByTestId("sub-name"), "New");
     await userEvent.click(screen.getByTestId("sub-create"));
     await waitFor(() => expect(apiMock.createSubscription).toHaveBeenCalled());
+    // The modal switches to the post-create "ready" view showing the real id.
+    expect(await screen.findByTestId("sub-created")).toBeInTheDocument();
+    expect(screen.getByTestId("created-sub-id")).toHaveTextContent("x");
+    // Sending a test event calls the mutation with the new subscription id.
+    await userEvent.click(screen.getByTestId("created-send-test"));
+    await waitFor(() => expect(apiMock.testSubscription).toHaveBeenCalledWith("x"));
+    await userEvent.click(screen.getByTestId("created-done"));
+  });
+  it("sends a test event from a subscription row", async () => {
+    apiMock.subscriptions.mockResolvedValue([sub]);
+    apiMock.testSubscription.mockResolvedValue({ ok: false, channel: "POLLING", message: "No signals available yet to build a test event." });
+    renderWithProviders(<Subscriptions />);
+    await screen.findByText("All");
+    await userEvent.click(screen.getByTestId("sub-test-x"));
+    await waitFor(() => expect(apiMock.testSubscription).toHaveBeenCalledWith("x"));
+  });
+  it("surfaces an error when a test event fails", async () => {
+    apiMock.subscriptions.mockResolvedValue([sub]);
+    apiMock.testSubscription.mockRejectedValue(new Error("boom"));
+    renderWithProviders(<Subscriptions />);
+    await screen.findByText("All");
+    await userEvent.click(screen.getByTestId("sub-test-x"));
+    await waitFor(() => expect(apiMock.testSubscription).toHaveBeenCalled());
   });
   it("creates an EMAIL digest subscription with structured config", async () => {
     apiMock.subscriptions.mockResolvedValue([]);
