@@ -18,6 +18,11 @@ function sig(id: string, lastSeenAt: string, severity = "LOW"): LiveSignal {
   return { id, title: id, country: "US", region: null, city: null, severity, eventType: "GENERAL", lastSeenAt };
 }
 
+// Timestamps must be relative to "now": mergeCached evicts anything older than
+// 24h, so hardcoded calendar dates turn into a time-bomb that starts failing a
+// day after they were written. `ago(minutes)` keeps records inside the window.
+const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+
 beforeEach(resetDB);
 
 describe("signalCache", () => {
@@ -26,30 +31,27 @@ describe("signalCache", () => {
   });
 
   it("round-trips records newest-first and filters by since", async () => {
-    await mergeCached([
-      sig("old", "2026-07-05T10:00:00Z"),
-      sig("mid", "2026-07-05T11:00:00Z"),
-      sig("new", "2026-07-05T12:00:00Z"),
-    ]);
+    const midTs = ago(120);
+    await mergeCached([sig("old", ago(180)), sig("mid", midTs), sig("new", ago(60))]);
     const all = await getCached(0);
     expect(all.map((r) => r.id)).toEqual(["new", "mid", "old"]);
     // stored bookkeeping field is stripped on read
     expect((all[0] as unknown as Record<string, unknown>)._ts).toBeUndefined();
 
-    const since = Date.parse("2026-07-05T11:00:00Z");
+    const since = Date.parse(midTs);
     expect((await getCached(since)).map((r) => r.id)).toEqual(["new", "mid"]);
   });
 
   it("upserts by id rather than duplicating", async () => {
-    await mergeCached([sig("a", "2026-07-05T10:00:00Z", "LOW")]);
-    await mergeCached([sig("a", "2026-07-05T10:05:00Z", "CRITICAL")]);
+    await mergeCached([sig("a", ago(60), "LOW")]);
+    await mergeCached([sig("a", ago(55), "CRITICAL")]);
     const rows = await getCached(0);
     expect(rows).toHaveLength(1);
     expect(rows[0].severity).toBe("CRITICAL");
   });
 
   it("clearCache empties the store", async () => {
-    await mergeCached([sig("a", "2026-07-05T10:00:00Z")]);
+    await mergeCached([sig("a", ago(60))]);
     await clearCache();
     expect(await getCached(0)).toEqual([]);
   });
