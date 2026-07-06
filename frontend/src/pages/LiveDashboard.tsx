@@ -317,21 +317,24 @@ export function LiveDashboard() {
   const zoom = sel ? 5 : 2;
 
   const inCountry = useMemo(() => (country ? markers.filter((m) => m.country === country) : markers), [markers, country]);
+  // Apply every active filter EXCEPT the category toggles before counting, so a
+  // category's number equals how many pins enabling it would actually add. Doing
+  // this keeps the layer counts honest with "N events on map" — otherwise the
+  // "High only" influence filter hides pins while the panel still advertises the
+  // unfiltered totals (a category shows 5 but the map stays empty).
+  const eligible = useMemo(
+    () => inCountry.filter((m) => minInfluenceRank === 0 || influenceRank(m.influence) >= minInfluenceRank),
+    [inCountry, minInfluenceRank],
+  );
   const domainCount: Record<string, number> = {};
   const leafCount: Record<string, number> = {};
-  for (const m of inCountry) {
+  for (const m of eligible) {
     domainCount[m.category] = (domainCount[m.category] ?? 0) + 1;
     if (m.leaf) leafCount[m.leaf] = (leafCount[m.leaf] ?? 0) + 1;
   }
   const shown = useMemo(
-    () =>
-      inCountry.filter(
-        (m) =>
-          !disabledDomains.has(m.category) &&
-          !disabledLeaves.has(m.leaf) &&
-          (minInfluenceRank === 0 || influenceRank(m.influence) >= minInfluenceRank),
-      ),
-    [inCountry, disabledDomains, disabledLeaves, minInfluenceRank],
+    () => eligible.filter((m) => !disabledDomains.has(m.category) && !disabledLeaves.has(m.leaf)),
+    [eligible, disabledDomains, disabledLeaves],
   );
 
   // Choropleth layer (only in Regions mode): aggregate the visible set by country
