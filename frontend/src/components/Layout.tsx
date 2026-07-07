@@ -3,7 +3,7 @@ import { useDisclosure } from "@mantine/hooks";
 import {
   IconActivity, IconArticle, IconBell, IconBroadcast, IconChartBar, IconDatabase,
   IconFileText, IconGauge, IconListCheck, IconLogout, IconMail, IconSettings, IconSitemap,
-  IconUsers, IconUsersGroup, IconUserSearch, IconKey, IconSparkles,
+  IconUsers, IconUsersGroup, IconUserSearch, IconKey, IconSparkles, IconListDetails,
 } from "@tabler/icons-react";
 import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
@@ -18,6 +18,7 @@ const NAV: NavSection[] = [
     items: [
       { to: "/", label: "Dashboard", icon: <IconGauge size={18} /> },
       { to: "/for-you", label: "For You", icon: <IconSparkles size={18} />, perm: "subscriptions:read" },
+      { to: "/profiles", label: "Profiles", icon: <IconListDetails size={18} />, perm: "subscriptions:read" },
     ],
   },
   {

@@ -56,8 +56,8 @@ describe("ForYou", () => {
     expect(screen.getByText("9.2")).toBeInTheDocument();
     // the "why it ranked" reason is humanized (DISASTER -> Disaster)
     expect(screen.getByText("Disaster")).toBeInTheDocument();
-    // the feed was requested for the active profile
-    expect(apiMock.subscriptionFeed).toHaveBeenCalledWith("p1", 0, 40);
+    // the feed was requested for the active profile with the default background cutoff
+    expect(apiMock.subscriptionFeed).toHaveBeenCalledWith("p1", 2, 40);
   });
 
   it("sends feedback when a signal is voted on", async () => {

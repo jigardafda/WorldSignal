@@ -1,19 +1,25 @@
-import { Button, Chip, Group, SegmentedControl, Stack, Text } from "@mantine/core";
-import { IconAdjustments, IconPlus, IconSparkles } from "@tabler/icons-react";
+import { ActionIcon, Button, Chip, Group, Menu, SegmentedControl, Stack, Text } from "@mantine/core";
+import { IconAdjustments, IconDotsVertical, IconList, IconPencil, IconPlus, IconSparkles, IconTrash } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { useState } from "react";
-import { api, type FeedbackAction } from "../lib/api";
+import { Link, useSearchParams } from "react-router-dom";
+import { api, type FeedbackAction, type Subscription } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { AsyncBoundary, EmptyState } from "../components/States";
 import { PageHeader } from "../components/PageHeader";
 import { SignalFeedCard } from "../components/SignalFeedCard";
 import { InterestGraphDrawer } from "../components/InterestGraphDrawer";
 import { CreateProfileModal } from "../components/CreateProfileModal";
+import { RenameProfileModal } from "../components/RenameProfileModal";
+import { DeleteProfileModal } from "../components/DeleteProfileModal";
 import { rankItems, type RankMode } from "../lib/relevanceUi";
 
+// The feed defaults to hiding pure "background" signals (score < 2 — no interest
+// matched, just intrinsic quality) so a profile shows what's relevant to it, not
+// the whole firehose. "All" reveals everything.
 const RELEVANCE_FILTERS = [
   { label: "All", value: "0" },
-  { label: "Relevant", value: "4" },
+  { label: "Relevant", value: "2" },
   { label: "Strong", value: "7" },
 ];
 
@@ -22,19 +28,22 @@ const RELEVANCE_FILTERS = [
 export function ForYou() {
   const profilesState = useAsync(() => api.subscriptions(), []);
   const profiles = profilesState.data ?? [];
+  const [params] = useSearchParams();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const active = selectedId ?? profiles[0]?.id ?? null;
+  const active = selectedId ?? params.get("profile") ?? profiles[0]?.id ?? null;
   const activeProfile = profiles.find((p) => p.id === active);
 
   const [rankMode, setRankMode] = useState<RankMode>("relevance");
-  const [minScore, setMinScore] = useState("0");
+  const [minScore, setMinScore] = useState("2"); // hide background noise by default
   const [feedNonce, setFeedNonce] = useState(0);
   const [votes, setVotes] = useState<Record<string, FeedbackAction>>({});
 
   const [createOpen, setCreateOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerInterests, setDrawerInterests] = useState<Record<string, number>>({});
+  const [renaming, setRenaming] = useState<Subscription | null>(null);
+  const [deleting, setDeleting] = useState<Subscription | null>(null);
 
   const feedState = useAsync(
     () => (active ? api.subscriptionFeed(active, Number(minScore), 40) : Promise.resolve([])),
@@ -116,14 +125,35 @@ export function ForYou() {
                   />
                   <SegmentedControl size="xs" value={minScore} onChange={setMinScore} data={RELEVANCE_FILTERS} />
                 </Group>
-                <Button
-                  variant="light"
-                  leftSection={<IconAdjustments size={16} />}
-                  onClick={openInterests}
-                  disabled={!active}
-                >
-                  Edit interests
-                </Button>
+                <Group gap="xs">
+                  <Button
+                    variant="light"
+                    leftSection={<IconAdjustments size={16} />}
+                    onClick={openInterests}
+                    disabled={!active}
+                  >
+                    Edit interests
+                  </Button>
+                  <Menu withinPortal position="bottom-end" withArrow>
+                    <Menu.Target>
+                      <ActionIcon variant="light" color="gray" size="lg" aria-label="Profile actions" disabled={!activeProfile}>
+                        <IconDotsVertical size={18} />
+                      </ActionIcon>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Item leftSection={<IconPencil size={15} />} onClick={() => activeProfile && setRenaming(activeProfile)}>
+                        Rename profile
+                      </Menu.Item>
+                      <Menu.Item component={Link} to="/profiles" leftSection={<IconList size={15} />}>
+                        Manage all profiles
+                      </Menu.Item>
+                      <Menu.Divider />
+                      <Menu.Item color="red" leftSection={<IconTrash size={15} />} onClick={() => activeProfile && setDeleting(activeProfile)}>
+                        Delete profile
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
+                </Group>
               </Group>
 
               <AsyncBoundary state={feedState}>
@@ -179,6 +209,16 @@ export function ForYou() {
           onSaved={() => setFeedNonce((n) => n + 1)}
         />
       )}
+      <RenameProfileModal profile={renaming} onClose={() => setRenaming(null)} onRenamed={() => profilesState.reload()} />
+      <DeleteProfileModal
+        profile={deleting}
+        onClose={() => setDeleting(null)}
+        onDeleted={() => {
+          setSelectedId(null);
+          setFeedNonce((n) => n + 1);
+          profilesState.reload();
+        }}
+      />
     </Stack>
   );
 }
