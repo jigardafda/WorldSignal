@@ -162,7 +162,9 @@ func filterReasons(rs []DraftReason, interests map[string]float64) []DraftReason
 	return out
 }
 
-var properNoun = regexp.MustCompile(`\b([A-Z][a-zA-Z0-9&.\-]+(?:\s+[A-Z][a-zA-Z0-9&.\-]+){0,2})\b`)
+// properNoun matches a capitalized word or short phrase. Sentence punctuation is
+// excluded from the token so "India. This" splits into "India" and "This".
+var properNoun = regexp.MustCompile(`\b([A-Z][a-zA-Z0-9&\-]+(?:\s+[A-Z][a-zA-Z0-9&\-]+){0,2})\b`)
 
 // draftHeuristic derives a usable profile without an LLM: topics via the taxonomy
 // classifier, entities via proper-noun frequency, and sensible default gates.
@@ -202,7 +204,14 @@ func draftHeuristic(docText string) ProfileDraft {
 	for n, f := range freq {
 		ranked = append(ranked, nf{n, f})
 	}
-	sort.SliceStable(ranked, func(i, j int) bool { return ranked[i].f > ranked[j].f })
+	// Frequency desc, then name asc so ties are deterministic (map iteration order
+	// is not) — the same document always yields the same draft.
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].f != ranked[j].f {
+			return ranked[i].f > ranked[j].f
+		}
+		return ranked[i].n < ranked[j].n
+	})
 	for i, e := range ranked {
 		if i >= 4 {
 			break

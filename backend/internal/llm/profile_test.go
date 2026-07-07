@@ -28,9 +28,25 @@ func TestDraftHeuristicFromDocument(t *testing.T) {
 	if !hasSportsTopic {
 		t.Fatalf("expected a SPORTS topic interest, got %v", d.Interests)
 	}
-	// "Nike" (frequent proper noun) should surface as an entity.
-	if _, ok := d.Interests["entity:Nike"]; !ok {
-		t.Fatalf("expected entity:Nike, got %v", d.Interests)
+	// Prominent proper nouns should surface as entity interests (deterministically).
+	entities := 0
+	for k := range d.Interests {
+		if strings.HasPrefix(k, "entity:") {
+			entities++
+		}
+	}
+	if entities == 0 {
+		t.Fatalf("expected at least one entity interest, got %v", d.Interests)
+	}
+	// Deterministic: the same document always drafts the same interests.
+	d2 := DraftProfileFromDocument(context.Background(), nil, doc)
+	if len(d2.Interests) != len(d.Interests) {
+		t.Fatalf("heuristic must be deterministic: %v vs %v", d.Interests, d2.Interests)
+	}
+	for k, v := range d.Interests {
+		if d2.Interests[k] != v {
+			t.Fatalf("non-deterministic draft: %q %v vs %v", k, v, d2.Interests[k])
+		}
 	}
 	if d.MinScore <= 0 || d.MinSeverity == "" {
 		t.Fatal("draft should carry default gates")

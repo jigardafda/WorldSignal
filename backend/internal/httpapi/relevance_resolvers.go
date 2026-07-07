@@ -15,6 +15,7 @@ import (
 // capabilities under API keys.
 func (s *Server) registerRelevanceResolvers(q, m map[string]gql.FieldResolver) {
 	q["subscriptionFeed"] = s.resolveSubscriptionFeed
+	q["subscriptionInterests"] = s.resolveSubscriptionInterests
 	m["setSubscriptionInterests"] = s.mutSetSubscriptionInterests
 	m["recordSignalFeedback"] = s.mutRecordSignalFeedback
 	m["draftProfileFromDocument"] = s.mutDraftProfileFromDocument
@@ -45,12 +46,27 @@ func (s *Server) resolveSubscriptionFeed(ctx context.Context, args map[string]an
 		out = append(out, map[string]any{
 			"id": sc.ID, "title": sc.Title, "summary": sc.Summary, "eventType": sc.EventType,
 			"country": sc.Country, "region": sc.Region, "sentiment": sc.Sentiment,
-			"influence": sc.Influence, "severity": sc.Severity,
+			"influence": sc.Influence, "severity": sc.Severity, "ageHours": round1(sc.AgeHours),
 			"score": round1(sc.Score), "reasons": reasons,
 		})
 		if len(out) >= limit {
 			break
 		}
+	}
+	return out, nil
+}
+
+func (s *Server) resolveSubscriptionInterests(ctx context.Context, args map[string]any) (any, error) {
+	if err := authz(ctx, auth.PermSignalsRead); err != nil {
+		return nil, err
+	}
+	p, err := s.DB.LoadProfile(ctx, strVal(args["id"]))
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]any{}
+	for k, v := range p.Interests {
+		out[k] = v
 	}
 	return out, nil
 }

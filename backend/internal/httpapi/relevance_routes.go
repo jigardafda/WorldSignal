@@ -37,6 +37,7 @@ type feedItem struct {
 	Sentiment string   `json:"sentiment"`
 	Influence string   `json:"influence"`
 	Severity  string   `json:"severity"`
+	AgeHours  float64  `json:"ageHours"`
 	Score     float64  `json:"score"`
 	Reasons   []string `json:"reasons"`
 }
@@ -60,7 +61,7 @@ func (s *Server) subscriptionFeed(w http.ResponseWriter, r *http.Request) {
 		out = append(out, feedItem{
 			ID: sc.ID, Title: sc.Title, Summary: sc.Summary, EventType: sc.EventType,
 			Country: sc.Country, Region: sc.Region, Sentiment: sc.Sentiment,
-			Influence: sc.Influence, Severity: sc.Severity,
+			Influence: sc.Influence, Severity: sc.Severity, AgeHours: round1(sc.AgeHours),
 			Score: round1(sc.Score), Reasons: sc.Reasons,
 		})
 		if len(out) >= limit {
