@@ -50,6 +50,13 @@ func TestRelevanceResolversGraphQL(t *testing.T) {
 	if code, _ := postGQL(t, ht.URL, `{"query":"query{subscriptionFeed(id:\"pg\",limit:1,minScore:0){id}}"}`); code != 200 {
 		t.Fatalf("limit:1 feed should be 200")
 	}
+	// clampLimit bounds: 0 -> default, an excessive limit -> capped (CodeQL).
+	if code, _ := postGQL(t, ht.URL, `{"query":"query{subscriptionFeed(id:\"pg\",limit:0){id}}"}`); code != 200 {
+		t.Fatalf("limit:0 feed should be 200")
+	}
+	if code, _ := postGQL(t, ht.URL, `{"query":"query{subscriptionFeed(id:\"pg\",limit:999999){id}}"}`); code != 200 {
+		t.Fatalf("excessive limit should be capped and 200")
+	}
 	// recordSignalFeedback (valid + invalid action)
 	if code, body := postGQL(t, ht.URL, `{"query":"mutation{recordSignalFeedback(subscriptionId:\"pg\",signalId:\"qg\",action:\"UP\")}"}`); code != 200 || !strings.Contains(body, "true") {
 		t.Fatalf("recordSignalFeedback: %d %s", code, body)

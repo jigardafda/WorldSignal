@@ -42,9 +42,24 @@ type feedItem struct {
 	Reasons   []string `json:"reasons"`
 }
 
+// maxFeedLimit bounds the requested page size so a user-supplied `limit` can't
+// drive an oversized slice allocation (CodeQL: excessive-size allocation).
+const maxFeedLimit = 200
+
+// clampLimit constrains a requested page size to a safe, positive range.
+func clampLimit(n int) int {
+	if n <= 0 {
+		return 30
+	}
+	if n > maxFeedLimit {
+		return maxFeedLimit
+	}
+	return n
+}
+
 func (s *Server) subscriptionFeed(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	limit := queryInt(r, "limit", 30)
+	limit := clampLimit(queryInt(r, "limit", 30))
 	sinceHours := queryInt(r, "sinceHours", 72)
 	minScore := queryFloat(r, "minScore", 0)
 

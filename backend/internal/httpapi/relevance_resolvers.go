@@ -26,7 +26,7 @@ func (s *Server) resolveSubscriptionFeed(ctx context.Context, args map[string]an
 		return nil, err
 	}
 	id := strVal(args["id"])
-	limit := toInt(args["limit"], 30)
+	limit := clampLimit(toInt(args["limit"], 30))
 	sinceHours := toInt(args["sinceHours"], 72)
 	minScore := toFloat(args["minScore"], 0)
 
