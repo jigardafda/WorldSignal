@@ -53,18 +53,21 @@ export function CreateProfileModal({
     }
   }
 
-  async function create(interests: Record<string, number>) {
-    if (!name.trim()) {
+  async function create(interests: Record<string, number>, overrideName?: string) {
+    // Use an explicit name when provided — the "start blank" path can't rely on
+    // the async `name` state having updated yet (that caused a double-click).
+    const finalName = (overrideName ?? name).trim();
+    if (!finalName) {
       notifications.show({ color: "red", message: "Give the profile a name." });
       return;
     }
     setCreating(true);
     try {
-      const sub = await api.createSubscription({ name: name.trim(), channel: "POLLING" });
+      const sub = await api.createSubscription({ name: finalName, channel: "POLLING" });
       if (Object.keys(interests).length > 0) {
         await api.setSubscriptionInterests(sub.id, interests);
       }
-      notifications.show({ color: "teal", message: `Created “${name.trim()}” — ranking your feed now.` });
+      notifications.show({ color: "teal", message: `Created “${finalName}” — ranking your feed now.` });
       onCreated(sub.id);
       close();
     } catch (e) {
@@ -91,6 +94,13 @@ export function CreateProfileModal({
             Paste a brand brief, media kit, product page, or contract. We read it, research the brand, and
             draft a ranked profile — you review before it's saved.
           </Text>
+          <TextInput
+            data-testid="name-input"
+            label="Profile name"
+            placeholder="e.g. Nike — sponsorship risk"
+            value={name}
+            onChange={(e) => setName(e.currentTarget.value)}
+          />
           <Textarea
             data-testid="doc-input"
             value={text}
@@ -105,10 +115,7 @@ export function CreateProfileModal({
               variant="subtle"
               color="gray"
               leftSection={<IconFileText size={16} />}
-              onClick={() => {
-                setName("New profile");
-                create({});
-              }}
+              onClick={() => create({}, name.trim() || "New profile")}
               loading={creating}
             >
               Start blank instead
