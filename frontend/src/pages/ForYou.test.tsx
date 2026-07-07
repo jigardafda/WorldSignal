@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { screen, waitFor, fireEvent } from "@testing-library/react";
+import { screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { renderWithProviders } from "../test/utils";
 
 const { apiMock } = vi.hoisted(() => ({
@@ -58,6 +58,20 @@ describe("ForYou", () => {
     expect(screen.getByText("Disaster")).toBeInTheDocument();
     // the feed was requested for the active profile with the default background cutoff
     expect(apiMock.subscriptionFeed).toHaveBeenCalledWith("p1", 2, 40);
+  });
+
+  it("summarizes what the profile ranks by, above the feed", async () => {
+    apiMock.subscriptions.mockResolvedValue([{ id: "p1", name: "Sponsorship risk", channel: "POLLING", enabled: true }]);
+    apiMock.subscriptionFeed.mockResolvedValue(FEED);
+    apiMock.subscriptionInterests.mockResolvedValue({ "tag:DISASTER": 5, "sentiment:NEGATIVE": 2 });
+
+    renderWithProviders(<ForYou />);
+
+    const summary = await screen.findByTestId("interest-summary");
+    expect(within(summary).getByText(/Ranking by/i)).toBeInTheDocument();
+    expect(within(summary).getByText("Disaster")).toBeInTheDocument();
+    expect(within(summary).getByText("×5")).toBeInTheDocument();
+    expect(within(summary).getByText("Negative sentiment")).toBeInTheDocument();
   });
 
   it("sends feedback when a signal is voted on", async () => {

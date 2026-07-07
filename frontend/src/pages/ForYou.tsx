@@ -12,6 +12,7 @@ import { InterestGraphDrawer } from "../components/InterestGraphDrawer";
 import { CreateProfileModal } from "../components/CreateProfileModal";
 import { RenameProfileModal } from "../components/RenameProfileModal";
 import { DeleteProfileModal } from "../components/DeleteProfileModal";
+import { InterestSummary } from "../components/InterestSummary";
 import { rankItems, type RankMode } from "../lib/relevanceUi";
 
 // The feed defaults to hiding pure "background" signals (score < 2 — no interest
@@ -41,9 +42,16 @@ export function ForYou() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerInterests, setDrawerInterests] = useState<Record<string, number>>({});
   const [renaming, setRenaming] = useState<Subscription | null>(null);
   const [deleting, setDeleting] = useState<Subscription | null>(null);
+
+  // The active profile's interests, reloaded when the profile changes or after a
+  // save — drives both the summary strip and the editor drawer.
+  const interestsState = useAsync(
+    () => (active ? api.subscriptionInterests(active) : Promise.resolve({})),
+    [active, feedNonce],
+  );
+  const interests = interestsState.data ?? {};
 
   const feedState = useAsync(
     () => (active ? api.subscriptionFeed(active, Number(minScore), 40) : Promise.resolve([])),
@@ -60,16 +68,8 @@ export function ForYou() {
     });
   }
 
-  async function openInterests() {
-    if (!active) return;
-    try {
-      const interests = await api.subscriptionInterests(active);
-      setDrawerInterests(interests ?? {});
-      setDrawerOpen(true);
-    } catch {
-      setDrawerInterests({});
-      setDrawerOpen(true);
-    }
+  function openInterests() {
+    if (active) setDrawerOpen(true);
   }
 
   const items = feedState.data ? rankItems(feedState.data, rankMode) : [];
@@ -156,6 +156,8 @@ export function ForYou() {
                 </Group>
               </Group>
 
+              <InterestSummary interests={interests} onEdit={openInterests} />
+
               <AsyncBoundary state={feedState}>
                 {(feed) =>
                   feed.length === 0 || items.length === 0 ? (
@@ -205,7 +207,7 @@ export function ForYou() {
           onClose={() => setDrawerOpen(false)}
           subscriptionId={active}
           profileName={activeProfile.name}
-          initial={drawerInterests}
+          initial={interests}
           onSaved={() => setFeedNonce((n) => n + 1)}
         />
       )}
