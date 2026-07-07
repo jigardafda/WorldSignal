@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAge, humanizeReason, rankItems, scoreBand, scorePct } from "./relevanceUi";
+import { formatAge, humanizeReason, rankItems, reasonColor, scoreBand, scorePct } from "./relevanceUi";
 import type { FeedItem } from "./api";
 
 describe("relevanceUi", () => {
@@ -39,5 +39,15 @@ describe("relevanceUi", () => {
     ] as FeedItem[];
     expect(rankItems(items, "relevance").map((i) => i.id)).toEqual(["b", "c", "a"]);
     expect(rankItems(items, "recency").map((i) => i.id)).toEqual(["c", "a", "b"]);
+  });
+
+  it("colors reason chips by kind and clamps negative ages", () => {
+    expect(reasonColor("entity")).toBe("grape");
+    expect(reasonColor("topic")).toBe("blue");
+    expect(reasonColor("keyword")).toBe("orange");
+    expect(reasonColor("other")).toBe("gray");
+    expect(humanizeReason("weirdkey")).toEqual({ label: "weirdkey", kind: "other" });
+    expect(humanizeReason("region:California")).toEqual({ label: "California", kind: "place" });
+    expect(formatAge(-5)).toBe("1m ago");
   });
 });

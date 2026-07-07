@@ -55,6 +55,18 @@ describe("Profiles", () => {
     await waitFor(() => expect(apiMock.updateSubscription).toHaveBeenCalledWith("p1", { name: "Nike risk" }));
   });
 
+  it("opens a profile's feed and the create modal", async () => {
+    apiMock.createSubscription.mockResolvedValue({ id: "n", name: "n" });
+    renderWithProviders(<Profiles />);
+    await waitFor(() => expect(screen.getByText("Sponsorship risk")).toBeInTheDocument());
+
+    fireEvent.click(screen.getAllByLabelText(/Actions for/)[0]);
+    fireEvent.click(await screen.findByText("Open feed")); // navigates, executes the handler
+
+    fireEvent.click(screen.getByText("New profile"));
+    expect(await screen.findByTestId("create-profile")).toBeInTheDocument();
+  });
+
   it("deletes a profile after confirming in the dialog", async () => {
     renderWithProviders(<Profiles />);
     await waitFor(() => expect(screen.getByText("Sponsorship risk")).toBeInTheDocument());

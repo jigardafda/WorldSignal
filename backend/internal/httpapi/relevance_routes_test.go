@@ -92,3 +92,49 @@ func TestRelevanceEndpoints(t *testing.T) {
 		t.Fatalf("short draft want 400, got %d", code)
 	}
 }
+
+// TestRelevanceEndpointEdges covers the parse/error branches of the REST feed API.
+func TestRelevanceEndpointEdges(t *testing.T) {
+	d := dbtest.Connect(t)
+	seed(t, d)
+	ht, _ := newServer(t, d)
+	ex := func(sql string) {
+		if _, err := d.Pool.Exec(context.Background(), sql); err != nil {
+			t.Fatalf("exec: %v", err)
+		}
+	}
+	ex(`INSERT INTO "Subscriber" ("id","name","status","createdAt") VALUES ('se','A','ACTIVE',now()) ON CONFLICT DO NOTHING`)
+	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","enabled","createdAt") VALUES ('pe','se','n','WEBHOOK','{}','{}',true,now())`)
+
+	// Non-numeric query params fall back to defaults — still 200.
+	if code, _ := send(t, "GET", ht.URL+"/v1/subscriptions/pe/feed?limit=abc&sinceHours=xyz&minScore=nope", ""); code != 200 {
+		t.Fatalf("bad query params should default to 200, got %d", code)
+	}
+	// A valid numeric minScore is parsed (queryFloat success branch).
+	if code, _ := send(t, "GET", ht.URL+"/v1/subscriptions/pe/feed?minScore=5.5", ""); code != 200 {
+		t.Fatalf("valid minScore should be 200")
+	}
+	// Invalid JSON body → 400 on interests + feedback.
+	if code, _ := send(t, "PATCH", ht.URL+"/v1/subscriptions/pe/interests", `{not json`); code != 400 {
+		t.Fatalf("bad interests body want 400, got %d", code)
+	}
+	if code, _ := send(t, "POST", ht.URL+"/v1/feedback", `{not json`); code != 400 {
+		t.Fatalf("bad feedback body want 400, got %d", code)
+	}
+	// Feedback for a non-existent signal violates the FK → 500.
+	if code, _ := send(t, "POST", ht.URL+"/v1/feedback", `{"subscriptionId":"pe","signalId":"nope","action":"UP"}`); code != 500 {
+		t.Fatalf("feedback FK error want 500, got %d", code)
+	}
+	// setInterests 500 when the Subscription table is gone.
+	ex(`ALTER TABLE "Subscription" RENAME TO "Subscription__he"`)
+	if code, _ := send(t, "PATCH", ht.URL+"/v1/subscriptions/pe/interests", `{"interests":{"tag:DISASTER":1}}`); code != 500 {
+		t.Fatalf("setInterests DB error want 500, got %d", code)
+	}
+	ex(`ALTER TABLE "Subscription__he" RENAME TO "Subscription"`)
+	// Feed 500 when the backing table is gone.
+	ex(`ALTER TABLE "Signal" RENAME TO "Signal__he"`)
+	if code, _ := send(t, "GET", ht.URL+"/v1/subscriptions/pe/feed", ""); code != 500 {
+		t.Fatalf("feed DB error want 500, got %d", code)
+	}
+	ex(`ALTER TABLE "Signal__he" RENAME TO "Signal"`)
+}

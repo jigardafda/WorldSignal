@@ -92,3 +92,47 @@ func TestRankSortsDescendingStable(t *testing.T) {
 		t.Fatal("Rank must be sorted descending by score")
 	}
 }
+
+func TestQualityClampsOutOfRangeInputs(t *testing.T) {
+	// Relevance/Confidence above 1 are clamped, not amplified.
+	s := baseSignal()
+	s.Relevance, s.Confidence = 1.5, 2.0
+	got := Score(Profile{}, s)
+	capped := baseSignal()
+	capped.Relevance, capped.Confidence = 1.0, 1.0
+	if got.Score != Score(Profile{}, capped).Score {
+		t.Fatal("relevance/confidence should clamp to 1.0")
+	}
+}
+
+func TestMatchesAllDimensionsAndMalformedKeys(t *testing.T) {
+	s := baseSignal() // country IN, region Maharashtra, sentiment NEGATIVE, entity NDMA
+	cases := map[string]bool{
+		"region:Maharashtra": true, "region:Goa": false,
+		"sentiment:NEGATIVE": true, "sentiment:POSITIVE": false,
+		"entity:ndma": true, "entity:other": false,
+		"country:IN": true, "unknown:x": false,
+	}
+	for key, want := range cases {
+		matched := len(Score(Profile{Interests: map[string]float64{key: 3}}, s).Reasons) > 0
+		if matched != want {
+			t.Errorf("interest %q: matched=%v want %v", key, matched, want)
+		}
+	}
+	for _, bad := range []string{"nocolon", "trailing:", ":leading"} {
+		if len(Score(Profile{Interests: map[string]float64{bad: 5}}, s).Reasons) != 0 {
+			t.Errorf("malformed key %q should not match", bad)
+		}
+	}
+}
+
+func TestRecencyAndClampNegativeEdges(t *testing.T) {
+	// Negative age → treated as fresh (0); negative relevance/confidence → clamped to 0.
+	s := baseSignal()
+	s.AgeHours, s.Relevance, s.Confidence = -5, -1, -1
+	fresh := baseSignal()
+	fresh.AgeHours, fresh.Relevance, fresh.Confidence = 0, 0, 0
+	if Score(Profile{}, s).Score != Score(Profile{}, fresh).Score {
+		t.Fatal("negative age/relevance/confidence should clamp")
+	}
+}
