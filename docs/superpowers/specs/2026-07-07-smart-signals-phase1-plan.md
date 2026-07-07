@@ -46,6 +46,19 @@ builds entirely on the existing enrichment + subscriptions.
 - Verify: drive the For-You feed against the local DB (~90k enriched signals);
   confirm ranking reflects weights and feedback records.
 
+## SECURITY — tenant scoping (required with the brand/ownership model)
+
+The feed/interests/feedback endpoints take a subscription id and act on it after
+only a scope check — matching the existing (single-tenant) subscription API, which
+is not owner-scoped. This is acceptable ONLY while a deployment is single-tenant.
+When the multi-brand model lands (`Subscription.brandId`; API keys / sessions bound
+to an owner + set of brands via `TeamMember`), it becomes a hard requirement:
+- Every relevance handler MUST verify the subscription belongs to a brand the
+  caller may access (else IDOR). Enforce once via a `resolveOwnedSubscription`
+  helper used by REST + GraphQL.
+- `ListSubscriptions` / feed / deliveries MUST filter to the caller's brands.
+Flagged by the commit security review; tracked here so it ships with `brandId`.
+
 ## Later phases (need external keys/accounts — scaffold interfaces now)
 - **Phase 2:** social velocity, Google Trends, first-party ingestion adapters.
 - **Phase 3:** Slack app, Shopify app, Signals API keys + metered billing.

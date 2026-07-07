@@ -9,6 +9,16 @@ import (
 
 // registerRelevanceRoutes wires the smart-signals feed: a personalized ranked
 // feed per profile, feedback, interest editing, and AI draft-from-document.
+//
+// SECURITY — tenant scoping (TODO with the brand/ownership model): these handlers
+// take a subscription id from the path/body and operate on it after only a
+// scope check, exactly like the existing subscription REST API (which is not
+// owner-scoped — a valid key sees all subscriptions in the deployment). This is
+// acceptable only while the platform is single-tenant per deployment. When the
+// multi-brand model lands (Subscription.brandId + API keys bound to an owner /
+// set of brands), EVERY handler here MUST verify the subscription belongs to a
+// brand the caller may access — otherwise this becomes an IDOR. Enforce it in one
+// place (a helper that resolves+authorizes the subscription for the identity).
 func (s *Server) registerRelevanceRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/subscriptions/{id}/feed", s.requireAPIKey("signals:read", s.subscriptionFeed))
 	mux.HandleFunc("PATCH /v1/subscriptions/{id}/interests", s.requireAPIKey("subscriptions:write", s.setInterests))
