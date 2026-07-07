@@ -4,12 +4,12 @@
 //
 // Score model: score = (2·match + quality) · recency
 //   - match:    Σ weights of interests the signal matches + keyword hits. This is
-//               the personal component; it dominates when interests are set.
+//     the personal component; it dominates when interests are set.
 //   - quality:  the signal's intrinsic newsworthiness (influence/severity/
-//               relevance/confidence), 0..1 — so an empty profile still surfaces
-//               the most important recent news.
+//     relevance/confidence), 0..1 — so an empty profile still surfaces
+//     the most important recent news.
 //   - recency:  time decay in [0.3, 1] so fresh events outrank stale ones without
-//               old-but-relevant items vanishing entirely.
+//     old-but-relevant items vanishing entirely.
 package relevance
 
 import (
@@ -79,7 +79,7 @@ func Score(p Profile, s Signal) Scored {
 	for _, kw := range p.Keywords {
 		kw = strings.ToLower(strings.TrimSpace(kw))
 		if kw != "" && strings.Contains(hay, kw) {
-			match += 1
+			match++
 			reasons = append(reasons, "keyword:"+kw)
 		}
 	}

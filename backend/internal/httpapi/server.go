@@ -59,6 +59,7 @@ func (s *Server) Handler() http.Handler {
 	s.registerSourceRoutes(mux)
 	s.registerStreamRoutes(mux)
 	s.registerSubscriptionRoutes(mux)
+	s.registerRelevanceRoutes(mux)
 	s.registerGraphQL(mux)
 	return cors(mux)
 }
