@@ -40,6 +40,21 @@ describe("Layout", () => {
     expect(screen.getByText("Users")).toBeInTheDocument();
   });
 
+  it("switches the color scheme from the account menu", async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    await user.click(screen.getByTestId("user-menu"));
+    const toggle = await screen.findByTestId("theme-toggle");
+    await user.click(within(toggle).getByText("Dark"));
+    await waitFor(() =>
+      expect(document.documentElement.getAttribute("data-mantine-color-scheme")).toBe("dark"),
+    );
+    await user.click(within(toggle).getByText("Light"));
+    await waitFor(() =>
+      expect(document.documentElement.getAttribute("data-mantine-color-scheme")).toBe("light"),
+    );
+  });
+
   it("toggles full-screen Live Mode from the top bar", async () => {
     renderLayout();
     expect(screen.getByText("home-content")).toBeInTheDocument();
