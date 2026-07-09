@@ -8,6 +8,6 @@ RUN CGO_ENABLED=0 go build -o /out/server ./cmd/server
 
 FROM gcr.io/distroless/static-debian12
 COPY --from=build /out/server /server
-EXPOSE 4000
-ENV HOST=0.0.0.0 PORT=4000 ROLE=all
+EXPOSE 4800
+ENV HOST=0.0.0.0 PORT=4800 ROLE=all
 ENTRYPOINT ["/server"]

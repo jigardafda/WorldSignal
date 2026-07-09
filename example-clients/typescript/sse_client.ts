@@ -1,13 +1,13 @@
 /**
  * Consume a WorldSignal subscription as a Server-Sent Events stream.
  *
- * Env: WS_API_BASE (default http://localhost:4000), WS_API_KEY (required),
+ * Env: WS_API_BASE (default http://localhost:4800), WS_API_KEY (required),
  *      WS_SUBSCRIPTION (default demo-stream), WS_SINCE (default 0), WS_MAX.
  *
  * Uses the built-in fetch stream — prefer the Authorization header over the
  * ?api_key= query param (browsers need it, but proxies may log URLs).
  */
-const BASE = process.env.WS_API_BASE ?? "http://localhost:4000";
+const BASE = process.env.WS_API_BASE ?? "http://localhost:4800";
 const KEY = process.env.WS_API_KEY ?? "";
 const SUB = process.env.WS_SUBSCRIPTION ?? "demo-stream";
 const SINCE = process.env.WS_SINCE ?? "0";

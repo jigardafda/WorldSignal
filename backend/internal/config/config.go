@@ -58,7 +58,7 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
 	}
 
-	port, err := strconv.Atoi(getenv("PORT", "4000"))
+	port, err := strconv.Atoi(getenv("PORT", "4800"))
 	if err != nil {
 		return Config{}, fmt.Errorf("PORT must be a number: %w", err)
 	}

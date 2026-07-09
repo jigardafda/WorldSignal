@@ -8,7 +8,7 @@ require 'json'
 require 'net/http'
 require 'uri'
 
-BASE = ENV.fetch('WS_API_BASE', 'http://localhost:4000')
+BASE = ENV.fetch('WS_API_BASE', 'http://localhost:4800')
 KEY = ENV.fetch('WS_API_KEY', '')
 SUB = ENV.fetch('WS_SUBSCRIPTION', 'demo-stream')
 MAX = ENV.fetch('WS_MAX', '0').to_i

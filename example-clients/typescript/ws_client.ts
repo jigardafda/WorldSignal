@@ -5,7 +5,7 @@
  */
 import WebSocket from "ws";
 
-const BASE = process.env.WS_API_BASE ?? "http://localhost:4000";
+const BASE = process.env.WS_API_BASE ?? "http://localhost:4800";
 const KEY = process.env.WS_API_KEY ?? "";
 const SUB = process.env.WS_SUBSCRIPTION ?? "demo-stream";
 const SINCE = process.env.WS_SINCE ?? "0";

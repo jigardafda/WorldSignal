@@ -10,8 +10,8 @@
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
 
-  // Backend (:4000), Vite dev server (:5173), Postgres (:5432).
-  "forwardPorts": [4000, 5173, 5432],
+  // Backend (:4800), Vite dev server (:5400), Postgres (:5432).
+  "forwardPorts": [4800, 5400, 5432],
 
   // Pre-fetch dependencies after the container is created.
   "postCreateCommand": "cd backend && go mod download && cd ../frontend && npm ci",

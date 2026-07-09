@@ -4,7 +4,7 @@
 # Env: WS_API_BASE, WS_API_KEY, WS_SUBSCRIPTION, WS_SINCE, WS_MAX.
 set -uo pipefail
 
-BASE="${WS_API_BASE:-http://localhost:4000}"
+BASE="${WS_API_BASE:-http://localhost:4800}"
 KEY="${WS_API_KEY:?WS_API_KEY is required}"
 SUB="${WS_SUBSCRIPTION:-demo-stream}"
 SINCE="${WS_SINCE:-0}"

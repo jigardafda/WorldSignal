@@ -11,7 +11,7 @@ import sys
 
 import websockets
 
-BASE = os.environ.get("WS_API_BASE", "http://localhost:4000")
+BASE = os.environ.get("WS_API_BASE", "http://localhost:4800")
 KEY = os.environ.get("WS_API_KEY", "")
 SUB = os.environ.get("WS_SUBSCRIPTION", "demo-stream")
 SINCE = os.environ.get("WS_SINCE", "0")

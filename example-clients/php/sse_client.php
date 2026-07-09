@@ -3,7 +3,7 @@
 // Opens the stream with an Authorization header and parses `data:` lines.
 // Env: WS_API_BASE, WS_API_KEY, WS_SUBSCRIPTION, WS_SINCE, WS_MAX.
 
-$base = getenv('WS_API_BASE') ?: 'http://localhost:4000';
+$base = getenv('WS_API_BASE') ?: 'http://localhost:4800';
 $key = getenv('WS_API_KEY') ?: '';
 $sub = getenv('WS_SUBSCRIPTION') ?: 'demo-stream';
 $since = getenv('WS_SINCE') ?: '0';

@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 // Backend target is overridable (e2e runs the Go backend on a separate port).
-const backend = process.env.WS_BACKEND ?? "http://localhost:4000";
+const backend = process.env.WS_BACKEND ?? "http://localhost:4800";
 
 export default defineConfig({
   plugins: [
@@ -53,7 +53,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    port: 5173,
+    port: 5400,
     proxy: {
       "/v1": backend,
       "/graphql": backend,

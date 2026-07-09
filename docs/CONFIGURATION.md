@@ -11,7 +11,7 @@ missing or `ROLE`/`PORT`/`SCHEDULER_TICK_MS` are invalid.
 | `DATABASE_URL` | **yes** | — | Postgres connection string (e.g. `postgresql://user@host:5432/worldsignal?sslmode=disable`). |
 | `ROLE` | no | `all` | Process role: `all` \| `api` \| `worker`. |
 | `HOST` | no | `0.0.0.0` | Bind address for the HTTP server. |
-| `PORT` | no | `4000` | HTTP port. |
+| `PORT` | no | `4800` | HTTP port. |
 | `OPENAI_API_KEY` | no | _(empty)_ | System LLM key. Empty ⇒ heuristic enrichment. Overridden at runtime by an active admin-managed key. |
 | `OPENAI_MODEL` | no | `gpt-4o-mini` | Default chat model for enrichment. |
 | `WEBHOOK_SIGNING_SECRET` | no | `change-me-in-prod` | Signs delivery webhooks **and** derives the AES key that encrypts admin LLM keys and email-connector secrets at rest. **Set a strong value in production** — changing it invalidates stored LLM keys and connector passwords. |
@@ -40,7 +40,7 @@ Never commit real secrets. `.gitignore` already excludes `.env` and `.env.local`
 ## Frontend
 
 The SPA has no runtime secrets. The dev server proxies `/graphql` and `/v1` to the
-backend (`WS_BACKEND`, default `http://localhost:4000`) — see `frontend/vite.config.ts`.
+backend (`WS_BACKEND`, default `http://localhost:4800`) — see `frontend/vite.config.ts`.
 
 ## Databases used in this repo
 

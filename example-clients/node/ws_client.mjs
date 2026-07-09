@@ -4,7 +4,7 @@
 // set request headers, so it authenticates with the ?api_key= query param
 // (the same fallback the browser uses). Frames are {seq, payload} JSON, with a
 // leading {type:"connected"} handshake. Env: same as sse_client.mjs.
-const BASE = process.env.WS_API_BASE || "http://localhost:4000";
+const BASE = process.env.WS_API_BASE || "http://localhost:4800";
 const KEY = process.env.WS_API_KEY || "";
 const SUB = process.env.WS_SUBSCRIPTION || "demo-stream";
 const SINCE = process.env.WS_SINCE || "0";

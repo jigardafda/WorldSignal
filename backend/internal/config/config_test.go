@@ -84,7 +84,7 @@ func TestLoadInvalidPort(t *testing.T) {
 func TestLoadInvalidTick(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://x")
 	t.Setenv("ROLE", "all")
-	t.Setenv("PORT", "4000")
+	t.Setenv("PORT", "4800")
 	t.Setenv("SCHEDULER_TICK_MS", "xx")
 	if _, err := Load(); err == nil {
 		t.Fatal("expected error for invalid SCHEDULER_TICK_MS")

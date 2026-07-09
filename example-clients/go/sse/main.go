@@ -36,7 +36,7 @@ func or(v, def string) string {
 }
 
 func main() {
-	base := env("WS_API_BASE", "http://localhost:4000")
+	base := env("WS_API_BASE", "http://localhost:4800")
 	key := os.Getenv("WS_API_KEY")
 	sub := env("WS_SUBSCRIPTION", "demo-stream")
 	since := env("WS_SINCE", "0")

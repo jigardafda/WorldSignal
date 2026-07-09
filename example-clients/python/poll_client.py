@@ -13,7 +13,7 @@ import sys
 import time
 import urllib.request
 
-BASE = os.environ.get("WS_API_BASE", "http://localhost:4000")
+BASE = os.environ.get("WS_API_BASE", "http://localhost:4800")
 KEY = os.environ.get("WS_API_KEY", "")
 SUB = os.environ.get("WS_SUBSCRIPTION", "demo-stream")
 MAX = int(os.environ.get("WS_MAX", "0"))

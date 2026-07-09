@@ -4,7 +4,7 @@
 #      WS_INTERVAL (seconds, default 3).
 set -euo pipefail
 
-BASE="${WS_API_BASE:-http://localhost:4000}"
+BASE="${WS_API_BASE:-http://localhost:4800}"
 KEY="${WS_API_KEY:?WS_API_KEY is required}"
 SUB="${WS_SUBSCRIPTION:-demo-stream}"
 CURSOR="${WS_SINCE:-0}"

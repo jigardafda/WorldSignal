@@ -10,11 +10,11 @@ export default defineConfig({
   workers: 1,
   timeout: 30_000,
   globalSetup: "./e2e/global-setup.ts",
-  use: { baseURL: "http://localhost:5173", trace: "on-first-retry" },
+  use: { baseURL: "http://localhost:5400", trace: "on-first-retry" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {
-      // Run on 4100 so it never collides with a dev backend on the default 4000.
+      // Run on 4100 so it never collides with a dev backend on the default 4800.
       command: "/tmp/ws-go",
       env: {
         DATABASE_URL: E2E_DB,
@@ -31,7 +31,7 @@ export default defineConfig({
     {
       command: "npm run dev",
       env: { WS_BACKEND: "http://127.0.0.1:4100" },
-      url: "http://localhost:5173",
+      url: "http://localhost:5400",
       reuseExistingServer: false,
       timeout: 30_000,
     },

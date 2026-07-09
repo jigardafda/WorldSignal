@@ -85,12 +85,12 @@ cp .env.example backend/.env.local   # edit as needed; git-ignored
 ./dev.sh
 ```
 
-- Web console: <http://localhost:5173> · GraphQL: <http://localhost:4000/graphql> · Health: <http://localhost:4000/health>
+- Web console: <http://localhost:5400> · GraphQL: <http://localhost:4800/graphql> · Health: <http://localhost:4800/health>
 - Default admin: `admin@worldsignal.local` / `admin12345` — **change it after first login**.
 
 Without an `OPENAI_API_KEY`, enrichment uses a deterministic heuristic, so the pipeline still
 produces Signals. Everything runs in Docker too: `docker compose up --build` (web console on
-<http://localhost:8080>, API on `:4000`).
+<http://localhost:8080>, API on `:4800`).
 
 ### Other ways to run
 

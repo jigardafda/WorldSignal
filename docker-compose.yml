@@ -33,7 +33,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-change-me-in-prod}
     ports:
-      - "4000:4000"
+      - "4800:4800"
 
   frontend:
     build: ./frontend
