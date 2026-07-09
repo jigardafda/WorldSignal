@@ -70,7 +70,7 @@ Every pull client reads the same variables:
 
 | Var | Default | Meaning |
 |-----|---------|---------|
-| `WS_API_BASE` | `http://localhost:4000` | server base URL |
+| `WS_API_BASE` | `http://localhost:4800` | server base URL |
 | `WS_API_KEY` | — | API key with the `signals:read` scope (**required**) |
 | `WS_SUBSCRIPTION` | `demo-stream` | subscription id to consume |
 | `WS_SINCE` | `0` | resume cursor (`0` = from the start of the log) |

@@ -3,7 +3,7 @@
 // Env: WS_API_BASE, WS_API_KEY, WS_SUBSCRIPTION, WS_SINCE, WS_MAX,
 //      WS_INTERVAL (seconds, default 3).
 
-$base = getenv('WS_API_BASE') ?: 'http://localhost:4000';
+$base = getenv('WS_API_BASE') ?: 'http://localhost:4800';
 $key = getenv('WS_API_KEY') ?: '';
 $sub = getenv('WS_SUBSCRIPTION') ?: 'demo-stream';
 $max = (int)(getenv('WS_MAX') ?: '0');

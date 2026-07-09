@@ -51,7 +51,7 @@ describe("codeFor", () => {
 
   it("falls back to placeholders for empty base URL / subscription id", () => {
     const code = codeFor("curl", "SSE", { baseUrl: "", subscriptionId: "" })!;
-    expect(code).toContain("localhost:4000");
+    expect(code).toContain("localhost:4800");
     expect(code).toContain("subscription=%3Csubscription-id%3E"); // encoded <subscription-id>
   });
 

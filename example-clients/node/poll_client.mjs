@@ -5,7 +5,7 @@
 //
 // Dependency-free (Node 18+ global fetch). Env: WS_API_BASE, WS_API_KEY,
 // WS_SUBSCRIPTION, WS_SINCE, WS_MAX, WS_INTERVAL (seconds, default 3).
-const BASE = process.env.WS_API_BASE || "http://localhost:4000";
+const BASE = process.env.WS_API_BASE || "http://localhost:4800";
 const KEY = process.env.WS_API_KEY || "";
 const SUB = process.env.WS_SUBSCRIPTION || "demo-stream";
 const MAX = Number(process.env.WS_MAX || "0");

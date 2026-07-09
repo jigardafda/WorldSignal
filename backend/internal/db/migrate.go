@@ -254,7 +254,20 @@ CREATE INDEX IF NOT EXISTS "DigestQueue_sub_idx" ON "DigestQueue"("subscriptionI
 -- stream cursor. Adding it with a volatile default backfills existing rows.
 CREATE SEQUENCE IF NOT EXISTS "DeliveryEvent_seq_seq";
 ALTER TABLE "DeliveryEvent" ADD COLUMN IF NOT EXISTS "seq" bigint NOT NULL DEFAULT nextval('"DeliveryEvent_seq_seq"');
-CREATE INDEX IF NOT EXISTS "DeliveryEvent_sub_seq_idx" ON "DeliveryEvent"("subscriptionId","seq");`
+CREATE INDEX IF NOT EXISTS "DeliveryEvent_sub_seq_idx" ON "DeliveryEvent"("subscriptionId","seq");
+
+-- Smart-signals relevance engine: a subscription carries a weighted interest
+-- graph (dimension:value -> weight) used to rank its personalized "For You" feed;
+-- feedback (open/up/down) is logged per subscription+signal for later learning.
+ALTER TABLE "Subscription" ADD COLUMN IF NOT EXISTS "interests" jsonb NOT NULL DEFAULT '{}';
+CREATE TABLE IF NOT EXISTS "SignalFeedback" (
+  "subscriptionId" text NOT NULL REFERENCES "Subscription"("id") ON DELETE CASCADE,
+  "signalId"       text NOT NULL REFERENCES "Signal"("id") ON DELETE CASCADE,
+  "action"         text NOT NULL,
+  "createdAt"      timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("subscriptionId","signalId","action")
+);
+CREATE INDEX IF NOT EXISTS "SignalFeedback_sub_idx" ON "SignalFeedback"("subscriptionId","createdAt" DESC);`
 
 // MigrateContent ensures the extended source-metadata columns and the
 // SourceValidationLog table exist. Safe to run repeatedly.

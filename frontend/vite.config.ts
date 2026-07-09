@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 // Backend target is overridable (e2e runs the Go backend on a separate port).
-const backend = process.env.WS_BACKEND ?? "http://localhost:4000";
+const backend = process.env.WS_BACKEND ?? "http://localhost:4800";
 
 export default defineConfig({
   plugins: [
@@ -15,7 +15,10 @@ export default defineConfig({
       registerType: "autoUpdate",
       injectRegister: "auto",
       manifest: false,
-      devOptions: { enabled: true, type: "module" },
+      // Keep the service worker OUT of dev: a dev-mode SW precaches the app shell
+      // and, when it updates on code changes, flashes a stale-cache overlay after
+      // login. The PWA/offline behavior still ships in production builds.
+      devOptions: { enabled: false, type: "module" },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
         // The lazy geo/boundary and 3D-globe (three.js) chunks are multi-MB; keep
@@ -50,7 +53,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    port: 5173,
+    port: 5400,
     proxy: {
       "/v1": backend,
       "/graphql": backend,

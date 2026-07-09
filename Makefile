@@ -15,7 +15,7 @@ help: ## Show this help
 		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) }' $(MAKEFILE_LIST)
 
 .PHONY: dev
-dev: ## Start backend (:4000) + frontend (:5173) for local development
+dev: ## Start backend (:4800) + frontend (:5400) for local development
 	./dev.sh
 
 ##@ Database

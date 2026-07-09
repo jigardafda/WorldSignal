@@ -8,7 +8,7 @@
 #   ./test.sh              # uses WS_API_BASE / DATABASE_URL / admin defaults
 set -uo pipefail
 
-BASE="${WS_API_BASE:-http://localhost:4000}"
+BASE="${WS_API_BASE:-http://localhost:4800}"
 DB="${DATABASE_URL:-postgresql://worldsignal:worldsignal@localhost:5432/worldsignal?sslmode=disable}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SUB="client-e2e-$(python3 -c 'import time;print(int(time.time()))')"

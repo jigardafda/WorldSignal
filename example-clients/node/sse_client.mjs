@@ -5,7 +5,7 @@
 // the stream with fetch() and parses `data:` lines itself — letting it use the
 // header (preferred) instead of the ?api_key= query param. Dependency-free.
 // Env: WS_API_BASE, WS_API_KEY, WS_SUBSCRIPTION, WS_SINCE, WS_MAX.
-const BASE = process.env.WS_API_BASE || "http://localhost:4000";
+const BASE = process.env.WS_API_BASE || "http://localhost:4800";
 const KEY = process.env.WS_API_KEY || "";
 const SUB = process.env.WS_SUBSCRIPTION || "demo-stream";
 const SINCE = process.env.WS_SINCE || "0";

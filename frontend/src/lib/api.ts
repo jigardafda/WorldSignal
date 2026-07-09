@@ -166,6 +166,42 @@ function sourceArgs(f: SourceFilter = {}, extra: Record<string, string | number>
 }
 const USER_FIELDS = `id email name role status createdAt updatedAt`;
 
+/** One ranked signal in a profile's "For You" feed. */
+export interface FeedItem {
+  id: string;
+  title: string;
+  summary: string;
+  eventType: string;
+  country: string;
+  region: string;
+  sentiment: string;
+  influence: string;
+  severity: string;
+  ageHours: number;
+  score: number;
+  reasons: string[];
+}
+
+export type FeedbackAction = "OPEN" | "UP" | "DOWN";
+
+/** A reason one interest was proposed, with its provenance. */
+export interface DraftReason {
+  key: string;
+  why: string;
+  origin: "doc" | "web" | "inferred";
+}
+
+/** An AI-proposed profile built from a document. */
+export interface ProfileDraft {
+  name: string;
+  summary: string;
+  minScore: number;
+  minSeverity: string;
+  source: "llm" | "heuristic";
+  interests: Record<string, number>;
+  reasons: DraftReason[];
+}
+
 export const api = {
   // auth
   login: (email: string, password: string) =>
@@ -346,6 +382,30 @@ export const api = {
     const args = sourceArgs(filter as Record<string, string>, { limit, offset });
     return gql<{ auditLogs: Page<AuditLog> }>(`{auditLogs${args}{items{id actorEmail actorRole action targetType targetId metadata createdAt} total}}`).then((d) => d.auditLogs);
   },
+
+  // smart-signals relevance feed (For You)
+  subscriptionFeed: (id: string, minScore = 0, limit = 40) =>
+    gql<{ subscriptionFeed: FeedItem[] }>(
+      `query($id:ID!,$m:Float,$l:Int){subscriptionFeed(id:$id,minScore:$m,limit:$l){id title summary eventType country region sentiment influence severity ageHours score reasons}}`,
+      { id, m: minScore, l: limit },
+    ).then((d) => d.subscriptionFeed),
+  subscriptionInterests: (id: string) =>
+    gql<{ subscriptionInterests: Record<string, number> }>(`query($id:ID!){subscriptionInterests(id:$id)}`, { id }).then((d) => d.subscriptionInterests),
+  setSubscriptionInterests: (id: string, interests: Record<string, number>) =>
+    gql<{ setSubscriptionInterests: { ok: boolean } }>(
+      `mutation($id:ID!,$i:JSON){setSubscriptionInterests(id:$id,interests:$i){ok}}`,
+      { id, i: interests },
+    ).then((d) => d.setSubscriptionInterests),
+  recordSignalFeedback: (subscriptionId: string, signalId: string, action: FeedbackAction) =>
+    gql<{ recordSignalFeedback: boolean }>(
+      `mutation($s:ID!,$g:ID!,$a:String!){recordSignalFeedback(subscriptionId:$s,signalId:$g,action:$a)}`,
+      { s: subscriptionId, g: signalId, a: action },
+    ).then((d) => d.recordSignalFeedback),
+  draftProfileFromDocument: (text: string) =>
+    gql<{ draftProfileFromDocument: ProfileDraft }>(
+      `mutation($t:String!){draftProfileFromDocument(text:$t){name summary minScore minSeverity source interests reasons{key why origin}}}`,
+      { t: text },
+    ).then((d) => d.draftProfileFromDocument),
 };
 
 const LLM_KEY_FIELDS = `id provider label keyLast4 model isActive status lastTestedAt lastError createdBy createdAt updatedAt`;

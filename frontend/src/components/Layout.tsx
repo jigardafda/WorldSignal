@@ -1,9 +1,10 @@
-import { AppShell, Burger, Group, Menu, NavLink, ScrollArea, SegmentedControl, Text, Avatar, UnstyledButton } from "@mantine/core";
+import { AppShell, Burger, Center, Group, Menu, NavLink, ScrollArea, SegmentedControl, Text, Avatar, UnstyledButton, useMantineColorScheme, type MantineColorScheme } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
   IconActivity, IconArticle, IconBell, IconBroadcast, IconChartBar, IconDatabase,
   IconFileText, IconGauge, IconListCheck, IconLogout, IconMail, IconSettings, IconSitemap,
-  IconUsers, IconUsersGroup, IconUserSearch, IconKey,
+  IconUsers, IconUsersGroup, IconUserSearch, IconKey, IconSparkles, IconListDetails,
+  IconSun, IconMoon, IconDeviceLaptop,
 } from "@tabler/icons-react";
 import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
@@ -14,7 +15,13 @@ interface NavItem { to: string; label: string; icon: React.ReactNode; perm?: str
 interface NavSection { title?: string; items: NavItem[] }
 
 const NAV: NavSection[] = [
-  { items: [{ to: "/", label: "Dashboard", icon: <IconGauge size={18} /> }] },
+  {
+    items: [
+      { to: "/", label: "Dashboard", icon: <IconGauge size={18} /> },
+      { to: "/for-you", label: "For You", icon: <IconSparkles size={18} />, perm: "subscriptions:read" },
+      { to: "/profiles", label: "Profiles", icon: <IconListDetails size={18} />, perm: "subscriptions:read" },
+    ],
+  },
   {
     title: "Intelligence",
     items: [
@@ -60,6 +67,7 @@ export function Layout() {
   const { user, logout, hasPerm } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
   const live = location.pathname === "/live"; // URL-driven so it survives reloads
 
   // Filter each section by permission, dropping sections that end up empty.
@@ -103,6 +111,21 @@ export function Layout() {
               </UnstyledButton>
             </Menu.Target>
             <Menu.Dropdown>
+              <Menu.Label>Theme</Menu.Label>
+              <SegmentedControl
+                data-testid="theme-toggle"
+                fullWidth
+                size="xs"
+                value={colorScheme}
+                onChange={(v) => setColorScheme(v as MantineColorScheme)}
+                data={[
+                  { value: "light", label: <Center><IconSun size={14} /><Text span size="xs" ml={5}>Light</Text></Center> },
+                  { value: "dark", label: <Center><IconMoon size={14} /><Text span size="xs" ml={5}>Dark</Text></Center> },
+                  { value: "auto", label: <Center><IconDeviceLaptop size={14} /><Text span size="xs" ml={5}>System</Text></Center> },
+                ]}
+                mb={4}
+              />
+              <Menu.Divider />
               <Menu.Item leftSection={<IconSettings size={16} />} onClick={() => navigate("/account")}>Account</Menu.Item>
               <Menu.Item color="red" leftSection={<IconLogout size={16} />} onClick={() => { void logout(); }}>Log out</Menu.Item>
             </Menu.Dropdown>

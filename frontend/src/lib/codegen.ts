@@ -26,7 +26,7 @@ const KEY = "$WORLDSIGNAL_API_KEY"; // placeholder; a real key looks like wsk_â€
 const SECRET_ENV = "WORLDSIGNAL_WEBHOOK_SECRET";
 
 function urls(o: CodeOpts) {
-  const base = (o.baseUrl || "http://localhost:4000").replace(/\/+$/, "");
+  const base = (o.baseUrl || "http://localhost:4800").replace(/\/+$/, "");
   const sub = encodeURIComponent(o.subscriptionId || "<subscription-id>");
   return {
     base,
