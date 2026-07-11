@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version: "1.25.12"
           cache-dependency-path: backend/go.sum
       - name: Bootstrap base schema
         run: psql "$GO_TEST_DB" -v ON_ERROR_STOP=1 -f backend/schema/schema.sql
@@ -75,7 +75,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version: "1.25.12"
           cache: false
       - uses: golangci/golangci-lint-action@v9
         with:
@@ -90,7 +90,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version: "1.25.12"
       - name: govulncheck
         working-directory: backend
         run: |
@@ -109,7 +109,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version: "1.25.12"
       - name: Build server + sourcetool
         working-directory: backend
         env:
@@ -157,7 +157,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version: "1.25.12"
       - uses: actions/setup-node@v6
         with:
           node-version: 20
