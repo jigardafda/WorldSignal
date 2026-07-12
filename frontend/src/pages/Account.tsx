@@ -1,4 +1,4 @@
-import { Button, Card, Grid, Group, PasswordInput, Stack, Text } from "@mantine/core";
+import { Badge, Button, Card, Grid, Group, PasswordInput, Stack, Text } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useState } from "react";
@@ -31,15 +31,32 @@ export function Account() {
 
   return (
     <>
-      <PageHeader title="Account" subtitle="Your profile and security" />
+      <PageHeader title={user?.account ? "My Account" : "Account"}
+        subtitle={user?.account ? "Your workspace, plan and security" : "Your profile and security"} />
       <Grid>
+        {user?.account && (
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Card withBorder radius="md" data-testid="workspace-card">
+              <Text fw={700} mb="sm">Workspace</Text>
+              <Stack gap={6}>
+                <Text size="sm"><b>Name:</b> {user.account.name}</Text>
+                <Group gap="xs"><Text size="sm" fw={700}>Plan:</Text><Badge variant="light" color="teal">{user.account.plan}</Badge></Group>
+                <Group gap="xs"><Text size="sm" fw={700}>Status:</Text><StatusBadge status={user.account.status} /></Group>
+                <Text size="sm"><b>Workspace ID:</b> <Text span ff="monospace">{user.account.slug}</Text></Text>
+              </Stack>
+            </Card>
+          </Grid.Col>
+        )}
         <Grid.Col span={{ base: 12, md: 6 }}>
           <Card withBorder radius="md">
             <Text fw={700} mb="sm">Profile</Text>
             <Stack gap={4}>
               <Text size="sm"><b>Email:</b> {user?.email}</Text>
               <Text size="sm"><b>Name:</b> {user?.name || "—"}</Text>
-              <Group gap="xs"><Text size="sm" fw={700}>Role:</Text>{user && <StatusBadge status={user.role} />}</Group>
+              {/* The internal RBAC role is operator-only context; tenants see plan instead. */}
+              {user && !user.account && (
+                <Group gap="xs"><Text size="sm" fw={700}>Role:</Text><StatusBadge status={user.role} /></Group>
+              )}
               <Text size="sm"><b>Member since:</b> {fmtDate(user?.createdAt)}</Text>
             </Stack>
           </Card>

@@ -117,6 +117,13 @@ func (s *Server) resolveMe(ctx context.Context, _ map[string]any) (any, error) {
 	}
 	out := userToMap(u)
 	out["permissions"] = auth.EffectivePermissions(u.Role, u.AccountID != nil)
+	// Attach the tenant's account so the customer console has workspace context
+	// (name, plan, status) without a second round-trip. Best-effort.
+	if u.AccountID != nil {
+		if a, _ := s.DB.GetAccount(ctx, *u.AccountID); a != nil {
+			out["account"] = accountToMap(a)
+		}
+	}
 	return out, nil
 }
 

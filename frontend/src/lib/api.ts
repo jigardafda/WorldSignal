@@ -9,6 +9,8 @@ export interface User {
   role: string;
   status: string;
   accountId?: string | null;
+  // For account-scoped (tenant) users, `me` carries their workspace/account.
+  account?: { id: string; name: string; slug: string; status: string; plan: string } | null;
   createdAt: string;
   updatedAt: string;
   permissions?: string[];
@@ -214,7 +216,7 @@ export const api = {
       `mutation($e:String!,$p:String!){login(email:$e,password:$p){token user{${USER_FIELDS} permissions}}}`,
       { e: email, p: password },
     ).then((d) => d.login),
-  me: () => gql<{ me: User | null }>(`{me{${USER_FIELDS} permissions}}`).then((d) => d.me),
+  me: () => gql<{ me: User | null }>(`{me{${USER_FIELDS} permissions account{id name slug status plan}}}`).then((d) => d.me),
   logout: () => gql<{ logout: boolean }>(`mutation{logout}`).then((d) => d.logout),
   changePassword: (oldPassword: string, newPassword: string) =>
     gql<{ changePassword: boolean }>(

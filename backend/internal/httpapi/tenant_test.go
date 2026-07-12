@@ -35,8 +35,9 @@ func TestTenantConsoleSeparation(t *testing.T) {
 	defer func() { bearer = "" }()
 
 	// me/permissions reflect the tenant capability set (signals:read, analytics:read)
-	// — NOT the operator role matrix, even though the stored role is ADMIN.
-	if _, body := postGQL(t, ht.URL, `{"query":"{me{role accountId permissions}}"}`); !strings.Contains(body, `"permissions":["analytics:read","signals:read"]`) || !strings.Contains(body, `"accountId":"`+acme.ID+`"`) {
+	// — NOT the operator role matrix, even though the stored role is ADMIN. me also
+	// carries the tenant's account for workspace context.
+	if _, body := postGQL(t, ht.URL, `{"query":"{me{role accountId permissions account{name plan}}}"}`); !strings.Contains(body, `"permissions":["analytics:read","signals:read"]`) || !strings.Contains(body, `"accountId":"`+acme.ID+`"`) || !strings.Contains(body, `"account":{"name":"Acme"`) || !strings.Contains(body, `"plan":"PRO"`) {
 		t.Fatalf("tenant me: %s", body)
 	}
 
