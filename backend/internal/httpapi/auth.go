@@ -116,7 +116,7 @@ func (s *Server) resolveMe(ctx context.Context, _ map[string]any) (any, error) {
 		return nil, err
 	}
 	out := userToMap(u)
-	out["permissions"] = auth.Permissions(u.Role)
+	out["permissions"] = auth.EffectivePermissions(u.Role, u.AccountID != nil)
 	return out, nil
 }
 
@@ -125,7 +125,7 @@ func (s *Server) resolvePermissions(ctx context.Context, _ map[string]any) (any,
 	if err != nil {
 		return nil, err
 	}
-	return auth.Permissions(id.Role), nil
+	return auth.EffectivePermissions(id.Role, id.AccountID != nil), nil
 }
 
 // SeedDefaultAdmin creates an initial ADMIN user when the table is empty.

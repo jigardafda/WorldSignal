@@ -78,6 +78,24 @@ func AuthToken(t *testing.T, d *db.DB, role string) (string, *db.User) {
 	return token, u
 }
 
+// AuthTokenTenant creates an account-scoped (tenant) user with an active session,
+// returning the bearer token and the user. The account must already exist.
+func AuthTokenTenant(t *testing.T, d *db.DB, role, accountID string) (string, *db.User) {
+	t.Helper()
+	u := SeedUser(t, d, "tenant-"+cuid.New()+"@test.local", role)
+	if _, err := d.UpdateUser(context.Background(), u.ID, db.UserPatch{AccountID: &accountID}); err != nil {
+		t.Fatalf("bind user to account: %v", err)
+	}
+	token, err := auth.GenerateToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.CreateSession(context.Background(), u.ID, token, time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	return token, u
+}
+
 // Reset truncates all application tables and restarts identities.
 func Reset(t *testing.T, d *db.DB) {
 	t.Helper()

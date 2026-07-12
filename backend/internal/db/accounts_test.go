@@ -108,6 +108,56 @@ func TestAccountCRUD(t *testing.T) {
 	}
 }
 
+func TestUserAccountBinding(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	ctx := context.Background()
+
+	acme, err := d.CreateAccount(ctx, cuid.New(), "Acme", "acme", "FREE")
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	u, err := d.CreateUser(ctx, "u@test.local", "U", "hash", "ADMIN")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if u.AccountID != nil {
+		t.Fatal("new user should be platform staff (nil accountId)")
+	}
+	// Bind to a tenant.
+	bound, err := d.UpdateUser(ctx, u.ID, db.UserPatch{AccountID: &acme.ID})
+	if err != nil || bound == nil || bound.AccountID == nil || *bound.AccountID != acme.ID {
+		t.Fatalf("bind: %+v %v", bound, err)
+	}
+	// Unbind (pointer to empty string → NULL).
+	empty := ""
+	unbound, err := d.UpdateUser(ctx, u.ID, db.UserPatch{AccountID: &empty})
+	if err != nil || unbound == nil || unbound.AccountID != nil {
+		t.Fatalf("unbind: %+v %v", unbound, err)
+	}
+}
+
+func TestDeleteAPIKeyForAccount(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	ctx := context.Background()
+
+	a, _ := d.CreateAccount(ctx, cuid.New(), "A", "a", "FREE")
+	b, _ := d.CreateAccount(ctx, cuid.New(), "B", "b", "FREE")
+	key, err := d.CreateAPIKey(ctx, cuid.New(), db.CreateAPIKeyInput{AccountID: a.ID, Name: "k", Hash: "h", Prefix: "wsk_a", Scopes: []string{"signals:read"}, RateLimitPerMin: 10})
+	if err != nil {
+		t.Fatalf("create key: %v", err)
+	}
+	// A different account cannot delete it.
+	if ok, err := d.DeleteAPIKeyForAccount(ctx, key.ID, b.ID); err != nil || ok {
+		t.Fatalf("cross-account delete should not succeed: ok=%v err=%v", ok, err)
+	}
+	// The owning account can.
+	if ok, err := d.DeleteAPIKeyForAccount(ctx, key.ID, a.ID); err != nil || !ok {
+		t.Fatalf("owner delete should succeed: ok=%v err=%v", ok, err)
+	}
+}
+
 func TestAccountDBErrors(t *testing.T) {
 	d := dbtest.Connect(t)
 	dbtest.Reset(t, d)

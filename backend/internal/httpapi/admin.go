@@ -55,6 +55,19 @@ func (s *Server) mutCreateUser(ctx context.Context, args map[string]any) (any, e
 	if email == "" || len(password) < 8 || !auth.ValidRole(role) {
 		return nil, fmt.Errorf("%w: email, password (min 8 chars) and a valid role are required", errValidation)
 	}
+	// An optional accountId binds the new user to a tenant (customer console);
+	// omitting it creates platform staff (operator console).
+	var accountID string
+	if v, ok := input["accountId"].(string); ok && v != "" {
+		acct, err := s.DB.GetAccount(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		if acct == nil {
+			return nil, fmt.Errorf("%w: unknown account %q", errValidation, v)
+		}
+		accountID = v
+	}
 	hash, err := auth.HashPassword(password)
 	if err != nil {
 		return nil, err
@@ -63,7 +76,14 @@ func (s *Server) mutCreateUser(ctx context.Context, args map[string]any) (any, e
 	if err != nil {
 		return nil, err
 	}
-	s.audit(ctx, "USER_CREATED", "user", u.ID, map[string]any{"email": email, "role": role})
+	if accountID != "" {
+		if bound, err := s.DB.UpdateUser(ctx, u.ID, db.UserPatch{AccountID: &accountID}); err != nil {
+			return nil, err
+		} else if bound != nil {
+			u = bound
+		}
+	}
+	s.audit(ctx, "USER_CREATED", "user", u.ID, map[string]any{"email": email, "role": role, "accountId": accountID})
 	return userToMap(u), nil
 }
 

@@ -106,3 +106,47 @@ func TestContextHelpers(t *testing.T) {
 		t.Fatal("editor should be forbidden from users:manage")
 	}
 }
+
+func TestTenantPermissions(t *testing.T) {
+	// A tenant (account-scoped) user is limited to the tenant capability set,
+	// regardless of a privileged stored role.
+	if len(TenantPermissions()) != 2 {
+		t.Fatalf("tenant perms = %v", TenantPermissions())
+	}
+	if !CanScoped(RoleAdmin, true, PermSignalsRead) {
+		t.Fatal("tenant should read signals")
+	}
+	if CanScoped(RoleAdmin, true, PermUsersManage) {
+		t.Fatal("tenant admin must NOT manage users")
+	}
+	if CanScoped(RoleAdmin, true, PermSourcesRead) {
+		t.Fatal("tenant admin must NOT read sources")
+	}
+	// Platform staff keep the full role matrix.
+	if !CanScoped(RoleAdmin, false, PermUsersManage) {
+		t.Fatal("staff admin should manage users")
+	}
+	// EffectivePermissions switches on the tenant flag.
+	if got := EffectivePermissions(RoleAdmin, true); len(got) != len(TenantPermissions()) {
+		t.Fatalf("tenant effective perms = %v", got)
+	}
+	if got := EffectivePermissions(RoleAdmin, false); len(got) != len(allPerms) {
+		t.Fatalf("staff admin effective perms = %d", len(got))
+	}
+
+	// RequirePermission honours the identity's account scope.
+	acct := "acct_x"
+	ctx := WithIdentity(context.Background(), &Identity{UserID: "u", Role: RoleAdmin, AccountID: &acct})
+	if !IsTenant(ctx) {
+		t.Fatal("identity with account should be a tenant")
+	}
+	if err := RequirePermission(ctx, PermSignalsRead); err != nil {
+		t.Fatalf("tenant should pass signals:read: %v", err)
+	}
+	if err := RequirePermission(ctx, PermUsersManage); !errors.Is(err, ErrForbidden) {
+		t.Fatal("tenant admin should be forbidden from users:manage")
+	}
+	if IsTenant(WithIdentity(context.Background(), &Identity{UserID: "s", Role: RoleAdmin})) {
+		t.Fatal("staff identity should not be a tenant")
+	}
+}

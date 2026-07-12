@@ -106,11 +106,13 @@ func (d *DB) ListUsers(ctx context.Context) ([]*User, error) {
 	return out, rows.Err()
 }
 
-// UserPatch holds optional user updates.
+// UserPatch holds optional user updates. AccountID binds (or, when set to a
+// pointer to "", unbinds) the user to a tenant.
 type UserPatch struct {
-	Name   *string
-	Role   *string
-	Status *string
+	Name      *string
+	Role      *string
+	Status    *string
+	AccountID *string
 }
 
 // UpdateUser applies a partial update and returns the row.
@@ -128,6 +130,15 @@ func (d *DB) UpdateUser(ctx context.Context, id string, p UserPatch) (*User, err
 	if p.Status != nil {
 		args = append(args, *p.Status)
 		sets += `, "status"=$` + itoa(len(args))
+	}
+	if p.AccountID != nil {
+		// A pointer to the empty string unbinds the user (platform staff).
+		if *p.AccountID == "" {
+			sets += `, "accountId"=NULL`
+		} else {
+			args = append(args, *p.AccountID)
+			sets += `, "accountId"=$` + itoa(len(args))
+		}
 	}
 	row := d.Pool.QueryRow(ctx, `UPDATE "User" SET `+sets+` WHERE "id"=$1 RETURNING `+userCols, args...)
 	u, err := scanUser(row)

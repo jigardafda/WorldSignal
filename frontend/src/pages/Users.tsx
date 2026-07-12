@@ -4,7 +4,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { IconPlus } from "@tabler/icons-react";
 import { useState } from "react";
-import { api, type User } from "../lib/api";
+import { api, type Account, type User } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useAuth } from "../lib/auth";
 import { AsyncBoundary } from "../components/States";
@@ -12,18 +12,21 @@ import { PageHeader } from "../components/PageHeader";
 import { DataTable } from "../components/DataTable";
 import { ConfirmButton } from "../components/ConfirmButton";
 import { StatusBadge } from "../components/badges";
+import { Badge } from "@mantine/core";
 import { fmtDate } from "../lib/format";
 
 const ROLES = ["ADMIN", "EDITOR", "VIEWER"];
 const STATUSES = ["ACTIVE", "SUSPENDED"];
+const STAFF = ""; // sentinel for "platform staff (operator)" in the account select
 
 export function Users() {
   const { user: me } = useAuth();
   const state = useAsync<User[]>(() => api.users(), []);
+  const accounts = useAsync<Account[]>(() => api.accounts(), []);
   const [opened, { open, close }] = useDisclosure(false);
   const [busy, setBusy] = useState(false);
   const form = useForm({
-    initialValues: { email: "", name: "", password: "", role: "VIEWER" },
+    initialValues: { email: "", name: "", password: "", role: "VIEWER", accountId: STAFF },
     validate: {
       email: (v) => (/^\S+@\S+$/.test(v) ? null : "Valid email required"),
       password: (v) => (v.length >= 8 ? null : "Min 8 characters"),
@@ -33,12 +36,19 @@ export function Users() {
   async function create(v: typeof form.values) {
     setBusy(true);
     try {
-      await api.createUser(v);
+      // An empty accountId creates platform staff; a selected account creates a
+      // tenant (customer-console) user.
+      await api.createUser({ email: v.email, name: v.name, password: v.password, role: v.role, accountId: v.accountId || undefined });
       notifications.show({ message: "User created", color: "green" });
       close(); form.reset(); state.reload();
     } catch (e) { notifications.show({ message: e instanceof Error ? e.message : "Failed", color: "red" }); }
     finally { setBusy(false); }
   }
+
+  const accountOptions = [
+    { value: STAFF, label: "— Platform staff (operator) —" },
+    ...(accounts.data ?? []).map((a) => ({ value: a.id, label: `${a.name} (tenant)` })),
+  ];
 
   async function update(id: string, input: Record<string, unknown>) {
     try { await api.updateUser(id, input); notifications.show({ message: "Updated", color: "green" }); state.reload(); }
@@ -56,6 +66,9 @@ export function Users() {
               columns={[
                 { key: "email", header: "Email", render: (r) => r.email },
                 { key: "name", header: "Name", render: (r) => r.name || "—" },
+                { key: "type", header: "Console", render: (r) => (
+                  <Badge size="sm" variant="light" color={r.accountId ? "teal" : "grape"}>{r.accountId ? "Customer" : "Operator"}</Badge>
+                ) },
                 { key: "role", header: "Role", render: (r) => (
                   <Select size="xs" w={110} data={ROLES} value={r.role} allowDeselect={false}
                     onChange={(v) => v && update(r.id, { role: v })} disabled={r.id === me?.id} />
@@ -82,6 +95,8 @@ export function Users() {
             <TextInput label="Name" {...form.getInputProps("name")} />
             <PasswordInput label="Password" required {...form.getInputProps("password")} data-testid="user-password" />
             <Select label="Role" data={ROLES} {...form.getInputProps("role")} />
+            <Select label="Console / account" description="Bind to an account for the customer console, or leave as staff for the operator console"
+              data={accountOptions} allowDeselect={false} {...form.getInputProps("accountId")} data-testid="user-account" />
             <Group justify="flex-end">
               <Button variant="default" onClick={close}>Cancel</Button>
               <Button type="submit" loading={busy}>Create</Button>

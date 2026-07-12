@@ -61,14 +61,41 @@ var rolePerms = map[string][]string{
 	RoleViewer: readPerms,
 }
 
-// Permissions returns the sorted permission list granted to a role.
+// tenantPerms is the capability set a tenant (account-scoped) user gets,
+// regardless of their stored role. Tenants live in the customer console: they
+// read the shared signal corpus and analytics, and manage their own account +
+// API keys (the latter enforced by account ownership, not a role permission).
+// They can never reach operator-only surfaces (sources, users, jobs, settings,
+// accounts, other tenants' data).
+var tenantPerms = []string{
+	PermSignalsRead, PermAnalyticsRead,
+}
+
+// Permissions returns the sorted permission list granted to a role (platform
+// staff). For tenant users, use TenantPermissions instead.
 func Permissions(role string) []string {
 	ps := append([]string{}, rolePerms[role]...)
 	sort.Strings(ps)
 	return ps
 }
 
-// Can reports whether a role grants a permission.
+// TenantPermissions returns the sorted capability set for an account-scoped user.
+func TenantPermissions() []string {
+	ps := append([]string{}, tenantPerms...)
+	sort.Strings(ps)
+	return ps
+}
+
+// EffectivePermissions returns the permissions in force for a principal: the
+// tenant set when account-scoped, else the full role matrix.
+func EffectivePermissions(role string, tenant bool) []string {
+	if tenant {
+		return TenantPermissions()
+	}
+	return Permissions(role)
+}
+
+// Can reports whether a role (platform staff) grants a permission.
 func Can(role, perm string) bool {
 	for _, p := range rolePerms[role] {
 		if p == perm {
@@ -76,6 +103,20 @@ func Can(role, perm string) bool {
 		}
 	}
 	return false
+}
+
+// CanScoped reports whether a principal may exercise perm, honouring tenant
+// scoping: tenant users are limited to the tenant capability set.
+func CanScoped(role string, tenant bool, perm string) bool {
+	if tenant {
+		for _, p := range tenantPerms {
+			if p == perm {
+				return true
+			}
+		}
+		return false
+	}
+	return Can(role, perm)
 }
 
 // HashPassword returns a bcrypt hash of the password.
