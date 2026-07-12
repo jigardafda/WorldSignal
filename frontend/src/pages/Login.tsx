@@ -1,9 +1,16 @@
-import { Alert, Button, Center, Paper, PasswordInput, Stack, Text, TextInput, Title } from "@mantine/core";
+import { Alert, Box, Button, Center, Flex, Group, PasswordInput, Paper, Stack, Text, TextInput, ThemeIcon, Title } from "@mantine/core";
 import { useForm } from "@mantine/form";
+import { IconBolt, IconChecks, IconWorldBolt } from "@tabler/icons-react";
 import { LogoMark } from "../components/Logo";
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+
+const HIGHLIGHTS = [
+  { icon: <IconWorldBolt size={18} />, title: "Real-time global signals", body: "The world's public news, distilled into clean events." },
+  { icon: <IconChecks size={18} />, title: "Deduplicated & enriched", body: "Clustered, classified and scored for relevance." },
+  { icon: <IconBolt size={18} />, title: "Delivered your way", body: "REST API, webhooks, streaming and email digests." },
+];
 
 export function Login() {
   const { user, login, loading } = useAuth();
@@ -39,22 +46,61 @@ export function Login() {
   }
 
   return (
-    <Center mih="100vh" bg="var(--mantine-color-gray-0)">
-      <Paper withBorder shadow="md" p="xl" radius="md" w={380}>
-        <Stack align="center" gap="xs" mb="md">
-          <LogoMark size={48} />
-          <Title order={3}>WorldSignal</Title>
-          <Text c="dimmed" size="sm">Sign in to the admin console</Text>
-        </Stack>
-        <form onSubmit={form.onSubmit(submit)}>
-          <Stack>
-            {error && <Alert color="red" data-testid="login-error">{error}</Alert>}
-            <TextInput label="Email" placeholder="you@example.com" {...form.getInputProps("email")} data-testid="email" />
-            <PasswordInput label="Password" {...form.getInputProps("password")} data-testid="password" />
-            <Button type="submit" loading={busy} fullWidth>Sign in</Button>
+    <Flex mih="100vh">
+      {/* Brand hero — sets the tone before the customer even signs in. */}
+      <Box
+        visibleFrom="md"
+        style={{
+          flex: 1.1,
+          position: "relative",
+          overflow: "hidden",
+          background: "linear-gradient(135deg, #10245f 0%, #2f6df6 52%, #22c3e6 100%)",
+        }}
+      >
+        <Box style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.14) 1px, transparent 0)", backgroundSize: "22px 22px", opacity: 0.5 }} />
+        <Stack justify="space-between" h="100%" p={48} style={{ position: "relative" }}>
+          <Group gap="sm">
+            <LogoMark size={40} />
+            <Text fw={800} fz={26} c="white" style={{ fontFamily: "'Space Grotesk Variable', sans-serif", letterSpacing: "-0.02em" }}>WorldSignal</Text>
+          </Group>
+          <Stack gap="xl" maw={440}>
+            <Title order={1} c="white" style={{ fontSize: 40, lineHeight: 1.1 }}>
+              The world's news, as real-time signals.
+            </Title>
+            <Stack gap="lg">
+              {HIGHLIGHTS.map((h) => (
+                <Group key={h.title} wrap="nowrap" align="flex-start" gap="md">
+                  <ThemeIcon size={38} radius="md" variant="white" color="dark">{h.icon}</ThemeIcon>
+                  <div>
+                    <Text c="white" fw={600}>{h.title}</Text>
+                    <Text c="white" opacity={0.75} size="sm">{h.body}</Text>
+                  </div>
+                </Group>
+              ))}
+            </Stack>
           </Stack>
-        </form>
-      </Paper>
-    </Center>
+          <Text c="white" opacity={0.6} size="xs">© WorldSignal — global signal intelligence</Text>
+        </Stack>
+      </Box>
+
+      {/* Sign-in panel */}
+      <Center style={{ flex: 1 }} p="xl">
+        <Paper withBorder shadow="lg" p="xl" radius="lg" w={400}>
+          <Stack align="center" gap={6} mb="lg">
+            <Box hiddenFrom="md"><LogoMark size={44} /></Box>
+            <Title order={3}><span className="ws-wordmark">WorldSignal</span></Title>
+            <Text c="dimmed" size="sm">Sign in to the admin console</Text>
+          </Stack>
+          <form onSubmit={form.onSubmit(submit)}>
+            <Stack>
+              {error && <Alert color="red" data-testid="login-error">{error}</Alert>}
+              <TextInput label="Email" placeholder="you@example.com" size="md" {...form.getInputProps("email")} data-testid="email" />
+              <PasswordInput label="Password" size="md" {...form.getInputProps("password")} data-testid="password" />
+              <Button type="submit" size="md" loading={busy} fullWidth mt="xs">Sign in</Button>
+            </Stack>
+          </form>
+        </Paper>
+      </Center>
+    </Flex>
   );
 }

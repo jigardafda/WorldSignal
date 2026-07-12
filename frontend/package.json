@@ -14,6 +14,8 @@
     "test:e2e": "(cd ../backend && go build -o /tmp/ws-go ./cmd/server) && playwright test"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/space-grotesk": "^5.2.10",
     "@mantine/charts": "^9.4.1",
     "@mantine/core": "^9.4.1",
     "@mantine/form": "^9.4.1",

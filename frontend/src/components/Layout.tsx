@@ -119,7 +119,7 @@ export function Layout() {
           <Group gap="xs">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <LogoMark size={28} />
-            <Text fw={700}>World<Text span c="blue" inherit>Signal</Text></Text>
+            <Text fw={800} fz="lg" className="ws-wordmark" style={{ fontFamily: "'Space Grotesk Variable', sans-serif", letterSpacing: "-0.02em" }}>WorldSignal</Text>
             <Badge size="sm" variant="light" color={isTenant ? "teal" : "grape"} data-testid="console-mode">
               {isTenant ? "Customer" : "Operator"}
             </Badge>
