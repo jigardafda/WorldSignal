@@ -32,6 +32,12 @@ const TENANT_NAV: NavSection[] = [
     ],
   },
   {
+    title: "Delivery",
+    items: [
+      { to: "/my-subscriptions", label: "Subscriptions", icon: <IconBell size={18} /> },
+    ],
+  },
+  {
     title: "Account",
     items: [
       { to: "/my-api-keys", label: "API Keys", icon: <IconKey size={18} /> },
@@ -70,7 +76,6 @@ const NAV: NavSection[] = [
     title: "Distribution",
     items: [
       { to: "/subscriptions", label: "Subscriptions", icon: <IconBell size={18} />, perm: "subscriptions:read" },
-      { to: "/subscribers", label: "Subscribers", icon: <IconUsersGroup size={18} />, perm: "subscriptions:read" },
       { to: "/deliveries", label: "Deliveries", icon: <IconDatabase size={18} />, perm: "deliveries:read" },
       { to: "/connectors", label: "Connectors", icon: <IconMail size={18} />, perm: "settings:manage" },
     ],

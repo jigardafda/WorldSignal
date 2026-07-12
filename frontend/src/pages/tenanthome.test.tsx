@@ -49,7 +49,7 @@ describe("TenantHome (customer console)", () => {
     await userEvent.click(screen.getByTestId("qa-keys"));
     expect(navigate).toHaveBeenCalledWith("/my-api-keys");
     await userEvent.click(screen.getByTestId("qa-personalize"));
-    expect(navigate).toHaveBeenCalledWith("/for-you");
+    expect(navigate).toHaveBeenCalledWith("/my-subscriptions");
     await userEvent.click(screen.getByTestId("qa-signals"));
     expect(navigate).toHaveBeenCalledWith("/signals");
   });

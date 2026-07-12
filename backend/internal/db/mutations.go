@@ -95,10 +95,11 @@ type CreateSubscriptionInput struct {
 	Filter       RawJSON
 	Config       RawJSON
 	SubscriberID string // optional; defaults to the __default__ subscriber
+	AccountID    string // owning tenant; defaults to the default account
 }
 
-// CreateSubscription inserts a Subscription under the default subscriber and
-// returns the scalar row.
+// CreateSubscription inserts a Subscription owned by an Account (defaulting to
+// the tenant-neutral default account) and returns the scalar row.
 func (d *DB) CreateSubscription(ctx context.Context, in CreateSubscriptionInput) (*Subscription, error) {
 	subID := in.SubscriberID
 	if subID == "" {
@@ -106,6 +107,9 @@ func (d *DB) CreateSubscription(ctx context.Context, in CreateSubscriptionInput)
 			return nil, err
 		}
 		subID = "__default__"
+	}
+	if in.AccountID == "" {
+		in.AccountID = DefaultAccountID
 	}
 	if in.Channel == "" {
 		in.Channel = "WEBHOOK"
@@ -117,18 +121,9 @@ func (d *DB) CreateSubscription(ctx context.Context, in CreateSubscriptionInput)
 		in.Config = RawJSON("{}")
 	}
 	id := cuid.New()
-	var s Subscription
-	var filter, config []byte
-	err := d.Pool.QueryRow(ctx,
-		`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config")
-		 VALUES ($1,$6,$2,$3::"DeliveryChannel",$4,$5)
+	return scanSubscription(d.Pool.QueryRow(ctx,
+		`INSERT INTO "Subscription" ("id","accountId","subscriberId","name","channel","filter","config")
+		 VALUES ($1,$7,$6,$2,$3::"DeliveryChannel",$4,$5)
 		 RETURNING `+subscriptionCols,
-		id, in.Name, in.Channel, []byte(in.Filter), []byte(in.Config), subID).
-		Scan(&s.ID, &s.SubscriberID, &s.Name, &s.Channel, &filter, &config, &s.Enabled, &s.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	s.Filter = RawJSON(filter)
-	s.Config = RawJSON(config)
-	return &s, nil
+		id, in.Name, in.Channel, []byte(in.Filter), []byte(in.Config), subID, in.AccountID))
 }

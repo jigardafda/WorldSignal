@@ -299,7 +299,21 @@ DO $migrate$ BEGIN
     ALTER TABLE "User" ADD CONSTRAINT "User_accountId_fkey"
       FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE SET NULL;
   END IF;
-END $migrate$;`
+END $migrate$;
+
+-- Subscriptions are a customer-owned entity: each belongs to an Account (the
+-- tenant). Pre-multitenancy rows (owned via the vestigial __default__ subscriber)
+-- backfill to the default account. The subscriberId column is retained for
+-- backwards compatibility but accountId is now the authoritative owner.
+ALTER TABLE "Subscription" ADD COLUMN IF NOT EXISTS "accountId" text NOT NULL DEFAULT 'acct_default';
+CREATE INDEX IF NOT EXISTS "Subscription_account_idx" ON "Subscription"("accountId");
+
+DO $migrate2$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Subscription_accountId_fkey') THEN
+    ALTER TABLE "Subscription" ADD CONSTRAINT "Subscription_accountId_fkey"
+      FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE CASCADE;
+  END IF;
+END $migrate2$;`
 
 // MigrateContent ensures the extended source-metadata columns and the
 // SourceValidationLog table exist. Safe to run repeatedly.

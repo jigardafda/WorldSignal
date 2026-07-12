@@ -402,6 +402,15 @@ export const api = {
   revokeMyApiKey: (id: string) =>
     gql<{ revokeMyApiKey: boolean }>(`mutation($id:ID!){revokeMyApiKey(id:$id)}`, { id }).then((d) => d.revokeMyApiKey),
 
+  // tenant subscriptions (customer console) — scoped to the caller's own account
+  mySubscriptions: () => gql<{ mySubscriptions: Subscription[] }>(`{mySubscriptions{id name channel enabled filter config createdAt}}`).then((d) => d.mySubscriptions),
+  createMySubscription: (input: Record<string, unknown>) =>
+    gql<{ createMySubscription: Subscription }>(`mutation($i:CreateMySubscriptionInput!){createMySubscription(input:$i){id name channel enabled filter config createdAt}}`, { i: input }).then((d) => d.createMySubscription),
+  updateMySubscription: (id: string, input: Record<string, unknown>) =>
+    gql<{ updateMySubscription: Subscription }>(`mutation($id:ID!,$i:UpdateSubscriptionInput!){updateMySubscription(id:$id,input:$i){id name channel enabled filter config createdAt}}`, { id, i: input }).then((d) => d.updateMySubscription),
+  deleteMySubscription: (id: string) =>
+    gql<{ deleteMySubscription: boolean }>(`mutation($id:ID!){deleteMySubscription(id:$id)}`, { id }).then((d) => d.deleteMySubscription),
+
   // audit log (settings:manage)
   auditLogs: (filter: AuditFilter = {}, limit = 50, offset = 0) => {
     const args = sourceArgs(filter as Record<string, string>, { limit, offset });

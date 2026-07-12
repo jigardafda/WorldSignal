@@ -36,6 +36,7 @@ const RESP: Record<string, unknown> = {
   accounts: [{ id: "a" }], account: { id: "a" }, createAccount: { id: "a" }, updateAccount: { id: "a" },
   myAccount: { id: "a" }, myApiKeys: [{ id: "k" }], tenantApiScopes: ["signals:read"],
   createMyApiKey: { id: "k", key: "wsk_x" }, revokeMyApiKey: true,
+  mySubscriptions: [{ id: "s" }], createMySubscription: { id: "s" }, updateMySubscription: { id: "s" }, deleteMySubscription: true,
   entities: [{ name: "Acme", type: "ORG", signalCount: 3 }],
   countries: [{ code: "US", name: "United States" }],
   taxonomy: [{ code: "C" }], taxonomyStats: [{ key: "C", count: 1 }],
@@ -150,6 +151,10 @@ describe("api wrappers", () => {
     expect(await api.tenantApiScopes()).toEqual(RESP.tenantApiScopes);
     expect(await api.createMyApiKey({ name: "k", scopes: ["signals:read"] })).toEqual(RESP.createMyApiKey);
     expect(await api.revokeMyApiKey("k")).toBe(true);
+    expect(await api.mySubscriptions()).toEqual(RESP.mySubscriptions);
+    expect(await api.createMySubscription({ name: "s" })).toEqual(RESP.createMySubscription);
+    expect(await api.updateMySubscription("s", { enabled: false })).toEqual(RESP.updateMySubscription);
+    expect(await api.deleteMySubscription("s")).toBe(true);
 
     expect(await api.entities({ search: "a", type: "ORG" }, 10)).toEqual(RESP.entities);
     expect(await api.entities()).toEqual(RESP.entities);

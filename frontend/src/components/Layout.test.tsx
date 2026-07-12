@@ -55,6 +55,7 @@ describe("Layout", () => {
     expect(screen.getByTestId("console-mode")).toHaveTextContent("Customer");
     expect(screen.getByTestId("workspace-name")).toHaveTextContent("Acme Corp");
     expect(screen.getByText("Signals")).toBeInTheDocument();
+    expect(screen.getByText("Subscriptions")).toBeInTheDocument();
     expect(screen.getByText("API Keys")).toBeInTheDocument();
     expect(screen.getByText("My Account")).toBeInTheDocument();
     // Operator-only items are absent.

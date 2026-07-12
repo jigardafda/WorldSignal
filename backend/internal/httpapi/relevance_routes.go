@@ -10,15 +10,10 @@ import (
 // registerRelevanceRoutes wires the smart-signals feed: a personalized ranked
 // feed per profile, feedback, interest editing, and AI draft-from-document.
 //
-// SECURITY — tenant scoping (TODO with the brand/ownership model): these handlers
-// take a subscription id from the path/body and operate on it after only a
-// scope check, exactly like the existing subscription REST API (which is not
-// owner-scoped — a valid key sees all subscriptions in the deployment). This is
-// acceptable only while the platform is single-tenant per deployment. When the
-// multi-brand model lands (Subscription.brandId + API keys bound to an owner /
-// set of brands), EVERY handler here MUST verify the subscription belongs to a
-// brand the caller may access — otherwise this becomes an IDOR. Enforce it in one
-// place (a helper that resolves+authorizes the subscription for the identity).
+// SECURITY — tenant scoping: API keys are account-scoped, and every handler that
+// takes a subscription id verifies the subscription belongs to the key's account
+// (s.tenantOwnsSubscription), returning 404 otherwise. This closes the IDOR that
+// existed while subscriptions were global.
 func (s *Server) registerRelevanceRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/subscriptions/{id}/feed", s.requireAPIKey("signals:read", s.subscriptionFeed))
 	mux.HandleFunc("PATCH /v1/subscriptions/{id}/interests", s.requireAPIKey("subscriptions:write", s.setInterests))
@@ -59,6 +54,13 @@ func clampLimit(n int) int {
 
 func (s *Server) subscriptionFeed(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if ok, err := s.tenantOwnsSubscription(r.Context(), id); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	} else if !ok {
+		apiKeyError(w, http.StatusNotFound, "subscription not found")
+		return
+	}
 	limit := clampLimit(queryInt(r, "limit", 30))
 	sinceHours := queryInt(r, "sinceHours", 72)
 	minScore := queryFloat(r, "minScore", 0)
@@ -90,6 +92,13 @@ func (s *Server) subscriptionFeed(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) setInterests(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if ok, err := s.tenantOwnsSubscription(r.Context(), id); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	} else if !ok {
+		apiKeyError(w, http.StatusNotFound, "subscription not found")
+		return
+	}
 	var body struct {
 		Interests map[string]float64 `json:"interests"`
 	}
@@ -114,6 +123,13 @@ func (s *Server) postFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := readJSON(r, &body); err != nil || body.SubscriptionID == "" || body.SignalID == "" || !validFeedback[body.Action] {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "subscriptionId, signalId and action (OPEN|UP|DOWN) required"})
+		return
+	}
+	if ok, err := s.tenantOwnsSubscription(r.Context(), body.SubscriptionID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	} else if !ok {
+		apiKeyError(w, http.StatusNotFound, "subscription not found")
 		return
 	}
 	if err := s.DB.RecordFeedback(r.Context(), body.SubscriptionID, body.SignalID, body.Action); err != nil {

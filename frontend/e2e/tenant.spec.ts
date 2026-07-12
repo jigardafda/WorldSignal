@@ -44,6 +44,14 @@ test.describe("operator vs tenant consoles", () => {
     await expect(page.getByText("scoped to your account")).toBeVisible();
     await expect(page.getByTestId("add-key")).toBeVisible();
 
+    // Manage its own subscriptions (customer-owned entity).
+    await page.getByRole("link", { name: "Subscriptions" }).click();
+    await expect(page.getByRole("heading", { name: "Subscriptions", level: 2 })).toBeVisible();
+    await page.getByTestId("add-subscription").click();
+    await page.getByTestId("subscription-name").fill("My alerts");
+    await page.getByRole("button", { name: "Create" }).click();
+    await expect(page.getByText("My alerts")).toBeVisible();
+
     // And its own account page: a workspace card with plan/status, not an
     // internal RBAC role.
     await page.getByRole("link", { name: "My Account" }).click();

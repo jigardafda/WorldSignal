@@ -18,7 +18,6 @@ vi.mock("../lib/api", () => ({ api: apiMock }));
 vi.mock("../lib/auth", () => ({ useAuth: () => authMock }));
 
 import { Subscriptions } from "./Subscriptions";
-import { Subscribers } from "./Subscribers";
 import { Users } from "./Users";
 import { Teams } from "./Teams";
 import { Account } from "./Account";
@@ -141,19 +140,6 @@ describe("Subscriptions", () => {
   });
 });
 
-describe("Subscribers", () => {
-  it("lists, creates, deletes", async () => {
-    apiMock.subscribers.mockResolvedValue([{ id: "sb", name: "Acme", status: "ACTIVE", createdAt: "2026-01-01T00:00:00Z", subscriptionCount: 2 }]);
-    apiMock.createSubscriber.mockResolvedValue({ id: "sb2", name: "New", status: "ACTIVE", createdAt: "2026-01-01T00:00:00Z", subscriptionCount: 0 });
-    apiMock.deleteSubscriber.mockResolvedValue(true);
-    renderWithProviders(<Subscribers />);
-    expect(await screen.findByText("Acme")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Add subscriber" }));
-    await userEvent.type(await screen.findByTestId("subscriber-name"), "New");
-    await userEvent.click(screen.getByRole("button", { name: "Create" }));
-    await waitFor(() => expect(apiMock.createSubscriber).toHaveBeenCalledWith("New"));
-  });
-});
 
 describe("Users", () => {
   it("lists, creates and forbids self-delete", async () => {
