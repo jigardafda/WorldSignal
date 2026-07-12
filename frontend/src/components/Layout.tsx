@@ -4,7 +4,7 @@ import {
   IconActivity, IconArticle, IconBell, IconBroadcast, IconChartBar, IconDatabase,
   IconFileText, IconGauge, IconListCheck, IconLogout, IconMail, IconSettings, IconSitemap,
   IconUsers, IconUsersGroup, IconUserSearch, IconKey, IconSparkles, IconListDetails,
-  IconSun, IconMoon, IconDeviceLaptop,
+  IconSun, IconMoon, IconDeviceLaptop, IconBuildingStore,
 } from "@tabler/icons-react";
 import { NavLink as RouterLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
@@ -53,6 +53,7 @@ const NAV: NavSection[] = [
     title: "Administration",
     items: [
       { to: "/jobs", label: "Jobs", icon: <IconListCheck size={18} />, perm: "jobs:read" },
+      { to: "/accounts", label: "Accounts", icon: <IconBuildingStore size={18} />, perm: "accounts:manage" },
       { to: "/users", label: "Users", icon: <IconUsers size={18} />, perm: "users:manage" },
       { to: "/teams", label: "Teams", icon: <IconUsersGroup size={18} />, perm: "teams:manage" },
       { to: "/settings", label: "Settings", icon: <IconSettings size={18} />, perm: "settings:manage" },

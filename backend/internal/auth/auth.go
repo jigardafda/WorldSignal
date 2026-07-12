@@ -37,12 +37,14 @@ const (
 	PermUsersManage        = "users:manage"
 	PermTeamsManage        = "teams:manage"
 	PermSettingsManage     = "settings:manage"
+	PermAccountsManage     = "accounts:manage"
 )
 
 var allPerms = []string{
 	PermSignalsRead, PermSourcesRead, PermSourcesWrite, PermSubscriptionsRead,
 	PermSubscriptionsWrite, PermDeliveriesRead, PermDeliveriesRetry, PermJobsRead,
 	PermJobsManage, PermAnalyticsRead, PermUsersManage, PermTeamsManage, PermSettingsManage,
+	PermAccountsManage,
 }
 
 var readPerms = []string{

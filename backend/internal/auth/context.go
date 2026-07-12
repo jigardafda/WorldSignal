@@ -11,6 +11,9 @@ type Identity struct {
 	Email  string
 	Role   string
 	Token  string // the session token used (for logout)
+	// AccountID is nil for platform-staff (operator console) users and set to the
+	// tenant id for account-scoped users.
+	AccountID *string
 }
 
 type ctxKey struct{}

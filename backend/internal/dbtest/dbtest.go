@@ -26,7 +26,7 @@ func URL() string {
 var tables = []string{
 	"DigestQueue", "DeliveryEvent", "Subscription", "Subscriber", "SignalTag", "SignalArticle",
 	"Signal", "Article", "RawItem", "SourceValidationLog", "Source", "TaxonomyTag",
-	"ApiKeyUsage", "ApiKey", "LLMKey", "EmailConnector", "AuditLog", "Session", "TeamMember", "Team", "User",
+	"ApiKeyUsage", "ApiKey", "LLMKey", "EmailConnector", "AuditLog", "Session", "TeamMember", "Team", "User", "Account",
 }
 
 // Connect opens a pool to the test DB (ensuring auth tables exist), skipping the
@@ -90,6 +90,11 @@ func Reset(t *testing.T, d *db.DB) {
 	}
 	if _, err := d.Pool.Exec(context.Background(), "TRUNCATE TABLE "+list+" RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("reset: %v", err)
+	}
+	// Re-seed the default tenant so account-scoped foreign keys (ApiKey.accountId)
+	// resolve after a truncate.
+	if err := d.EnsureDefaultAccount(context.Background()); err != nil {
+		t.Fatalf("ensure default account: %v", err)
 	}
 }
 

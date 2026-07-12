@@ -267,7 +267,39 @@ CREATE TABLE IF NOT EXISTS "SignalFeedback" (
   "createdAt"      timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("subscriptionId","signalId","action")
 );
-CREATE INDEX IF NOT EXISTS "SignalFeedback_sub_idx" ON "SignalFeedback"("subscriptionId","createdAt" DESC);`
+CREATE INDEX IF NOT EXISTS "SignalFeedback_sub_idx" ON "SignalFeedback"("subscriptionId","createdAt" DESC);
+
+-- Multi-tenancy spine. Account is a SaaS tenant that owns API keys, subscriptions
+-- and (later) billing; the global signal corpus stays shared. Pre-multitenancy
+-- rows are backfilled to a seeded default account so account-scoped foreign keys
+-- always resolve. A platform-staff user has accountId = NULL.
+CREATE TABLE IF NOT EXISTS "Account" (
+  "id"        text PRIMARY KEY,
+  "name"      text NOT NULL,
+  "slug"      text NOT NULL UNIQUE,
+  "status"    text NOT NULL DEFAULT 'ACTIVE',
+  "plan"      text NOT NULL DEFAULT 'FREE',
+  "createdAt" timestamptz NOT NULL DEFAULT now(),
+  "updatedAt" timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO "Account" ("id","name","slug") VALUES ('acct_default','Default Account','default')
+  ON CONFLICT ("id") DO NOTHING;
+
+ALTER TABLE "ApiKey" ADD COLUMN IF NOT EXISTS "accountId" text NOT NULL DEFAULT 'acct_default';
+CREATE INDEX IF NOT EXISTS "ApiKey_account_idx" ON "ApiKey"("accountId");
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "accountId" text;
+CREATE INDEX IF NOT EXISTS "User_account_idx" ON "User"("accountId");
+
+DO $migrate$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ApiKey_accountId_fkey') THEN
+    ALTER TABLE "ApiKey" ADD CONSTRAINT "ApiKey_accountId_fkey"
+      FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'User_accountId_fkey') THEN
+    ALTER TABLE "User" ADD CONSTRAINT "User_accountId_fkey"
+      FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE SET NULL;
+  END IF;
+END $migrate$;`
 
 // MigrateContent ensures the extended source-metadata columns and the
 // SourceValidationLog table exist. Safe to run repeatedly.

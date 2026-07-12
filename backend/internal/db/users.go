@@ -14,7 +14,9 @@ import (
 // ErrDuplicateEmail is returned when a user email already exists.
 var ErrDuplicateEmail = errors.New("email already exists")
 
-// User mirrors the User table (password hash never leaves the db layer).
+// User mirrors the User table (password hash never leaves the db layer). A nil
+// AccountID marks a platform-staff user (operator console); a non-nil AccountID
+// binds the user to a tenant.
 type User struct {
 	ID           string
 	Email        string
@@ -22,15 +24,16 @@ type User struct {
 	PasswordHash string
 	Role         string
 	Status       string
+	AccountID    *string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
 
-const userCols = `"id","email","name","passwordHash","role","status","createdAt","updatedAt"`
+const userCols = `"id","email","name","passwordHash","role","status","accountId","createdAt","updatedAt"`
 
 func scanUser(row pgx.Row) (*User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.Role, &u.Status, &u.AccountID, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
