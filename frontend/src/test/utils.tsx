@@ -3,6 +3,7 @@ import { Notifications } from "@mantine/notifications";
 import { render, type RenderResult } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { theme } from "../theme";
 
 /** Render a component wrapped in Mantine + Notifications + a memory router. The
  * providers are supplied via RTL's `wrapper` so `rerender` keeps them. */
@@ -12,7 +13,7 @@ export function renderWithProviders(
 ): RenderResult {
   function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <MantineProvider>
+      <MantineProvider theme={theme}>
         {/* autoClose disabled so a notification's timer can never fire after the
             jsdom environment is torn down (which throws "window is not defined"). */}
         <Notifications autoClose={false} />

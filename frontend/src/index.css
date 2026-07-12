@@ -1,0 +1,95 @@
+/* WorldSignal global styling — depth + character beyond the component library. */
+
+:root {
+  --ws-bg-light: #f4f7fc;
+  --ws-bg-dark: #0a0e1a;
+}
+
+html,
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tighter tracking on display headings for a more deliberate, editorial feel. */
+.mantine-Title-root {
+  letter-spacing: -0.02em;
+}
+
+/* App background: a soft, brand-tinted field with two faint corner glows so
+   white cards read as layered surfaces rather than floating on a flat sheet. */
+body {
+  min-height: 100vh;
+  background-color: var(--ws-bg-light);
+  background-image:
+    radial-gradient(60rem 60rem at 110% -10%, rgba(47, 109, 246, 0.10), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 110%, rgba(34, 195, 230, 0.10), transparent 55%);
+  background-attachment: fixed;
+}
+
+:root[data-mantine-color-scheme="dark"] body {
+  background-color: var(--ws-bg-dark);
+  background-image:
+    radial-gradient(60rem 60rem at 110% -10%, rgba(47, 109, 246, 0.16), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 110%, rgba(34, 195, 230, 0.12), transparent 55%);
+}
+
+/* Let the tinted body show through the shell chrome. */
+.mantine-AppShell-main,
+.mantine-AppShell-root {
+  background: transparent;
+}
+
+/* Frosted, layered top bar + sidebar. */
+.mantine-AppShell-header {
+  backdrop-filter: saturate(180%) blur(10px);
+  background: color-mix(in srgb, var(--mantine-color-body) 82%, transparent);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+.mantine-AppShell-navbar {
+  background: color-mix(in srgb, var(--mantine-color-body) 72%, transparent);
+}
+
+/* Brand text selection. */
+::selection {
+  background: rgba(47, 109, 246, 0.22);
+}
+
+/* Slimmer, quieter scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--mantine-color-gray-5) 55%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--mantine-color-gray-5) 55%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--mantine-color-gray-6) 65%, transparent);
+  background-clip: content-box;
+}
+
+/* Subtle hover lift for interactive cards (stat tiles, quick actions). */
+.ws-lift {
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.ws-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--mantine-shadow-md);
+}
+
+/* The brand wordmark gradient (blue → cyan), reused wherever the name appears. */
+.ws-wordmark {
+  background: linear-gradient(100deg, #2f6df6 0%, #22c3e6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
