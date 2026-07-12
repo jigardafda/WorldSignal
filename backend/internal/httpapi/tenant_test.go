@@ -121,6 +121,67 @@ func TestTenantConsoleSeparation(t *testing.T) {
 	}
 }
 
+// TestTenantSubscriptionCRUD covers the customer-console subscription resolvers:
+// create (with channel/filter/config + validation), update own, delete own, and
+// the DB-error branches.
+func TestTenantSubscriptionCRUD(t *testing.T) {
+	d := dbtest.Connect(t)
+	dbtest.Reset(t, d)
+	ht, _ := newServer(t, d)
+	ctx := context.Background()
+	acme, _ := d.CreateAccount(ctx, cuid.New(), "Acme", "acme", "PRO")
+	tenant, _ := dbtest.AuthTokenTenant(t, d, auth.RoleViewer, acme.ID)
+
+	bearer = tenant
+	defer func() { bearer = "" }()
+
+	// Create with channel/filter/config.
+	_, body := postGQL(t, ht.URL, `{"query":"mutation($i:CreateMySubscriptionInput!){createMySubscription(input:$i){id name channel}}","variables":{"i":{"name":"Alerts","channel":"WEBHOOK","filter":{"country":"US"},"config":{"url":"https://x"}}}}`)
+	if !strings.Contains(body, `"name":"Alerts"`) {
+		t.Fatalf("create: %s", body)
+	}
+	subID := firstIDRe.FindStringSubmatch(body)[1]
+
+	// Name is required.
+	if _, body := postGQL(t, ht.URL, `{"query":"mutation($i:CreateMySubscriptionInput!){createMySubscription(input:$i){id}}","variables":{"i":{"name":"  "}}}`); !strings.Contains(body, "name is required") {
+		t.Fatalf("create validation: %s", body)
+	}
+	// Update own (name + filter + config).
+	if _, body := postGQL(t, ht.URL, `{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateMySubscription(id:$id,input:$i){name enabled}}","variables":{"id":"`+subID+`","i":{"name":"Renamed","enabled":false,"filter":{"country":"IN"},"config":{"url":"https://y"}}}}`); !strings.Contains(body, `"name":"Renamed"`) {
+		t.Fatalf("update own: %s", body)
+	}
+	// mySubscriptions lists it.
+	if _, body := postGQL(t, ht.URL, `{"query":"{mySubscriptions{id name}}"}`); !strings.Contains(body, `"name":"Renamed"`) {
+		t.Fatalf("list: %s", body)
+	}
+	// Delete own → true.
+	if _, body := postGQL(t, ht.URL, `{"query":"mutation($id:ID!){deleteMySubscription(id:$id)}","variables":{"id":"`+subID+`"}}`); !strings.Contains(body, `"deleteMySubscription":true`) {
+		t.Fatalf("delete own: %s", body)
+	}
+	// Update/delete a non-existent subscription → forbidden (no owner).
+	if _, body := postGQL(t, ht.URL, `{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateMySubscription(id:$id,input:$i){id}}","variables":{"id":"ghost","i":{"enabled":true}}}`); !strings.Contains(body, "forbidden") {
+		t.Fatalf("update ghost: %s", body)
+	}
+
+	// DB errors surface.
+	if _, err := d.Pool.Exec(ctx, `ALTER TABLE "Subscription" RENAME TO "Subscription__h"`); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`{"query":"{mySubscriptions{id}}"}`,
+		`{"query":"mutation($i:CreateMySubscriptionInput!){createMySubscription(input:$i){id}}","variables":{"i":{"name":"x"}}}`,
+		`{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateMySubscription(id:$id,input:$i){id}}","variables":{"id":"x","i":{"enabled":true}}}`,
+		`{"query":"mutation($id:ID!){deleteMySubscription(id:$id)}","variables":{"id":"x"}}`,
+	} {
+		if _, body := postGQL(t, ht.URL, q); !strings.Contains(body, `"errors"`) {
+			t.Fatalf("want db error for %s: %s", q, body)
+		}
+	}
+	if _, err := d.Pool.Exec(ctx, `ALTER TABLE "Subscription__h" RENAME TO "Subscription"`); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestTenantErrors covers the unauthenticated and DB-error branches of the
 // tenant self-service resolvers.
 func TestTenantErrors(t *testing.T) {
@@ -137,8 +198,12 @@ func TestTenantErrors(t *testing.T) {
 		`{"query":"{myAccount{id}}"}`,
 		`{"query":"{myApiKeys{id}}"}`,
 		`{"query":"{tenantApiScopes}"}`,
+		`{"query":"{mySubscriptions{id}}"}`,
 		`{"query":"mutation($i:CreateMyApiKeyInput!){createMyApiKey(input:$i){id}}","variables":{"i":{"name":"x","scopes":["signals:read"]}}}`,
 		`{"query":"mutation($id:ID!){revokeMyApiKey(id:$id)}","variables":{"id":"x"}}`,
+		`{"query":"mutation($i:CreateMySubscriptionInput!){createMySubscription(input:$i){id}}","variables":{"i":{"name":"x"}}}`,
+		`{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateMySubscription(id:$id,input:$i){id}}","variables":{"id":"x","i":{"enabled":true}}}`,
+		`{"query":"mutation($id:ID!){deleteMySubscription(id:$id)}","variables":{"id":"x"}}`,
 	} {
 		if _, body := postGQL(t, ht.URL, q); !strings.Contains(body, "unauthenticated") {
 			t.Fatalf("want unauthenticated for %s: %s", q, body)

@@ -310,19 +310,14 @@ func (d *DB) UpdateSubscription(ctx context.Context, id string, p SubscriptionPa
 	if len(sets) == 0 {
 		return d.getSubscriptionBasic(ctx, id)
 	}
-	var s Subscription
-	var filter, config []byte
-	err := d.Pool.QueryRow(ctx, `UPDATE "Subscription" SET `+strings.Join(sets, ", ")+` WHERE "id"=$1 RETURNING `+subscriptionCols, args...).
-		Scan(&s.ID, &s.SubscriberID, &s.Name, &s.Channel, &filter, &config, &s.Enabled, &s.CreatedAt)
+	s, err := scanSubscription(d.Pool.QueryRow(ctx, `UPDATE "Subscription" SET `+strings.Join(sets, ", ")+` WHERE "id"=$1 RETURNING `+subscriptionCols, args...))
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	s.Filter = RawJSON(filter)
-	s.Config = RawJSON(config)
-	return &s, nil
+	return s, nil
 }
 
 // DeleteSubscription removes a subscription; returns false if absent.

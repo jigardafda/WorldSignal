@@ -41,7 +41,7 @@ export function TenantHome() {
             <Button variant="light" leftSection={<IconKey size={16} />} rightSection={<IconArrowRight size={14} />}
               onClick={() => navigate("/my-api-keys")} data-testid="qa-keys">Create an API key</Button>
             <Button variant="light" leftSection={<IconSparkles size={16} />} rightSection={<IconArrowRight size={14} />}
-              onClick={() => navigate("/for-you")} data-testid="qa-personalize">Personalize your feed</Button>
+              onClick={() => navigate("/my-subscriptions")} data-testid="qa-personalize">Set up delivery</Button>
             <Button variant="light" leftSection={<IconActivity size={16} />} rightSection={<IconArrowRight size={14} />}
               onClick={() => navigate("/signals")} data-testid="qa-signals">Browse signals</Button>
           </Group>

@@ -1,12 +1,27 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/worldsignal/backend/internal/db"
 )
+
+// tenantOwnsSubscription reports whether the API key's account owns the given
+// subscription. Used to prevent cross-tenant access (IDOR) on the /v1 surface.
+func (s *Server) tenantOwnsSubscription(ctx context.Context, subID string) (bool, error) {
+	acct := tenantAccountID(ctx)
+	if acct == "" {
+		return false, nil
+	}
+	owner, err := s.DB.SubscriptionAccountID(ctx, subID)
+	if err != nil {
+		return false, err
+	}
+	return owner != "" && owner == acct, nil
+}
 
 func (s *Server) registerSubscriptionRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/subscriptions", s.requireAPIKey("subscriptions:read", s.listSubscriptions))
@@ -29,7 +44,7 @@ func (s *Server) createSubscriptionREST(w http.ResponseWriter, r *http.Request) 
 		}{"name required"})
 		return
 	}
-	in := db.CreateSubscriptionInput{Name: *b.Name, Filter: db.RawJSON(b.Filter), Config: db.RawJSON(b.Config)}
+	in := db.CreateSubscriptionInput{Name: *b.Name, Filter: db.RawJSON(b.Filter), Config: db.RawJSON(b.Config), AccountID: tenantAccountID(r.Context())}
 	if b.Channel != nil {
 		in.Channel = *b.Channel
 	}
@@ -83,7 +98,8 @@ type restSubscriptionScalar struct {
 }
 
 func (s *Server) listSubscriptions(w http.ResponseWriter, r *http.Request) {
-	subs, err := s.DB.ListSubscriptions(r.Context())
+	// Account-scoped: a key only ever sees its own tenant's subscriptions.
+	subs, err := s.DB.ListSubscriptionsByAccount(r.Context(), tenantAccountID(r.Context()))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -133,7 +149,8 @@ func (s *Server) listDeliveries(w http.ResponseWriter, r *http.Request) {
 			limit = n
 		}
 	}
-	rows, err := s.DB.ListDeliveries(r.Context(), limit)
+	// Account-scoped: only deliveries for this tenant's subscriptions.
+	rows, err := s.DB.ListDeliveriesByAccount(r.Context(), tenantAccountID(r.Context()), limit)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

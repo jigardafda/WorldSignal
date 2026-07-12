@@ -23,7 +23,7 @@ import { DeliveryDetail } from "./pages/DeliveryDetail";
 import { Subscriptions } from "./pages/Subscriptions";
 import { ForYou } from "./pages/ForYou";
 import { Profiles } from "./pages/Profiles";
-import { Subscribers } from "./pages/Subscribers";
+import { MySubscriptions } from "./pages/MySubscriptions";
 import { Taxonomy } from "./pages/Taxonomy";
 import { Jobs } from "./pages/Jobs";
 import { Users } from "./pages/Users";
@@ -75,7 +75,7 @@ export default function App() {
         <Route path="/for-you" element={<RequirePerm perm="subscriptions:read"><ForYou /></RequirePerm>} />
         <Route path="/profiles" element={<RequirePerm perm="subscriptions:read"><Profiles /></RequirePerm>} />
         <Route path="/subscriptions" element={<RequirePerm perm="subscriptions:read"><Subscriptions /></RequirePerm>} />
-        <Route path="/subscribers" element={<RequirePerm perm="subscriptions:read"><Subscribers /></RequirePerm>} />
+        <Route path="/my-subscriptions" element={<MySubscriptions />} />
         <Route path="/taxonomy" element={<RequirePerm perm="signals:read"><Taxonomy /></RequirePerm>} />
         <Route path="/jobs" element={<RequirePerm perm="jobs:read"><Jobs /></RequirePerm>} />
         <Route path="/users" element={<RequirePerm perm="users:manage"><Users /></RequirePerm>} />

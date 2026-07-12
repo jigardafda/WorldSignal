@@ -30,8 +30,120 @@ func (s *Server) registerTenantResolvers(q, m map[string]gql.FieldResolver) {
 	q["myAccount"] = s.resolveMyAccount
 	q["myApiKeys"] = s.resolveMyApiKeys
 	q["tenantApiScopes"] = s.resolveTenantApiScopes
+	q["mySubscriptions"] = s.resolveMySubscriptions
 	m["createMyApiKey"] = s.mutCreateMyApiKey
 	m["revokeMyApiKey"] = s.mutRevokeMyApiKey
+	m["createMySubscription"] = s.mutCreateMySubscription
+	m["updateMySubscription"] = s.mutUpdateMySubscription
+	m["deleteMySubscription"] = s.mutDeleteMySubscription
+}
+
+func subscriptionToMap(sub *db.Subscription) map[string]any {
+	return map[string]any{
+		"id": sub.ID, "name": sub.Name, "channel": sub.Channel, "enabled": sub.Enabled,
+		"filter": sub.Filter, "config": sub.Config, "createdAt": sub.CreatedAt,
+	}
+}
+
+// requireOwnedSubscription returns the tenant identity and confirms it owns the
+// given subscription, else an error (ErrForbidden for cross-account access).
+func (s *Server) requireOwnedSubscription(ctx context.Context, subID string) (*auth.Identity, error) {
+	id, err := requireTenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+	owner, err := s.DB.SubscriptionAccountID(ctx, subID)
+	if err != nil {
+		return nil, err
+	}
+	if owner == "" || owner != *id.AccountID {
+		return nil, auth.ErrForbidden
+	}
+	return id, nil
+}
+
+func (s *Server) resolveMySubscriptions(ctx context.Context, _ map[string]any) (any, error) {
+	id, err := requireTenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+	subs, err := s.DB.ListSubscriptionsBasicByAccount(ctx, *id.AccountID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]any, len(subs))
+	for i, sub := range subs {
+		out[i] = subscriptionToMap(sub)
+	}
+	return out, nil
+}
+
+func (s *Server) mutCreateMySubscription(ctx context.Context, args map[string]any) (any, error) {
+	id, err := requireTenant(ctx)
+	if err != nil {
+		return nil, err
+	}
+	in, _ := args["input"].(map[string]any)
+	name := strings.TrimSpace(strVal(in["name"]))
+	if name == "" {
+		return nil, fmt.Errorf("%w: name is required", errValidation)
+	}
+	create := db.CreateSubscriptionInput{Name: name, AccountID: *id.AccountID}
+	if v, ok := in["channel"].(string); ok {
+		create.Channel = v
+	}
+	if v, ok := in["filter"]; ok && v != nil {
+		create.Filter = jsonRaw(v)
+	}
+	if v, ok := in["config"]; ok && v != nil {
+		create.Config = jsonRaw(v)
+	}
+	sub, err := s.DB.CreateSubscription(ctx, create)
+	if err != nil {
+		return nil, err
+	}
+	s.audit(ctx, "TENANT_SUBSCRIPTION_CREATED", "subscription", sub.ID, map[string]any{"name": name, "accountId": *id.AccountID})
+	return subscriptionToMap(sub), nil
+}
+
+func (s *Server) mutUpdateMySubscription(ctx context.Context, args map[string]any) (any, error) {
+	if _, err := s.requireOwnedSubscription(ctx, strVal(args["id"])); err != nil {
+		return nil, err
+	}
+	input, _ := args["input"].(map[string]any)
+	var p db.SubscriptionPatch
+	if v, ok := input["name"].(string); ok {
+		p.Name = &v
+	}
+	if v, ok := input["enabled"].(bool); ok {
+		p.Enabled = &v
+	}
+	if v, ok := input["filter"]; ok && v != nil {
+		p.Filter = jsonRaw(v)
+	}
+	if v, ok := input["config"]; ok && v != nil {
+		p.Config = jsonRaw(v)
+	}
+	sub, err := s.DB.UpdateSubscription(ctx, strVal(args["id"]), p)
+	if err != nil || sub == nil {
+		return nil, err
+	}
+	s.audit(ctx, "TENANT_SUBSCRIPTION_UPDATED", "subscription", sub.ID, nil)
+	return subscriptionToMap(sub), nil
+}
+
+func (s *Server) mutDeleteMySubscription(ctx context.Context, args map[string]any) (any, error) {
+	if _, err := s.requireOwnedSubscription(ctx, strVal(args["id"])); err != nil {
+		return nil, err
+	}
+	ok, err := s.DB.DeleteSubscription(ctx, strVal(args["id"]))
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		s.audit(ctx, "TENANT_SUBSCRIPTION_DELETED", "subscription", strVal(args["id"]), nil)
+	}
+	return ok, nil
 }
 
 // requireTenant returns the calling identity iff it is account-scoped (a
