@@ -121,7 +121,9 @@ func (s *Server) requireAPIKey(scope string, next http.HandlerFunc) http.Handler
 		}
 		// Best-effort usage tracking (never blocks the response).
 		_ = s.DB.TouchAPIKey(r.Context(), key.ID, now)
-		next(w, r)
+		// Tag the request with the key's tenant so account-scoped handlers can
+		// resolve it without re-loading the key.
+		next(w, r.WithContext(withTenant(r.Context(), key.AccountID)))
 	}
 }
 
@@ -152,7 +154,7 @@ func (s *Server) registerAPIKeyResolvers(q, m map[string]gql.FieldResolver) {
 
 func apiKeyToMap(k *db.ApiKey) map[string]any {
 	return map[string]any{
-		"id": k.ID, "name": k.Name, "keyPrefix": k.KeyPrefix, "scopes": strList(k.Scopes),
+		"id": k.ID, "accountId": k.AccountID, "name": k.Name, "keyPrefix": k.KeyPrefix, "scopes": strList(k.Scopes),
 		"rateLimitPerMin": k.RateLimitPerMin, "enabled": k.Enabled,
 		"expiresAt": timePtrT(k.ExpiresAt), "lastUsedAt": timePtrT(k.LastUsedAt),
 		"requestCount": int(k.RequestCount), "createdBy": k.CreatedBy, "createdAt": k.CreatedAt,
@@ -217,7 +219,20 @@ func (s *Server) mutCreateAPIKey(ctx context.Context, args map[string]any) (any,
 	if rate < 1 {
 		rate = 1
 	}
-	create := db.CreateAPIKeyInput{Name: name, Scopes: scopes, RateLimitPerMin: rate, CreatedBy: &id.UserID}
+	// Bind the key to a tenant. Absent input defaults to the tenant-neutral
+	// default account; an explicit account must exist.
+	accountID := strings.TrimSpace(strVal(in["accountId"]))
+	if accountID == "" {
+		accountID = db.DefaultAccountID
+	}
+	acct, err := s.DB.GetAccount(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	if acct == nil {
+		return nil, fmt.Errorf("%w: unknown account %q", errValidation, accountID)
+	}
+	create := db.CreateAPIKeyInput{AccountID: accountID, Name: name, Scopes: scopes, RateLimitPerMin: rate, CreatedBy: &id.UserID}
 	if exp := strings.TrimSpace(strVal(in["expiresAt"])); exp != "" {
 		if ts, perr := parseJSDate(exp); perr == nil {
 			create.ExpiresAt = &ts

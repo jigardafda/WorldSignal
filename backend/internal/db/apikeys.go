@@ -11,6 +11,7 @@ import (
 // raw key is stored; KeyPrefix is safe to display.
 type ApiKey struct {
 	ID              string
+	AccountID       string
 	Name            string
 	KeyHash         string
 	KeyPrefix       string
@@ -24,11 +25,11 @@ type ApiKey struct {
 	CreatedAt       time.Time
 }
 
-const apiKeyCols = `"id","name","keyHash","keyPrefix","scopes","rateLimitPerMin","enabled","expiresAt","lastUsedAt","requestCount","createdBy","createdAt"`
+const apiKeyCols = `"id","accountId","name","keyHash","keyPrefix","scopes","rateLimitPerMin","enabled","expiresAt","lastUsedAt","requestCount","createdBy","createdAt"`
 
 func scanAPIKey(row pgx.Row) (*ApiKey, error) {
 	var k ApiKey
-	if err := row.Scan(&k.ID, &k.Name, &k.KeyHash, &k.KeyPrefix, &k.Scopes, &k.RateLimitPerMin,
+	if err := row.Scan(&k.ID, &k.AccountID, &k.Name, &k.KeyHash, &k.KeyPrefix, &k.Scopes, &k.RateLimitPerMin,
 		&k.Enabled, &k.ExpiresAt, &k.LastUsedAt, &k.RequestCount, &k.CreatedBy, &k.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -65,6 +66,7 @@ func (d *DB) GetAPIKeyByHash(ctx context.Context, hash string) (*ApiKey, error) 
 
 // CreateAPIKeyInput carries the fields to persist for a new key.
 type CreateAPIKeyInput struct {
+	AccountID          string
 	Name, Hash, Prefix string
 	Scopes             []string
 	RateLimitPerMin    int
@@ -72,16 +74,38 @@ type CreateAPIKeyInput struct {
 	CreatedBy          *string
 }
 
-// CreateAPIKey inserts a key and returns it.
+// CreateAPIKey inserts a key and returns it. An empty AccountID defaults to the
+// tenant-neutral default account.
 func (d *DB) CreateAPIKey(ctx context.Context, id string, in CreateAPIKeyInput) (*ApiKey, error) {
 	if in.Scopes == nil {
 		in.Scopes = []string{}
 	}
+	if in.AccountID == "" {
+		in.AccountID = DefaultAccountID
+	}
 	return scanAPIKey(d.Pool.QueryRow(ctx, `
-INSERT INTO "ApiKey" ("id","name","keyHash","keyPrefix","scopes","rateLimitPerMin","expiresAt","createdBy")
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+INSERT INTO "ApiKey" ("id","accountId","name","keyHash","keyPrefix","scopes","rateLimitPerMin","expiresAt","createdBy")
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 RETURNING `+apiKeyCols,
-		id, in.Name, in.Hash, in.Prefix, in.Scopes, in.RateLimitPerMin, in.ExpiresAt, in.CreatedBy))
+		id, in.AccountID, in.Name, in.Hash, in.Prefix, in.Scopes, in.RateLimitPerMin, in.ExpiresAt, in.CreatedBy))
+}
+
+// ListAPIKeysByAccount returns an account's keys, newest first.
+func (d *DB) ListAPIKeysByAccount(ctx context.Context, accountID string) ([]*ApiKey, error) {
+	rows, err := d.Pool.Query(ctx, `SELECT `+apiKeyCols+` FROM "ApiKey" WHERE "accountId"=$1 ORDER BY "createdAt" DESC LIMIT 500`, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*ApiKey{}
+	for rows.Next() {
+		k, err := scanAPIKey(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, k)
+	}
+	return out, rows.Err()
 }
 
 // SetAPIKeyEnabled toggles a key, returning it (or nil,nil if unknown).

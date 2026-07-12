@@ -33,6 +33,7 @@ const RESP: Record<string, unknown> = {
   sendTestEmail: { ok: true }, deleteEmailConnector: true,
   apiKeys: [{ id: "k" }], apiScopes: ["signals:read"], createApiKey: { id: "k", key: "wsk_x" },
   setApiKeyEnabled: { id: "k" }, deleteApiKey: true,
+  accounts: [{ id: "a" }], account: { id: "a" }, createAccount: { id: "a" }, updateAccount: { id: "a" },
   entities: [{ name: "Acme", type: "ORG", signalCount: 3 }],
   countries: [{ code: "US", name: "United States" }],
   taxonomy: [{ code: "C" }], taxonomyStats: [{ key: "C", count: 1 }],
@@ -135,6 +136,12 @@ describe("api wrappers", () => {
     expect(await api.createApiKey({ name: "n", scopes: ["signals:read"], rateLimitPerMin: 60 })).toEqual(RESP.createApiKey);
     expect(await api.setApiKeyEnabled("k", false)).toEqual(RESP.setApiKeyEnabled);
     expect(await api.deleteApiKey("k")).toBe(true);
+
+    expect(await api.accounts()).toEqual(RESP.accounts);
+    expect(await api.account("a")).toEqual(RESP.account);
+    expect(await api.createAccount({ name: "Acme", slug: "acme", plan: "PRO" })).toEqual(RESP.createAccount);
+    expect(mockGql.mock.calls.at(-1)?.[1]).toEqual({ i: { name: "Acme", slug: "acme", plan: "PRO" } });
+    expect(await api.updateAccount("a", { status: "SUSPENDED" })).toEqual(RESP.updateAccount);
 
     expect(await api.entities({ search: "a", type: "ORG" }, 10)).toEqual(RESP.entities);
     expect(await api.entities()).toEqual(RESP.entities);

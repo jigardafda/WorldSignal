@@ -27,7 +27,7 @@ func (s *Server) contextWithIdentity(r *http.Request) context.Context {
 	if err != nil || u == nil {
 		return ctx
 	}
-	return auth.WithIdentity(ctx, &auth.Identity{UserID: u.ID, Email: u.Email, Role: u.Role, Token: token})
+	return auth.WithIdentity(ctx, &auth.Identity{UserID: u.ID, Email: u.Email, Role: u.Role, Token: token, AccountID: u.AccountID})
 }
 
 func bearerToken(r *http.Request) string {
@@ -47,7 +47,7 @@ func authz(ctx context.Context, perm string) error {
 func userToMap(u *db.User) map[string]any {
 	return map[string]any{
 		"id": u.ID, "email": u.Email, "name": u.Name, "role": u.Role,
-		"status": u.Status, "createdAt": u.CreatedAt, "updatedAt": u.UpdatedAt,
+		"status": u.Status, "accountId": u.AccountID, "createdAt": u.CreatedAt, "updatedAt": u.UpdatedAt,
 	}
 }
 

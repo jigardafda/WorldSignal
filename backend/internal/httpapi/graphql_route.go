@@ -63,6 +63,7 @@ func (s *Server) root() gql.Root {
 	s.registerLLMResolvers(q, m)       // LLM key management (settings:manage)
 	s.registerConnectorResolvers(q, m) // email connectors (settings:manage)
 	s.registerAPIKeyResolvers(q, m)    // public-API keys (settings:manage)
+	s.registerAccountResolvers(q, m)   // multi-tenant accounts (accounts:manage)
 	s.registerRelevanceResolvers(q, m) // smart-signals: For-You feed, interests, feedback, AI draft
 	return gql.Root{Query: q, Mutation: m}
 }

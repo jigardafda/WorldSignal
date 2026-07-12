@@ -1,6 +1,15 @@
 # Multi-Tenant SaaS — Architecture & Migration Design
 
-**Status:** Draft for review · **Date:** 2026-07-12
+**Status:** Phase 1 implemented · **Date:** 2026-07-12
+
+> **Phase 1 (Account foundation) has landed.** The `Account` tenant spine, the
+> `accountId` backfill migration, account-scoped API keys, the operator
+> **Accounts** admin page, and the `/v1/account` tenant-context endpoint are
+> implemented and tested (Go ≥95%, frontend thresholds met, Playwright e2e). See
+> **Implementation status** at the end of this doc for what shipped and what is
+> deferred to later phases.
+
+**Original design date:** 2026-07-12
 **Scope:** Turn WorldSignal (currently a single-tenant admin console over a global
 signal pipeline) into a multi-tenant SaaS served from **one instance**, without
 forking the shared signal corpus.
@@ -176,3 +185,41 @@ surface exists.
 4. **Signal visibility windows:** should plan tier gate *how far back* / *how fresh*
    a tenant can query the shared pool (e.g. FREE = 24h delay)? Cheap lever, worth
    deciding early since it touches the query layer in step 2.
+
+## Implementation status
+
+### Phase 1 — Account foundation (shipped)
+
+Backend (`backend/internal`):
+- `db/accounts.go` — `Account` model + CRUD (`EnsureDefaultAccount`, `CreateAccount`,
+  `GetAccount`, `GetAccountBySlug`, `ListAccounts`, `UpdateAccount`) with
+  `ACTIVE/SUSPENDED/DELETED` × `FREE/PRO/ENTERPRISE` vocabularies.
+- `db/migrate.go` — idempotent migration: `Account` table, seeded `acct_default`,
+  `accountId` on `ApiKey` (NOT NULL, backfilled) and `User` (NULL = platform staff),
+  guarded foreign keys.
+- `auth` — `accounts:manage` permission (admin-only) and `Identity.AccountID`.
+- `httpapi/accounts.go` — `accounts`/`account` queries, `createAccount`/`updateAccount`
+  mutations (all gated on `accounts:manage`), and the `/v1/account` REST endpoint
+  that resolves the presented API key's tenant. API keys are now account-scoped
+  (`createApiKey` takes an optional `accountId`, defaulting to `acct_default`).
+
+Frontend (`frontend/src`):
+- `pages/Accounts.tsx` — operator Accounts admin (list, create with derived slug +
+  plan, suspend/activate), wired into `App.tsx` routing and the `Layout` nav under
+  Administration, gated on `accounts:manage`.
+- `lib/api.ts` — `Account` type + `accounts`/`account`/`createAccount`/`updateAccount`.
+
+Tests: Go unit + API tests keep total coverage ≥95%; `pages/accounts.test.tsx` and
+`lib/api.test.ts` keep the frontend thresholds; `e2e/accounts.spec.ts` drives the
+full stack (login → list default tenant → create → suspend/activate).
+
+### Deferred to later phases
+
+- **Isolation hardening (step 2):** thread `accountId` through every per-tenant
+  query and add Postgres RLS + `SET LOCAL app.account_id` as the DB backstop.
+  Phase 1 establishes the column/FK spine; per-query scoping of subscriptions,
+  deliveries and feedback is next.
+- **Quotas + metering (step 3):** `AccountQuota` / `AccountUsage` and per-account
+  (not just per-key) rate limits.
+- **Tenant app split (step 4):** the customer-facing shell (`app.` / `/app/*`).
+- **Billing + self-serve signup (step 5).**

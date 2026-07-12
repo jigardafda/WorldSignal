@@ -129,6 +129,10 @@ export interface ApiKey {
   key?: string; // the raw secret — only present in the createApiKey response
 }
 export interface Subscriber { id: string; name: string; status: string; createdAt: string; subscriptionCount: number }
+export interface Account {
+  id: string; name: string; slug: string; status: string; plan: string;
+  createdAt: string; updatedAt: string;
+}
 export interface Entity { name: string; type: string; signalCount: number }
 export interface EntityFilter { search?: string; type?: string }
 export interface Bucket { key: string; count: number }
@@ -377,6 +381,15 @@ export const api = {
   deleteApiKey: (id: string) =>
     gql<{ deleteApiKey: boolean }>(`mutation($id:ID!){deleteApiKey(id:$id)}`, { id }).then((d) => d.deleteApiKey),
 
+  // accounts — multi-tenant SaaS tenants (accounts:manage)
+  accounts: () => gql<{ accounts: Account[] }>(`{accounts{${ACCOUNT_FIELDS}}}`).then((d) => d.accounts),
+  account: (id: string) =>
+    gql<{ account: Account | null }>(`query($id:ID!){account(id:$id){${ACCOUNT_FIELDS}}}`, { id }).then((d) => d.account),
+  createAccount: (input: { name: string; slug?: string; plan?: string }) =>
+    gql<{ createAccount: Account }>(`mutation($i:CreateAccountInput!){createAccount(input:$i){${ACCOUNT_FIELDS}}}`, { i: input }).then((d) => d.createAccount),
+  updateAccount: (id: string, input: { name?: string; status?: string; plan?: string }) =>
+    gql<{ updateAccount: Account }>(`mutation($id:ID!,$i:UpdateAccountInput!){updateAccount(id:$id,input:$i){${ACCOUNT_FIELDS}}}`, { id, i: input }).then((d) => d.updateAccount),
+
   // audit log (settings:manage)
   auditLogs: (filter: AuditFilter = {}, limit = 50, offset = 0) => {
     const args = sourceArgs(filter as Record<string, string>, { limit, offset });
@@ -411,3 +424,4 @@ export const api = {
 const LLM_KEY_FIELDS = `id provider label keyLast4 model isActive status lastTestedAt lastError createdBy createdAt updatedAt`;
 const CONNECTOR_FIELDS = `id name provider host port security username secretLast4 fromEmail fromName isActive enabled status lastTestedAt lastError createdAt updatedAt`;
 const API_KEY_FIELDS = `id name keyPrefix scopes rateLimitPerMin enabled expiresAt lastUsedAt requestCount createdBy createdAt`;
+const ACCOUNT_FIELDS = `id name slug status plan createdAt updatedAt`;

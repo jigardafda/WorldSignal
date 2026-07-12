@@ -55,6 +55,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /health", s.health) // open: liveness probe
 	mux.HandleFunc("GET /v1/stats", s.requireAPIKey("stats:read", s.stats))
 	mux.HandleFunc("GET /v1/taxonomy", s.requireAPIKey("signals:read", s.taxonomy))
+	mux.HandleFunc("GET /v1/account", s.requireAPIKey("signals:read", s.accountForKey))
 	s.registerSignalRoutes(mux)
 	s.registerSourceRoutes(mux)
 	s.registerStreamRoutes(mux)
