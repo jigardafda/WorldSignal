@@ -5,7 +5,7 @@ import { Layout } from "./components/Layout";
 import { ForbiddenState, LoadingState } from "./components/States";
 import { useAuth } from "./lib/auth";
 import { Login } from "./pages/Login";
-import { Dashboard } from "./pages/Dashboard";
+import { Home } from "./pages/Home";
 import { LiveDashboard } from "./pages/LiveDashboard";
 import { Signals } from "./pages/Signals";
 import { SignalDetail } from "./pages/SignalDetail";
@@ -57,7 +57,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route element={<RequireAuth />}>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<Home />} />
         <Route path="/live" element={<LiveDashboard />} />
         <Route path="/signals" element={<RequirePerm perm="signals:read"><Signals /></RequirePerm>} />
         <Route path="/signals/:id" element={<RequirePerm perm="signals:read"><SignalDetail /></RequirePerm>} />

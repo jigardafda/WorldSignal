@@ -12,7 +12,7 @@ const { apiMock, authMock } = vi.hoisted(() => ({
     teams: vi.fn(), team: vi.fn(), createTeam: vi.fn(), deleteTeam: vi.fn(), addTeamMember: vi.fn(), removeTeamMember: vi.fn(),
     changePassword: vi.fn(), analytics: vi.fn(), countries: vi.fn(),
   },
-  authMock: { user: { id: "me", email: "me@x.io", name: "Me", role: "ADMIN", createdAt: "2026-01-01T00:00:00Z" }, loading: false, hasPerm: () => true, login: vi.fn(), logout: vi.fn(), refresh: vi.fn() },
+  authMock: { user: { id: "me", email: "me@x.io", name: "Me", role: "ADMIN", createdAt: "2026-01-01T00:00:00Z" } as { id: string; email: string; name: string; role: string; createdAt: string; account?: { id: string; name: string; slug: string; status: string; plan: string } }, loading: false, hasPerm: () => true, login: vi.fn(), logout: vi.fn(), refresh: vi.fn() },
 }));
 vi.mock("../lib/api", () => ({ api: apiMock }));
 vi.mock("../lib/auth", () => ({ useAuth: () => authMock }));
@@ -287,6 +287,16 @@ describe("Account", () => {
     await userEvent.click(screen.getByRole("button", { name: "Update password" }));
     expect(await screen.findByText("Passwords do not match")).toBeInTheDocument();
     expect(apiMock.changePassword).not.toHaveBeenCalled();
+  });
+  it("shows the workspace (plan/status) and hides the internal role for tenants", async () => {
+    authMock.user = { id: "t", email: "t@acme.com", name: "T", role: "ADMIN", createdAt: "2026-01-01T00:00:00Z", account: { id: "a1", name: "Acme Corp", slug: "acme", status: "ACTIVE", plan: "PRO" } };
+    renderWithProviders(<Account />);
+    expect(screen.getByTestId("workspace-card")).toBeInTheDocument();
+    expect(screen.getByText("Acme Corp")).toBeInTheDocument();
+    expect(screen.getByText("PRO")).toBeInTheDocument();
+    // The internal RBAC role is not shown to tenants.
+    expect(screen.queryByText("Role:")).toBeNull();
+    authMock.user = { id: "me", email: "me@x.io", name: "Me", role: "ADMIN", createdAt: "2026-01-01T00:00:00Z" }; // restore
   });
 });
 

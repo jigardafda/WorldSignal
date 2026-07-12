@@ -21,6 +21,11 @@ test.describe("operator vs tenant consoles", () => {
   test("account users get the customer console with a tenant-only menu", async ({ page }) => {
     await login(page, "tenant@acme.test", "admin12345");
     await expect(page.getByTestId("console-mode")).toHaveText("Customer");
+    // The header shows the workspace, and the home is customer-facing (plan +
+    // usage), not the operator pipeline view.
+    await expect(page.getByTestId("workspace-name")).toHaveText("Tenant Inc");
+    await expect(page.getByText("Tenant Inc · your WorldSignal workspace")).toBeVisible();
+    await expect(page.getByText("PRO")).toBeVisible();
 
     // Tenant menu: shared-corpus reads + self-service.
     await expect(page.getByRole("link", { name: "Signals" })).toBeVisible();
@@ -39,8 +44,11 @@ test.describe("operator vs tenant consoles", () => {
     await expect(page.getByText("scoped to your account")).toBeVisible();
     await expect(page.getByTestId("add-key")).toBeVisible();
 
-    // And its own account page.
+    // And its own account page: a workspace card with plan/status, not an
+    // internal RBAC role.
     await page.getByRole("link", { name: "My Account" }).click();
+    await expect(page.getByTestId("workspace-card")).toBeVisible();
     await expect(page.getByText("tenant@acme.test")).toBeVisible();
+    await expect(page.getByText("Role:")).toHaveCount(0);
   });
 });

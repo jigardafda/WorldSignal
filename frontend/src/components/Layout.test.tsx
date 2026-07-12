@@ -7,7 +7,7 @@ import { render } from "@testing-library/react";
 import { Layout } from "./Layout";
 
 const { authMock } = vi.hoisted(() => ({
-  authMock: { user: { id: "me", email: "me@x.io", name: "Me", role: "ADMIN" } as { id: string; email: string; name: string; role: string; accountId?: string }, loading: false, logout: vi.fn(), login: vi.fn(), refresh: vi.fn(), hasPerm: (_p: string): boolean => true },
+  authMock: { user: { id: "me", email: "me@x.io", name: "Me", role: "ADMIN" } as { id: string; email: string; name: string; role: string; accountId?: string; account?: { id: string; name: string; slug: string; status: string; plan: string } }, loading: false, logout: vi.fn(), login: vi.fn(), refresh: vi.fn(), hasPerm: (_p: string): boolean => true },
 }));
 vi.mock("../lib/auth", () => ({ useAuth: () => authMock }));
 // Live Mode mounts Leaflet (needs a real DOM map); stub it here.
@@ -50,9 +50,10 @@ describe("Layout", () => {
 
   it("shows the customer console with a tenant-only menu for account users", () => {
     // An account-scoped user gets the customer console: no operator surfaces.
-    authMock.user = { id: "t", email: "t@acme.com", name: "T", role: "ADMIN", accountId: "a1" };
+    authMock.user = { id: "t", email: "t@acme.com", name: "T", role: "ADMIN", accountId: "a1", account: { id: "a1", name: "Acme Corp", slug: "acme", status: "ACTIVE", plan: "PRO" } };
     renderLayout();
     expect(screen.getByTestId("console-mode")).toHaveTextContent("Customer");
+    expect(screen.getByTestId("workspace-name")).toHaveTextContent("Acme Corp");
     expect(screen.getByText("Signals")).toBeInTheDocument();
     expect(screen.getByText("API Keys")).toBeInTheDocument();
     expect(screen.getByText("My Account")).toBeInTheDocument();

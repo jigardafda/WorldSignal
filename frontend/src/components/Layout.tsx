@@ -123,6 +123,11 @@ export function Layout() {
             <Badge size="sm" variant="light" color={isTenant ? "teal" : "grape"} data-testid="console-mode">
               {isTenant ? "Customer" : "Operator"}
             </Badge>
+            {isTenant && user?.account && (
+              <Text size="sm" c="dimmed" visibleFrom="sm" data-testid="workspace-name">
+                {user.account.name}
+              </Text>
+            )}
           </Group>
           <SegmentedControl
             size="xs"
