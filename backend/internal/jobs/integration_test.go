@@ -44,8 +44,7 @@ func TestWorkerPipelineDrain(t *testing.T) {
 		}
 	}
 	ex(`INSERT INTO "Source" ("id","name","url","updatedAt") VALUES ('s1','S',$1,now())`, srv.URL)
-	ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','Default',now())`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('p','__default__','All','POLLING','{}','{}',now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('p','All','POLLING','{}','{}',now())`)
 
 	q := jobs.New(d.Pool)
 	if err := q.Migrate(ctx); err != nil {

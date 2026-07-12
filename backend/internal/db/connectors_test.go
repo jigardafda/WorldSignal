@@ -174,8 +174,7 @@ func TestBuildDigestDeliveryInnerErrors(t *testing.T) {
 				t.Fatalf("exec: %v", err)
 			}
 		}
-		ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-		ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('dig','__default__','d','EMAIL','{}','{}',now())`)
+		ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('dig','d','EMAIL','{}','{}',now())`)
 		ex(`INSERT INTO "Signal" ("id","title","summary","severity","confidence","sourceCount","firstSeenAt","lastSeenAt","updatedAt") VALUES ('s1','T','S','HIGH',0.8,1,now(),now(),now())`)
 		ex(`INSERT INTO "DigestQueue" ("subscriptionId","signalId","queuedAt") VALUES ('dig','s1',now())`)
 	}
@@ -223,8 +222,7 @@ func TestDigestQueueAndBuild(t *testing.T) {
 			t.Fatalf("exec %q: %v", q, err)
 		}
 	}
-	ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('dig','__default__','digest','EMAIL','{}','{"mode":"digest","interval":"hourly"}',now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('dig','digest','EMAIL','{}','{"mode":"digest","interval":"hourly"}',now())`)
 	ex(`INSERT INTO "Signal" ("id","title","summary","severity","confidence","sourceCount","firstSeenAt","lastSeenAt","updatedAt") VALUES ('s1','First','A','HIGH',0.8,1,now(),now(),now())`)
 
 	// Idempotent queueing.

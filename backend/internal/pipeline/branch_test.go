@@ -248,8 +248,7 @@ func TestMatchAndSendEdges(t *testing.T) {
 		t.Fatalf("missing delivery: %v", err)
 	}
 	// Already-SENT delivery → early return.
-	mustExec(t, d, `INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-	mustExec(t, d, `INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('sub','__default__','S','POLLING','{}','{}',now())`)
+	mustExec(t, d, `INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('sub','S','POLLING','{}','{}',now())`)
 	mustExec(t, d, `INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','T','S',now(),now(),now())`)
 	mustExec(t, d, `INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload","createdAt") VALUES ('del','sub','sg','POLLING','SENT','{}',now())`)
 	if err := SendDelivery(ctx, d, nil, "s", "del", false, now); err != nil {

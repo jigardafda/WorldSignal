@@ -7,7 +7,6 @@ const { apiMock, authMock } = vi.hoisted(() => ({
   apiMock: {
     subscriptions: vi.fn(), createSubscription: vi.fn(), updateSubscription: vi.fn(), deleteSubscription: vi.fn(), testSubscription: vi.fn(),
     emailConnectors: vi.fn(),
-    subscribers: vi.fn(), createSubscriber: vi.fn(), deleteSubscriber: vi.fn(),
     users: vi.fn(), createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn(), accounts: vi.fn(),
     teams: vi.fn(), team: vi.fn(), createTeam: vi.fn(), deleteTeam: vi.fn(), addTeamMember: vi.fn(), removeTeamMember: vi.fn(),
     changePassword: vi.fn(), analytics: vi.fn(), countries: vi.fn(),
@@ -28,7 +27,6 @@ afterEach(() => { vi.clearAllMocks(); authMock.hasPerm = () => true; });
 describe("Subscriptions", () => {
   const sub = { id: "x", name: "All", channel: "POLLING", enabled: true, filter: {}, config: {}, createdAt: "2026-01-01T00:00:00Z" };
   beforeEach(() => {
-    apiMock.subscribers.mockResolvedValue([]);
     apiMock.countries.mockResolvedValue([]);
     apiMock.emailConnectors.mockResolvedValue([{ id: "c1", name: "Team", provider: "GMAIL", host: "smtp.gmail.com", port: 587, security: "STARTTLS", username: "", secretLast4: "", fromEmail: "me@gmail.com", fromName: "WS", isActive: true, enabled: true, status: "VALID", lastTestedAt: null, lastError: null, createdAt: "", updatedAt: "" }]);
   });

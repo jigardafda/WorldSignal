@@ -131,8 +131,7 @@ func seedStreamSub(t *testing.T, d *db.DB, id string, withDelivery bool) {
 			t.Fatal(err)
 		}
 	}
-	ex(`INSERT INTO "Subscriber"("id","name","createdAt") VALUES('__default__','D',now()) ON CONFLICT DO NOTHING`)
-	ex(`INSERT INTO "Subscription"("id","subscriberId","name","channel","filter","config","createdAt") VALUES($1,'__default__','s','SSE','{}','{}',now())`, id)
+	ex(`INSERT INTO "Subscription"("id","name","channel","filter","config","createdAt") VALUES($1,'s','SSE','{}','{}',now())`, id)
 	if withDelivery {
 		ex(`INSERT INTO "Signal"("id","title","summary","status","severity","confidence","sourceCount","firstSeenAt","lastSeenAt","updatedAt") VALUES($1,'t','s','CONFIRMED','HIGH',0.9,1,now(),now(),now())`, id)
 		ex(`INSERT INTO "DeliveryEvent"("id","subscriptionId","signalId","channel","status","payload","createdAt") VALUES($1,$1,$1,'SSE','SENT','{}',now())`, id)

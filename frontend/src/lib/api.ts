@@ -111,7 +111,7 @@ export interface DeliveryRow {
 }
 export interface DeliveryDetail extends DeliveryRow { payload: unknown }
 export interface Subscription {
-  id: string; subscriberId?: string; name: string; channel: string; enabled: boolean;
+  id: string; accountId?: string; name: string; channel: string; enabled: boolean;
   filter: unknown; config: unknown; createdAt: string;
 }
 export interface EmailConnector {
@@ -131,7 +131,6 @@ export interface ApiKey {
   lastUsedAt: string | null; requestCount: number; createdBy: string | null; createdAt: string;
   key?: string; // the raw secret — only present in the createApiKey response
 }
-export interface Subscriber { id: string; name: string; status: string; createdAt: string; subscriptionCount: number }
 export interface Account {
   id: string; name: string; slug: string; status: string; plan: string;
   createdAt: string; updatedAt: string;
@@ -306,9 +305,9 @@ export const api = {
     gql<{ delivery: DeliveryDetail | null }>(`query($id:ID!){delivery(id:$id){id subscriptionId subscriptionName channel signalId signalTitle status attempts createdAt deliveredAt failedAt errorMessage payload}}`, { id }).then((d) => d.delivery),
   retryDelivery: (id: string) => gql<{ retryDelivery: boolean }>(`mutation($id:ID!){retryDelivery(id:$id)}`, { id }).then((d) => d.retryDelivery),
 
-  // subscriptions / subscribers
+  // subscriptions (operator, cross-tenant)
   subscriptions: () => gql<{ subscriptions: Subscription[] }>(`{subscriptions{id name channel enabled filter config createdAt}}`).then((d) => d.subscriptions),
-  subscription: (id: string) => gql<{ subscription: Subscription | null }>(`query($id:ID!){subscription(id:$id){id subscriberId name channel enabled filter config createdAt}}`, { id }).then((d) => d.subscription),
+  subscription: (id: string) => gql<{ subscription: Subscription | null }>(`query($id:ID!){subscription(id:$id){id accountId name channel enabled filter config createdAt}}`, { id }).then((d) => d.subscription),
   createSubscription: (input: Record<string, unknown>) =>
     gql<{ createSubscription: Subscription }>(`mutation($i:CreateSubscriptionInput!){createSubscription(input:$i){id name channel enabled filter config createdAt}}`, { i: input }).then((d) => d.createSubscription),
   updateSubscription: (id: string, input: Record<string, unknown>) =>
@@ -316,9 +315,6 @@ export const api = {
   testSubscription: (id: string) =>
     gql<{ testSubscription: { ok: boolean; channel: string; message: string } }>(`mutation($id:ID!){testSubscription(id:$id){ok channel message}}`, { id }).then((d) => d.testSubscription),
   deleteSubscription: (id: string) => gql<{ deleteSubscription: boolean }>(`mutation($id:ID!){deleteSubscription(id:$id)}`, { id }).then((d) => d.deleteSubscription),
-  subscribers: () => gql<{ subscribers: Subscriber[] }>(`{subscribers{id name status createdAt subscriptionCount}}`).then((d) => d.subscribers),
-  createSubscriber: (name: string) => gql<{ createSubscriber: Subscriber }>(`mutation($n:String!){createSubscriber(name:$n){id name status createdAt subscriptionCount}}`, { n: name }).then((d) => d.createSubscriber),
-  deleteSubscriber: (id: string) => gql<{ deleteSubscriber: boolean }>(`mutation($id:ID!){deleteSubscriber(id:$id)}`, { id }).then((d) => d.deleteSubscriber),
 
   // entities (signals:read)
   entities: (filter: EntityFilter = {}, limit = 100) =>

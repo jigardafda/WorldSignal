@@ -220,20 +220,13 @@ model SignalTag {
   @@index([tagId])
 }
 
-// ── Subscribers & delivery ─────────────────────────────────────────────────────
-
-model Subscriber {
-  id            String           @id @default(cuid())
-  name          String
-  status        SubscriberStatus @default(ACTIVE)
-  createdAt     DateTime         @default(now())
-  subscriptions Subscription[]
-}
+// ── Subscriptions & delivery ────────────────────────────────────────────────────
 
 model Subscription {
   id           String          @id @default(cuid())
-  subscriberId String
-  subscriber   Subscriber      @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  // Owning tenant. The accountId column + FK are added by the Go migration
+  // (db.MigrateContent); the legacy Subscriber model was removed.
+  accountId    String          @default("acct_default")
   name         String
   channel      DeliveryChannel @default(WEBHOOK)
   // JSON filter: { tags, countries, minConfidence, minSeverity }
@@ -313,12 +306,6 @@ enum DeliveryStatus {
   FAILED
   RETRYING
   DEAD_LETTERED
-}
-
-enum SubscriberStatus {
-  ACTIVE
-  SUSPENDED
-  DELETED
 }
 
 enum SignalArticleRelation {

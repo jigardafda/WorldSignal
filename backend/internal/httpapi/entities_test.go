@@ -26,8 +26,7 @@ func seedEntities(t *testing.T, d *db.DB) {
 	ex(`INSERT INTO "Signal" ("id","title","summary","status","severity","confidence","eventType","country","sourceCount","firstSeenAt","lastSeenAt","createdAt","updatedAt") VALUES ('sg1','Quake hits region','S','CONFIRMED','HIGH',0.8,'DISASTER.EARTHQUAKE','US',1,now(),now(),now(),now())`)
 	ex(`INSERT INTO "SignalArticle" ("signalId","articleId","relationType","similarityScore") VALUES ('sg1','a1','PRIMARY',1)`)
 	ex(`INSERT INTO "SignalTag" ("signalId","tagId","confidence") SELECT 'sg1',"id",0.9 FROM "TaxonomyTag" WHERE "code"='DISASTER.EARTHQUAKE'`)
-	ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','Default',now())`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('sub1','__default__','All','POLLING','{}','{}',now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('sub1','All','POLLING','{}','{}',now())`)
 	ex(`INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload","attempts","errorMessage","failedAt","createdAt") VALUES ('d1','sub1','sg1','POLLING','FAILED','{"event_id":"e"}',2,'boom',now(),now())`)
 
 	// Jobs table + one row.
@@ -64,7 +63,6 @@ func TestEntityReadResolvers(t *testing.T) {
 		{"rawItem", `{"query":"query($id:ID!){rawItem(id:$id){id rawContent rawPayload}}","variables":{"id":"r1"}}`, `body text`},
 		{"deliveries", `{"query":"{deliveries(status:\"FAILED\"){items{id status signalTitle subscriptionName} total}}"}`, `"status":"FAILED"`},
 		{"delivery", `{"query":"query($id:ID!){delivery(id:$id){id payload errorMessage}}","variables":{"id":"d1"}}`, `boom`},
-		{"subscribers", `{"query":"{subscribers{id name subscriptionCount}}"}`, `"subscriptionCount":1`},
 		{"subscription", `{"query":"query($id:ID!){subscription(id:$id){id name channel}}","variables":{"id":"sub1"}}`, `"name":"All"`},
 		{"taxonomyStats", `{"query":"{taxonomyStats{code count}}"}`, `DISASTER.EARTHQUAKE`},
 		{"jobs", `{"query":"{jobs{items{id queue state lastError} total}}"}`, `"state":"failed"`},
@@ -94,12 +92,6 @@ func TestEntityMutations(t *testing.T) {
 
 	if b := gql(t, base, tok, `{"query":"mutation($id:ID!,$i:UpdateSourceInput!){updateSource(id:$id,input:$i){priority enabled credibility}}","variables":{"id":"src1","i":{"priority":3,"enabled":false,"credibility":0.7,"crawlFrequency":600,"country":"GB","name":"Renamed"}}}`); !strings.Contains(b, `"priority":3`) {
 		t.Fatalf("updateSource: %s", b)
-	}
-	if b := gql(t, base, tok, `{"query":"mutation($n:String!){createSubscriber(name:$n){id name}}","variables":{"n":"New Sub"}}`); !strings.Contains(b, `"name":"New Sub"`) {
-		t.Fatalf("createSubscriber: %s", b)
-	}
-	if b := gql(t, base, tok, `{"query":"mutation{createSubscriber(name:\"\"){id}}"}`); !strings.Contains(b, "validation") {
-		t.Fatalf("empty subscriber name: %s", b)
 	}
 	if b := gql(t, base, tok, `{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateSubscription(id:$id,input:$i){name enabled}}","variables":{"id":"sub1","i":{"name":"Renamed","enabled":false,"filter":{"tags":["X"]},"config":{"url":"u"}}}}`); !strings.Contains(b, `"name":"Renamed"`) {
 		t.Fatalf("updateSubscription: %s", b)
@@ -131,9 +123,6 @@ func TestEntityMutations(t *testing.T) {
 	if b := gql(t, base, tok, `{"query":"mutation($id:ID!){deleteSubscription(id:$id)}","variables":{"id":"sub1"}}`); !strings.Contains(b, `"deleteSubscription":true`) {
 		t.Fatalf("deleteSubscription: %s", b)
 	}
-	if b := gql(t, base, tok, `{"query":"mutation($id:ID!){deleteSubscriber(id:$id)}","variables":{"id":"__default__"}}`); !strings.Contains(b, `"deleteSubscriber":true`) {
-		t.Fatalf("deleteSubscriber: %s", b)
-	}
 	if b := gql(t, base, tok, `{"query":"mutation($id:ID!){deleteSource(id:$id)}","variables":{"id":"src1"}}`); !strings.Contains(b, `"deleteSource":true`) {
 		t.Fatalf("deleteSource: %s", b)
 	}
@@ -148,8 +137,7 @@ func TestTestSubscriptionBranches(t *testing.T) {
 			t.Fatalf("seed: %v\n%s", err, q)
 		}
 	}
-	ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','Default',now())`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('hook','__default__','Hook','WEBHOOK','{}','{"url":"https://x/y"}',now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('hook','Hook','WEBHOOK','{}','{"url":"https://x/y"}',now())`)
 	enq := &recordEnqueuer{}
 	base := newServerWith(t, d, enq)
 	tok, _ := dbtest.AuthToken(t, d, auth.RoleAdmin)
@@ -190,8 +178,6 @@ func TestEntityAuthz(t *testing.T) {
 		`{"query":"mutation($id:ID!,$i:UpdateSourceInput!){updateSource(id:$id,input:$i){id}}","variables":{"id":"src1","i":{"name":"x"}}}`,
 		`{"query":"mutation($id:ID!){retryDelivery(id:$id)}","variables":{"id":"d1"}}`,
 		`{"query":"mutation($id:ID!){retryJob(id:$id)}","variables":{"id":"j1"}}`,
-		`{"query":"mutation($n:String!){createSubscriber(name:$n){id}}","variables":{"n":"x"}}`,
-		`{"query":"mutation($id:ID!){deleteSubscriber(id:$id)}","variables":{"id":"__default__"}}`,
 		`{"query":"mutation($id:ID!){deleteSubscription(id:$id)}","variables":{"id":"sub1"}}`,
 		`{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateSubscription(id:$id,input:$i){id}}","variables":{"id":"sub1","i":{"name":"x"}}}`,
 		`{"query":"mutation($id:ID!){testSubscription(id:$id){ok}}","variables":{"id":"sub1"}}`,
@@ -216,7 +202,7 @@ func TestEntityUnauthenticated(t *testing.T) {
 		`{"query":"{stats}"}`, `{"query":"{analytics}"}`, `{"query":"{jobCounts{key count}}"}`,
 		`{"query":"{jobs{total}}"}`, `{"query":"{signalCount}"}`, `{"query":"{taxonomyStats{code}}"}`,
 		`{"query":"{articles{total}}"}`, `{"query":"{rawItems{total}}"}`, `{"query":"{deliveries{total}}"}`,
-		`{"query":"{subscribers{id}}"}`, `{"query":"query($id:ID!){source(id:$id){id}}","variables":{"id":"src1"}}`,
+		`{"query":"query($id:ID!){source(id:$id){id}}","variables":{"id":"src1"}}`,
 		`{"query":"query($id:ID!){article(id:$id){id}}","variables":{"id":"a1"}}`,
 		`{"query":"query($id:ID!){rawItem(id:$id){id}}","variables":{"id":"r1"}}`,
 		`{"query":"query($id:ID!){delivery(id:$id){id}}","variables":{"id":"d1"}}`,
@@ -255,7 +241,6 @@ func TestEntityResolverDBErrors(t *testing.T) {
 		{"Source", []string{`{"query":"{sources{id}}"}`, `{"query":"query($id:ID!){source(id:$id){id}}","variables":{"id":"src1"}}`, `{"query":"mutation($id:ID!,$i:UpdateSourceInput!){updateSource(id:$id,input:$i){id}}","variables":{"id":"src1","i":{"name":"x"}}}`, `{"query":"mutation($id:ID!){deleteSource(id:$id)}","variables":{"id":"src1"}}`, `{"query":"{analytics}"}`}},
 		{"Signal", []string{`{"query":"{signalCount}"}`, `{"query":"{analytics}"}`}},
 		{"Subscription", []string{`{"query":"{subscriptions{id}}"}`, `{"query":"query($id:ID!){subscription(id:$id){id}}","variables":{"id":"sub1"}}`, `{"query":"mutation($id:ID!,$i:UpdateSubscriptionInput!){updateSubscription(id:$id,input:$i){id}}","variables":{"id":"sub1","i":{"name":"x"}}}`, `{"query":"mutation($id:ID!){deleteSubscription(id:$id)}","variables":{"id":"sub1"}}`, `{"query":"mutation($id:ID!){testSubscription(id:$id){ok}}","variables":{"id":"sub1"}}`}},
-		{"Subscriber", []string{`{"query":"{subscribers{id}}"}`, `{"query":"mutation{createSubscriber(name:\"x\"){id}}"}`, `{"query":"mutation($id:ID!){deleteSubscriber(id:$id)}","variables":{"id":"__default__"}}`}},
 		{"TaxonomyTag", []string{`{"query":"{taxonomyStats{code count}}"}`}},
 		{"ws_jobs", []string{`{"query":"{jobs{total}}"}`, `{"query":"{jobCounts{key count}}"}`, `{"query":"mutation($id:ID!){retryJob(id:$id)}","variables":{"id":"j1"}}`}},
 	}

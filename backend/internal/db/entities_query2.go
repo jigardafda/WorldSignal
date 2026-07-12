@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-
-	"github.com/worldsignal/backend/internal/cuid"
 )
 
 // ---- Deliveries ----
@@ -323,50 +321,6 @@ func (d *DB) UpdateSubscription(ctx context.Context, id string, p SubscriptionPa
 // DeleteSubscription removes a subscription; returns false if absent.
 func (d *DB) DeleteSubscription(ctx context.Context, id string) (bool, error) {
 	tag, err := d.Pool.Exec(ctx, `DELETE FROM "Subscription" WHERE "id"=$1`, id)
-	if err != nil {
-		return false, err
-	}
-	return tag.RowsAffected() > 0, nil
-}
-
-// ---- Subscribers ----
-
-// ListSubscribers returns subscribers with subscription counts.
-func (d *DB) ListSubscribers(ctx context.Context) ([]Subscriber, error) {
-	rows, err := d.Pool.Query(ctx,
-		`SELECT s."id",s."name",s."status",s."createdAt",
-		 (SELECT count(*) FROM "Subscription" sub WHERE sub."subscriberId"=s."id")
-		 FROM "Subscriber" s ORDER BY s."createdAt" ASC LIMIT 500`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []Subscriber{}
-	for rows.Next() {
-		var s Subscriber
-		if err := rows.Scan(&s.ID, &s.Name, &s.Status, &s.CreatedAt, &s.SubscriptionCount); err != nil {
-			return nil, err
-		}
-		out = append(out, s)
-	}
-	return out, rows.Err()
-}
-
-// CreateSubscriber inserts a subscriber.
-func (d *DB) CreateSubscriber(ctx context.Context, name string) (*Subscriber, error) {
-	var s Subscriber
-	err := d.Pool.QueryRow(ctx,
-		`INSERT INTO "Subscriber" ("id","name") VALUES ($1,$2) RETURNING "id","name","status","createdAt"`,
-		cuid.New(), name).Scan(&s.ID, &s.Name, &s.Status, &s.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &s, nil
-}
-
-// DeleteSubscriber removes a subscriber; returns false if absent.
-func (d *DB) DeleteSubscriber(ctx context.Context, id string) (bool, error) {
-	tag, err := d.Pool.Exec(ctx, `DELETE FROM "Subscriber" WHERE "id"=$1`, id)
 	if err != nil {
 		return false, err
 	}

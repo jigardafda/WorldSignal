@@ -26,9 +26,8 @@ func TestDigesterTickBuildsAndEnqueues(t *testing.T) {
 			t.Fatalf("exec: %v", err)
 		}
 	}
-	ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
 	// Hourly digest, last fired 2h ago → due now.
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","lastDigestAt","createdAt") VALUES ('dig','__default__','digest','EMAIL','{}','{"mode":"digest","interval":"hourly","to":"r@x.com"}', now() - interval '2 hours', now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","lastDigestAt","createdAt") VALUES ('dig','digest','EMAIL','{}','{"mode":"digest","interval":"hourly","to":"r@x.com"}', now() - interval '2 hours', now())`)
 	ex(`INSERT INTO "Signal" ("id","title","summary","severity","confidence","sourceCount","firstSeenAt","lastSeenAt","updatedAt") VALUES ('s1','First','A','HIGH',0.8,1,now(),now(),now())`)
 	ex(`INSERT INTO "DigestQueue" ("subscriptionId","signalId","queuedAt") VALUES ('dig','s1',now())`)
 
@@ -60,9 +59,8 @@ func TestDigesterNotDue(t *testing.T) {
 			t.Fatalf("exec: %v", err)
 		}
 	}
-	ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
 	// Daily digest that just fired → not due.
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","lastDigestAt","createdAt") VALUES ('dig','__default__','digest','EMAIL','{}','{"mode":"digest","interval":"daily","to":"r@x.com"}', now(), now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","lastDigestAt","createdAt") VALUES ('dig','digest','EMAIL','{}','{"mode":"digest","interval":"daily","to":"r@x.com"}', now(), now())`)
 	ex(`INSERT INTO "Signal" ("id","title","summary","severity","confidence","sourceCount","firstSeenAt","lastSeenAt","updatedAt") VALUES ('s1','First','A','HIGH',0.8,1,now(),now(),now())`)
 	ex(`INSERT INTO "DigestQueue" ("subscriptionId","signalId","queuedAt") VALUES ('dig','s1',now())`)
 
@@ -100,8 +98,7 @@ func TestDigesterTickErrorPaths(t *testing.T) {
 			t.Fatalf("exec: %v", err)
 		}
 	}
-	ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","lastDigestAt","createdAt") VALUES ('dig','__default__','d','EMAIL','{}','{"mode":"digest","interval":"hourly","to":"r@x.com"}', now() - interval '2 hours', now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","lastDigestAt","createdAt") VALUES ('dig','d','EMAIL','{}','{"mode":"digest","interval":"hourly","to":"r@x.com"}', now() - interval '2 hours', now())`)
 	ex(`INSERT INTO "Signal" ("id","title","summary","severity","confidence","sourceCount","firstSeenAt","lastSeenAt","updatedAt") VALUES ('s1','T','A','LOW',0.5,1,now(),now(),now())`)
 	ex(`INSERT INTO "DigestQueue" ("subscriptionId","signalId","queuedAt") VALUES ('dig','s1',now())`)
 	if _, err := d.Pool.Exec(ctx, `ALTER TABLE "Article" RENAME TO "Article__h"`); err != nil {

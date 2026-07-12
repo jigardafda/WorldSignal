@@ -90,8 +90,7 @@ func seed(t *testing.T, d *db.DB) {
 	ex(`INSERT INTO "Article" ("id","sourceId","canonicalUrl","title","publishedAt") VALUES ('a1','s1','https://s.example/a','A',now())`)
 	ex(`INSERT INTO "SignalArticle" ("signalId","articleId","relationType","similarityScore") VALUES ('sg','a1','PRIMARY',1)`)
 	ex(`INSERT INTO "SignalTag" ("signalId","tagId","confidence") SELECT 'sg',"id",0.9 FROM "TaxonomyTag" WHERE "code"='DISASTER.EARTHQUAKE'`)
-	ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('sub','__default__','Sub','POLLING','{}','{}',now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('sub','Sub','POLLING','{}','{}',now())`)
 	ex(`INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload","createdAt") VALUES ('d1','sub','sg','POLLING','SENT','{"event_id":"e"}',now())`)
 }
 

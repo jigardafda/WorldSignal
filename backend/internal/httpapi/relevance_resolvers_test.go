@@ -25,8 +25,7 @@ func TestRelevanceResolversGraphQL(t *testing.T) {
 			t.Fatalf("exec: %v", err)
 		}
 	}
-	ex(`INSERT INTO "Subscriber" ("id","name","status","createdAt") VALUES ('sg2','Acme','ACTIVE',now()) ON CONFLICT DO NOTHING`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","enabled","createdAt") VALUES ('pg','sg2','For You','WEBHOOK','{}','{}',true,now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","enabled","createdAt") VALUES ('pg','For You','WEBHOOK','{}','{}',true,now())`)
 	ex(`INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","eventType","severity","influence","relevance","confidence","sourceCount","metadata","updatedAt") VALUES ('qg','Quake hits','A quake struck.',now(),now(),'DISASTER.EARTHQUAKE','HIGH','HIGH',0.8,0.9,1,'{}',now())`)
 	ex(`INSERT INTO "SignalAttribute" ("signalId","key","valueCode","valueText","confidence") VALUES ('qg','category','DISASTER.EARTHQUAKE','',0.9)`)
 

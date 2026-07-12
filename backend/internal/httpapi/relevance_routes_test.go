@@ -44,8 +44,7 @@ func TestRelevanceEndpoints(t *testing.T) {
 	}
 
 	// A profile (subscription) and two enriched signals.
-	ex(`INSERT INTO "Subscriber" ("id","name","status","createdAt") VALUES ('s2','Acme','ACTIVE',now()) ON CONFLICT DO NOTHING`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","enabled","createdAt") VALUES ('p9','s2','For You','WEBHOOK','{}','{}',true,now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","enabled","createdAt") VALUES ('p9','For You','WEBHOOK','{}','{}',true,now())`)
 	ex(`INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","eventType","severity","influence","relevance","confidence","sourceCount","metadata","updatedAt") VALUES ('q9','Quake hits coast','A quake struck.',now(),now(),'DISASTER.EARTHQUAKE','HIGH','HIGH',0.8,0.9,1,'{}',now())`)
 	ex(`INSERT INTO "SignalAttribute" ("signalId","key","valueCode","valueText","confidence") VALUES ('q9','category','DISASTER.EARTHQUAKE','',0.9)`)
 	ex(`INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","eventType","severity","influence","relevance","confidence","sourceCount","metadata","updatedAt") VALUES ('sp9','Cup final','Team wins.',now(),now(),'SPORTS.RESULT','LOW','LOW',0.3,0.4,1,'{}',now())`)
@@ -103,8 +102,7 @@ func TestRelevanceEndpointEdges(t *testing.T) {
 			t.Fatalf("exec: %v", err)
 		}
 	}
-	ex(`INSERT INTO "Subscriber" ("id","name","status","createdAt") VALUES ('se','A','ACTIVE',now()) ON CONFLICT DO NOTHING`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","enabled","createdAt") VALUES ('pe','se','n','WEBHOOK','{}','{}',true,now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","enabled","createdAt") VALUES ('pe','n','WEBHOOK','{}','{}',true,now())`)
 
 	// Non-numeric query params fall back to defaults — still 200.
 	if code, _ := send(t, "GET", ht.URL+"/v1/subscriptions/pe/feed?limit=abc&sinceHours=xyz&minScore=nope", ""); code != 200 {

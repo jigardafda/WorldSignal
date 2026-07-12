@@ -101,8 +101,7 @@ func TestSendEmailDelivery(t *testing.T) {
 	now := time.Now()
 	dbtest.Reset(t, d)
 	seedEmailConnector(t, d, "secret")
-	mustExec(t, d, `INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-	mustExec(t, d, `INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('sub','__default__','S','EMAIL','{}','{"to":"reader@example.com"}',now())`)
+	mustExec(t, d, `INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('sub','S','EMAIL','{}','{"to":"reader@example.com"}',now())`)
 	mustExec(t, d, `INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','T','S',now(),now(),now())`)
 	mustExec(t, d, `INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload","attempts","createdAt") VALUES ('del','sub','sg','EMAIL','PENDING','{"event_type":"signal.published","data":{"title":"T","severity":"LOW"}}',0,now())`)
 
@@ -134,8 +133,7 @@ func TestSendEmailDeliveryNoRecipients(t *testing.T) {
 	ctx := context.Background()
 	dbtest.Reset(t, d)
 	seedEmailConnector(t, d, "secret")
-	mustExec(t, d, `INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-	mustExec(t, d, `INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('sub','__default__','S','EMAIL','{}','{}',now())`)
+	mustExec(t, d, `INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('sub','S','EMAIL','{}','{}',now())`)
 	mustExec(t, d, `INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','T','S',now(),now(),now())`)
 	mustExec(t, d, `INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload","attempts","createdAt") VALUES ('del','sub','sg','EMAIL','PENDING','{}',0,now())`)
 
@@ -156,8 +154,7 @@ func TestSendEmailDeliveryDecryptError(t *testing.T) {
 	dbtest.Reset(t, d)
 	// Connector whose ciphertext can't be decrypted with the delivery secret.
 	mustExec(t, d, `INSERT INTO "EmailConnector" ("id","name","provider","host","port","security","username","secretCiphertext","secretLast4","fromEmail","fromName","isActive","enabled","status","updatedAt","createdAt") VALUES ('conn','C','GMAIL','smtp.gmail.com',587,'STARTTLS','me@gmail.com','bad-cipher!!','xxxx','me@gmail.com','WS',true,true,'VALID',now(),now())`)
-	mustExec(t, d, `INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-	mustExec(t, d, `INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('sub','__default__','S','EMAIL','{}','{"to":"r@x.com"}',now())`)
+	mustExec(t, d, `INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('sub','S','EMAIL','{}','{"to":"r@x.com"}',now())`)
 	mustExec(t, d, `INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','T','S',now(),now(),now())`)
 	mustExec(t, d, `INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload","attempts","createdAt") VALUES ('del','sub','sg','EMAIL','PENDING','{}',0,now())`)
 
@@ -176,8 +173,7 @@ func TestSendEmailDeliveryNoConnector(t *testing.T) {
 	ctx := context.Background()
 	dbtest.Reset(t, d)
 	// No connector seeded at all.
-	mustExec(t, d, `INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-	mustExec(t, d, `INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('sub','__default__','S','EMAIL','{}','{"to":"r@x.com"}',now())`)
+	mustExec(t, d, `INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('sub','S','EMAIL','{}','{"to":"r@x.com"}',now())`)
 	mustExec(t, d, `INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','T','S',now(),now(),now())`)
 	mustExec(t, d, `INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload","attempts","createdAt") VALUES ('del','sub','sg','EMAIL','PENDING','{}',0,now())`)
 
@@ -199,9 +195,8 @@ func TestMatchSubscriptionsDigestQueue(t *testing.T) {
 	dbtest.SeedTaxonomy(t, d)
 	mustExec(t, d, `INSERT INTO "Signal" ("id","title","summary","severity","confidence","country","sourceCount","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','T','S','HIGH',0.8,'US',1,now(),now(),now())`)
 	mustExec(t, d, `INSERT INTO "SignalTag" ("signalId","tagId","confidence") SELECT 'sg',"id",0.9 FROM "TaxonomyTag" WHERE "code"='DISASTER.EARTHQUAKE'`)
-	mustExec(t, d, `INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
 	// Digest-mode email subscription → queued, not delivered immediately.
-	mustExec(t, d, `INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('dig','__default__','digest','EMAIL','{"tags":["DISASTER"]}','{"mode":"digest","interval":"daily","to":"r@x.com"}',now())`)
+	mustExec(t, d, `INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('dig','digest','EMAIL','{"tags":["DISASTER"]}','{"mode":"digest","interval":"daily","to":"r@x.com"}',now())`)
 
 	ids, err := MatchSubscriptions(ctx, d, "sg", time.Now(), nil)
 	if err != nil {
@@ -222,8 +217,7 @@ func TestBuildDigest(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 	dbtest.Reset(t, d)
-	mustExec(t, d, `INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-	mustExec(t, d, `INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('dig','__default__','digest','EMAIL','{}','{"mode":"digest","interval":"daily","to":"r@x.com"}',now())`)
+	mustExec(t, d, `INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('dig','digest','EMAIL','{}','{"mode":"digest","interval":"daily","to":"r@x.com"}',now())`)
 	mustExec(t, d, `INSERT INTO "Signal" ("id","title","summary","severity","confidence","country","sourceCount","firstSeenAt","lastSeenAt","updatedAt") VALUES ('s1','First','A',	'HIGH',0.8,'IN',1,now(),now(),now())`)
 	mustExec(t, d, `INSERT INTO "Signal" ("id","title","summary","severity","confidence","sourceCount","firstSeenAt","lastSeenAt","updatedAt") VALUES ('s2','Second','B','LOW',0.5,1,now(),now() - interval '1 minute',now())`)
 	mustExec(t, d, `INSERT INTO "DigestQueue" ("subscriptionId","signalId","queuedAt") VALUES ('dig','s1',now()),('dig','s2',now())`)

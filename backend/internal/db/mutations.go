@@ -80,34 +80,18 @@ func (d *DB) UpdateSource(ctx context.Context, id string, p SourcePatch) (*Sourc
 	return scanSource(row)
 }
 
-// UpsertDefaultSubscriber ensures the __default__ subscriber exists.
-func (d *DB) UpsertDefaultSubscriber(ctx context.Context) error {
-	_, err := d.Pool.Exec(ctx,
-		`INSERT INTO "Subscriber" ("id","name") VALUES ('__default__','Default Subscriber')
-		 ON CONFLICT ("id") DO NOTHING`)
-	return err
-}
-
 // CreateSubscriptionInput captures createSubscription fields.
 type CreateSubscriptionInput struct {
-	Name         string
-	Channel      string // defaults to WEBHOOK
-	Filter       RawJSON
-	Config       RawJSON
-	SubscriberID string // optional; defaults to the __default__ subscriber
-	AccountID    string // owning tenant; defaults to the default account
+	Name      string
+	Channel   string // defaults to WEBHOOK
+	Filter    RawJSON
+	Config    RawJSON
+	AccountID string // owning tenant; defaults to the default account
 }
 
 // CreateSubscription inserts a Subscription owned by an Account (defaulting to
 // the tenant-neutral default account) and returns the scalar row.
 func (d *DB) CreateSubscription(ctx context.Context, in CreateSubscriptionInput) (*Subscription, error) {
-	subID := in.SubscriberID
-	if subID == "" {
-		if err := d.UpsertDefaultSubscriber(ctx); err != nil {
-			return nil, err
-		}
-		subID = "__default__"
-	}
 	if in.AccountID == "" {
 		in.AccountID = DefaultAccountID
 	}
@@ -122,8 +106,8 @@ func (d *DB) CreateSubscription(ctx context.Context, in CreateSubscriptionInput)
 	}
 	id := cuid.New()
 	return scanSubscription(d.Pool.QueryRow(ctx,
-		`INSERT INTO "Subscription" ("id","accountId","subscriberId","name","channel","filter","config")
-		 VALUES ($1,$7,$6,$2,$3::"DeliveryChannel",$4,$5)
+		`INSERT INTO "Subscription" ("id","accountId","name","channel","filter","config")
+		 VALUES ($1,$6,$2,$3::"DeliveryChannel",$4,$5)
 		 RETURNING `+subscriptionCols,
-		id, in.Name, in.Channel, []byte(in.Filter), []byte(in.Config), subID, in.AccountID))
+		id, in.Name, in.Channel, []byte(in.Filter), []byte(in.Config), in.AccountID))
 }
