@@ -29,6 +29,7 @@ import { Jobs } from "./pages/Jobs";
 import { Users } from "./pages/Users";
 import { Teams } from "./pages/Teams";
 import { Accounts } from "./pages/Accounts";
+import { MyApiKeys } from "./pages/MyApiKeys";
 import { Account } from "./pages/Account";
 import { Settings } from "./pages/Settings";
 import { Connectors } from "./pages/Connectors";
@@ -81,6 +82,7 @@ export default function App() {
         <Route path="/teams" element={<RequirePerm perm="teams:manage"><Teams /></RequirePerm>} />
         <Route path="/accounts" element={<RequirePerm perm="accounts:manage"><Accounts /></RequirePerm>} />
         <Route path="/account" element={<Account />} />
+        <Route path="/my-api-keys" element={<MyApiKeys />} />
         <Route path="/settings" element={<RequirePerm perm="settings:manage"><Settings /></RequirePerm>} />
         <Route path="/connectors" element={<RequirePerm perm="settings:manage"><Connectors /></RequirePerm>} />
         <Route path="/api-keys" element={<RequirePerm perm="settings:manage"><ApiKeys /></RequirePerm>} />

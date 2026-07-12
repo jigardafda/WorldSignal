@@ -22,6 +22,14 @@ VALUES ('e_art','e_src','https://bbc.example/quake','Major earthquake','A strong
 INSERT INTO "SignalArticle" ("signalId","articleId","relationType","similarityScore") VALUES ('e_sig','e_art','PRIMARY',1);
 INSERT INTO "SignalTag" ("signalId","tagId","confidence") VALUES ('e_sig','t_eq',0.9);
 
+-- A tenant account + an account-scoped (customer console) user. The Account
+-- table is created by the Go server's migration on boot; reuse the admin bcrypt
+-- hash so the tenant logs in with the same password ("admin12345").
+INSERT INTO "Account" ("id","name","slug","plan","status") VALUES ('e_acct','Tenant Inc','tenant-inc','PRO','ACTIVE')
+  ON CONFLICT ("id") DO NOTHING;
+INSERT INTO "User" ("id","email","name","passwordHash","role","status","accountId","createdAt","updatedAt")
+VALUES ('e_tenant','tenant@acme.test','Acme User','$2a$10$nRmQ72FEbXqLz461pnCWX.OUTUqgAssob6YLoJfMHgd0GAb6g/MRa','ADMIN','ACTIVE','e_acct',now(),now());
+
 INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','Default Subscriber',now());
 INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","enabled","createdAt")
 VALUES ('e_sub','__default__','All signals (polling)','POLLING','{}','{}',true,now());

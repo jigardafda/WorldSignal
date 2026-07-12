@@ -7,7 +7,7 @@ import { render } from "@testing-library/react";
 import { Layout } from "./Layout";
 
 const { authMock } = vi.hoisted(() => ({
-  authMock: { user: { id: "me", email: "me@x.io", name: "Me", role: "ADMIN" }, loading: false, logout: vi.fn(), login: vi.fn(), refresh: vi.fn(), hasPerm: (_p: string): boolean => true },
+  authMock: { user: { id: "me", email: "me@x.io", name: "Me", role: "ADMIN" } as { id: string; email: string; name: string; role: string; accountId?: string }, loading: false, logout: vi.fn(), login: vi.fn(), refresh: vi.fn(), hasPerm: (_p: string): boolean => true },
 }));
 vi.mock("../lib/auth", () => ({ useAuth: () => authMock }));
 // Live Mode mounts Leaflet (needs a real DOM map); stub it here.
@@ -38,6 +38,29 @@ describe("Layout", () => {
     expect(screen.getByText("home-content")).toBeInTheDocument();
     expect(screen.getAllByText("Dashboard").length).toBeGreaterThan(0); // nav item + mode toggle
     expect(screen.getByText("Users")).toBeInTheDocument();
+  });
+
+  it("shows the operator console for platform staff", () => {
+    authMock.user = { id: "me", email: "me@x.io", name: "Me", role: "ADMIN" };
+    renderLayout();
+    expect(screen.getByTestId("console-mode")).toHaveTextContent("Operator");
+    expect(screen.getByText("Sources")).toBeInTheDocument();
+    expect(screen.getByText("Users")).toBeInTheDocument();
+  });
+
+  it("shows the customer console with a tenant-only menu for account users", () => {
+    // An account-scoped user gets the customer console: no operator surfaces.
+    authMock.user = { id: "t", email: "t@acme.com", name: "T", role: "ADMIN", accountId: "a1" };
+    renderLayout();
+    expect(screen.getByTestId("console-mode")).toHaveTextContent("Customer");
+    expect(screen.getByText("Signals")).toBeInTheDocument();
+    expect(screen.getByText("API Keys")).toBeInTheDocument();
+    expect(screen.getByText("My Account")).toBeInTheDocument();
+    // Operator-only items are absent.
+    expect(screen.queryByText("Sources")).toBeNull();
+    expect(screen.queryByText("Users")).toBeNull();
+    expect(screen.queryByText("Accounts")).toBeNull();
+    authMock.user = { id: "me", email: "me@x.io", name: "Me", role: "ADMIN" }; // restore
   });
 
   it("switches the color scheme from the account menu", async () => {

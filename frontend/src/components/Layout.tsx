@@ -1,4 +1,4 @@
-import { AppShell, Burger, Center, Group, Menu, NavLink, ScrollArea, SegmentedControl, Text, Avatar, UnstyledButton, useMantineColorScheme, type MantineColorScheme } from "@mantine/core";
+import { AppShell, Badge, Burger, Center, Group, Menu, NavLink, ScrollArea, SegmentedControl, Text, Avatar, UnstyledButton, useMantineColorScheme, type MantineColorScheme } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
   IconActivity, IconArticle, IconBell, IconBroadcast, IconChartBar, IconDatabase,
@@ -13,6 +13,32 @@ import { LogoMark } from "./Logo";
 
 interface NavItem { to: string; label: string; icon: React.ReactNode; perm?: string }
 interface NavSection { title?: string; items: NavItem[] }
+
+// TENANT_NAV is the customer console: an account-scoped user manages its own
+// account + API keys and reads the shared signal corpus, but never sees the
+// operator surfaces (ingestion, distribution, administration).
+const TENANT_NAV: NavSection[] = [
+  {
+    items: [
+      { to: "/", label: "Dashboard", icon: <IconGauge size={18} /> },
+      { to: "/for-you", label: "For You", icon: <IconSparkles size={18} />, perm: "subscriptions:read" },
+    ],
+  },
+  {
+    title: "Intelligence",
+    items: [
+      { to: "/signals", label: "Signals", icon: <IconActivity size={18} />, perm: "signals:read" },
+      { to: "/analytics", label: "Analytics", icon: <IconChartBar size={18} />, perm: "analytics:read" },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      { to: "/my-api-keys", label: "API Keys", icon: <IconKey size={18} /> },
+      { to: "/account", label: "My Account", icon: <IconBuildingStore size={18} /> },
+    ],
+  },
+];
 
 const NAV: NavSection[] = [
   {
@@ -71,8 +97,14 @@ export function Layout() {
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const live = location.pathname === "/live"; // URL-driven so it survives reloads
 
+  // Account-scoped users get the customer console; platform staff get the full
+  // operator console. This is the visible half of the tenant/operator split —
+  // the backend enforces the same boundary on every resolver.
+  const isTenant = !!user?.accountId;
+  const nav = isTenant ? TENANT_NAV : NAV;
+
   // Filter each section by permission, dropping sections that end up empty.
-  const sections = NAV
+  const sections = nav
     .map((s) => ({ ...s, items: s.items.filter((n) => !n.perm || hasPerm(n.perm)) }))
     .filter((s) => s.items.length > 0);
 
@@ -88,6 +120,9 @@ export function Layout() {
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <LogoMark size={28} />
             <Text fw={700}>World<Text span c="blue" inherit>Signal</Text></Text>
+            <Badge size="sm" variant="light" color={isTenant ? "teal" : "grape"} data-testid="console-mode">
+              {isTenant ? "Customer" : "Operator"}
+            </Badge>
           </Group>
           <SegmentedControl
             size="xs"

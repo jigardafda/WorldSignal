@@ -8,7 +8,7 @@ const { apiMock, authMock } = vi.hoisted(() => ({
     subscriptions: vi.fn(), createSubscription: vi.fn(), updateSubscription: vi.fn(), deleteSubscription: vi.fn(), testSubscription: vi.fn(),
     emailConnectors: vi.fn(),
     subscribers: vi.fn(), createSubscriber: vi.fn(), deleteSubscriber: vi.fn(),
-    users: vi.fn(), createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn(),
+    users: vi.fn(), createUser: vi.fn(), updateUser: vi.fn(), deleteUser: vi.fn(), accounts: vi.fn(),
     teams: vi.fn(), team: vi.fn(), createTeam: vi.fn(), deleteTeam: vi.fn(), addTeamMember: vi.fn(), removeTeamMember: vi.fn(),
     changePassword: vi.fn(), analytics: vi.fn(), countries: vi.fn(),
   },
@@ -164,6 +164,7 @@ describe("Users", () => {
     apiMock.createUser.mockResolvedValue({ id: "u3", email: "n@x.io", name: "", role: "VIEWER", status: "ACTIVE", createdAt: "", updatedAt: "" });
     apiMock.updateUser.mockResolvedValue({ id: "u2", email: "other@x.io", name: "Other", role: "EDITOR", status: "ACTIVE", createdAt: "", updatedAt: "" });
     apiMock.deleteUser.mockResolvedValue(true);
+    apiMock.accounts.mockResolvedValue([]);
     renderWithProviders(<Users />);
     expect(await screen.findByText("other@x.io")).toBeInTheDocument();
     // Only the non-self row has a Delete button.
@@ -193,7 +194,25 @@ describe("Users", () => {
     await userEvent.type(await screen.findByTestId("user-email"), "n@x.io");
     await userEvent.type(screen.getByTestId("user-password"), "password123");
     await userEvent.click(screen.getByRole("button", { name: "Create" }));
-    await waitFor(() => expect(apiMock.createUser).toHaveBeenCalled());
+    await waitFor(() => expect(apiMock.createUser).toHaveBeenCalledWith(expect.objectContaining({ email: "n@x.io", accountId: undefined })));
+  });
+
+  it("creates a tenant user bound to an account", async () => {
+    apiMock.users.mockResolvedValue([]);
+    apiMock.accounts.mockResolvedValue([{ id: "a1", name: "Acme", slug: "acme", status: "ACTIVE", plan: "PRO", createdAt: "", updatedAt: "" }]);
+    apiMock.createUser.mockResolvedValue({ id: "u9", email: "t@acme.com", name: "", role: "VIEWER", status: "ACTIVE", accountId: "a1", createdAt: "", updatedAt: "" });
+    renderWithProviders(<Users />);
+    await screen.findByText("Users");
+    await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+    await userEvent.type(await screen.findByTestId("user-email"), "t@acme.com");
+    await userEvent.type(screen.getByTestId("user-password"), "password123");
+    // Pick the account → creates a customer-console (tenant) user.
+    const accountSelect = screen.getByTestId("user-account");
+    fireEvent.click(accountSelect);
+    const listbox = document.getElementById(accountSelect.getAttribute("aria-controls")!)!;
+    fireEvent.click(await within(listbox).findByRole("option", { name: "Acme (tenant)", hidden: true }));
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await waitFor(() => expect(apiMock.createUser).toHaveBeenCalledWith(expect.objectContaining({ accountId: "a1" })));
   });
 });
 

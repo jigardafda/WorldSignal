@@ -11,6 +11,7 @@ const { authMock, apiMock } = vi.hoisted(() => ({
     stats: vi.fn().mockResolvedValue({ sources: 0, articles: 0, signals: 0, deliveriesSent: 0, deliveriesPending: 0 }),
     signals: vi.fn().mockResolvedValue([]),
     users: vi.fn().mockResolvedValue([]),
+    accounts: vi.fn().mockResolvedValue([]),
   },
 }));
 vi.mock("./lib/auth", () => ({ useAuth: () => authMock, AuthProvider: ({ children }: { children: React.ReactNode }) => children }));

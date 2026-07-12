@@ -44,14 +44,23 @@ func Require(ctx context.Context) (*Identity, error) {
 	return id, nil
 }
 
-// RequirePermission ensures the context identity holds perm.
+// RequirePermission ensures the context identity holds perm. Tenant (account-
+// scoped) identities are limited to the tenant capability set, so an account
+// user with an ADMIN role still cannot reach operator-only resolvers.
 func RequirePermission(ctx context.Context, perm string) error {
 	id, err := Require(ctx)
 	if err != nil {
 		return err
 	}
-	if !Can(id.Role, perm) {
+	if !CanScoped(id.Role, id.AccountID != nil, perm) {
 		return ErrForbidden
 	}
 	return nil
+}
+
+// IsTenant reports whether the context identity is account-scoped (a customer)
+// rather than platform staff.
+func IsTenant(ctx context.Context) bool {
+	id := IdentityFrom(ctx)
+	return id != nil && id.AccountID != nil
 }

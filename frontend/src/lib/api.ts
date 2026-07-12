@@ -8,6 +8,7 @@ export interface User {
   name: string;
   role: string;
   status: string;
+  accountId?: string | null;
   createdAt: string;
   updatedAt: string;
   permissions?: string[];
@@ -168,7 +169,7 @@ function sourceArgs(f: SourceFilter = {}, extra: Record<string, string | number>
   for (const [k, v] of Object.entries(extra)) parts.push(`${k}:${typeof v === "number" ? v : JSON.stringify(v)}`);
   return parts.length ? `(${parts.join(",")})` : "";
 }
-const USER_FIELDS = `id email name role status createdAt updatedAt`;
+const USER_FIELDS = `id email name role status accountId createdAt updatedAt`;
 
 /** One ranked signal in a profile's "For You" feed. */
 export interface FeedItem {
@@ -389,6 +390,15 @@ export const api = {
     gql<{ createAccount: Account }>(`mutation($i:CreateAccountInput!){createAccount(input:$i){${ACCOUNT_FIELDS}}}`, { i: input }).then((d) => d.createAccount),
   updateAccount: (id: string, input: { name?: string; status?: string; plan?: string }) =>
     gql<{ updateAccount: Account }>(`mutation($id:ID!,$i:UpdateAccountInput!){updateAccount(id:$id,input:$i){${ACCOUNT_FIELDS}}}`, { id, i: input }).then((d) => d.updateAccount),
+
+  // tenant self-service (customer console) — scoped to the caller's own account
+  myAccount: () => gql<{ myAccount: Account | null }>(`{myAccount{${ACCOUNT_FIELDS}}}`).then((d) => d.myAccount),
+  myApiKeys: () => gql<{ myApiKeys: ApiKey[] }>(`{myApiKeys{${API_KEY_FIELDS}}}`).then((d) => d.myApiKeys),
+  tenantApiScopes: () => gql<{ tenantApiScopes: string[] }>(`{tenantApiScopes}`).then((d) => d.tenantApiScopes),
+  createMyApiKey: (input: { name: string; scopes: string[]; rateLimitPerMin?: number }) =>
+    gql<{ createMyApiKey: ApiKey }>(`mutation($i:CreateMyApiKeyInput!){createMyApiKey(input:$i){${API_KEY_FIELDS} key}}`, { i: input }).then((d) => d.createMyApiKey),
+  revokeMyApiKey: (id: string) =>
+    gql<{ revokeMyApiKey: boolean }>(`mutation($id:ID!){revokeMyApiKey(id:$id)}`, { id }).then((d) => d.revokeMyApiKey),
 
   // audit log (settings:manage)
   auditLogs: (filter: AuditFilter = {}, limit = 50, offset = 0) => {

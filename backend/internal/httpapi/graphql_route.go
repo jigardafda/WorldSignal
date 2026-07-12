@@ -64,6 +64,7 @@ func (s *Server) root() gql.Root {
 	s.registerConnectorResolvers(q, m) // email connectors (settings:manage)
 	s.registerAPIKeyResolvers(q, m)    // public-API keys (settings:manage)
 	s.registerAccountResolvers(q, m)   // multi-tenant accounts (accounts:manage)
+	s.registerTenantResolvers(q, m)    // tenant self-service: myAccount, myApiKeys
 	s.registerRelevanceResolvers(q, m) // smart-signals: For-You feed, interests, feedback, AI draft
 	return gql.Root{Query: q, Mutation: m}
 }

@@ -127,6 +127,17 @@ func (d *DB) DeleteAPIKey(ctx context.Context, id string) (bool, error) {
 	return tag.RowsAffected() > 0, nil
 }
 
+// DeleteAPIKeyForAccount removes a key only if it belongs to the given account,
+// returning whether a row was deleted. This scopes tenant self-service revocation
+// so one tenant can never delete another's credential.
+func (d *DB) DeleteAPIKeyForAccount(ctx context.Context, id, accountID string) (bool, error) {
+	tag, err := d.Pool.Exec(ctx, `DELETE FROM "ApiKey" WHERE "id"=$1 AND "accountId"=$2`, id, accountID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 // TouchAPIKey records that a key was used (best-effort; callers ignore the error).
 func (d *DB) TouchAPIKey(ctx context.Context, id string, at time.Time) error {
 	_, err := d.Pool.Exec(ctx,
