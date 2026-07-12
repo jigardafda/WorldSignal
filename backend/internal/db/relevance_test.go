@@ -22,9 +22,8 @@ func TestRelevanceFeed(t *testing.T) {
 
 	// A subscriber + subscription (the profile) and two enriched signals: one that
 	// matches a DISASTER interest, one that does not.
-	exec(`INSERT INTO "Subscriber" ("id","name","status","createdAt") VALUES ('sub1','Acme','ACTIVE',now())`)
-	exec(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","enabled","createdAt")
-	       VALUES ('p1','sub1','For You','WEBHOOK','{}','{}',true,now())`)
+	exec(`INSERT INTO "Subscription" ("id","name","channel","filter","config","enabled","createdAt")
+	       VALUES ('p1','For You','WEBHOOK','{}','{}',true,now())`)
 
 	exec(`INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","eventType","severity","influence","relevance","confidence","sourceCount","metadata","updatedAt")
 	       VALUES ('quake','Big earthquake','A quake struck.',now(),now(),'DISASTER.EARTHQUAKE','HIGH','HIGH',0.8,0.9,1,'{}',now())`)
@@ -105,10 +104,7 @@ func TestRelevanceFeedErrorPaths(t *testing.T) {
 	}
 	// SetSubscriptionInterests coerces nil to an empty map (no error shape change).
 	dbtest.Reset(t, d)
-	if _, err := d.Pool.Exec(context.Background(), `INSERT INTO "Subscriber" ("id","name","status","createdAt") VALUES ('s0','n','ACTIVE',now())`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := d.Pool.Exec(context.Background(), `INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","enabled","createdAt") VALUES ('p0','s0','n','WEBHOOK','{}','{}',true,now())`); err != nil {
+	if _, err := d.Pool.Exec(context.Background(), `INSERT INTO "Subscription" ("id","name","channel","filter","config","enabled","createdAt") VALUES ('p0','n','WEBHOOK','{}','{}',true,now())`); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.SetSubscriptionInterests(context.Background(), "p0", nil); err != nil {
@@ -120,10 +116,7 @@ func TestRankedFeedLargeLimit(t *testing.T) {
 	d := dbtest.Connect(t)
 	dbtest.Reset(t, d)
 	ctx := context.Background()
-	if _, err := d.Pool.Exec(ctx, `INSERT INTO "Subscriber" ("id","name","status","createdAt") VALUES ('sl','n','ACTIVE',now())`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := d.Pool.Exec(ctx, `INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","enabled","createdAt") VALUES ('pl','sl','n','WEBHOOK','{}','{}',true,now())`); err != nil {
+	if _, err := d.Pool.Exec(ctx, `INSERT INTO "Subscription" ("id","name","channel","filter","config","enabled","createdAt") VALUES ('pl','n','WEBHOOK','{}','{}',true,now())`); err != nil {
 		t.Fatal(err)
 	}
 	// A large limit exercises the maxCandidates upper clamp (>2000 -> 2000).
@@ -144,10 +137,7 @@ func TestCandidateDefaultsAndProfileKeyword(t *testing.T) {
 		t.Fatalf("clamped limit: %v", err)
 	}
 	// LoadProfile lifts the filter's keyword into the profile keywords.
-	if _, err := d.Pool.Exec(ctx, `INSERT INTO "Subscriber" ("id","name","status","createdAt") VALUES ('sk','n','ACTIVE',now())`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := d.Pool.Exec(ctx, `INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","enabled","createdAt") VALUES ('pk','sk','n','WEBHOOK','{"keyword":"nike"}','{}',true,now())`); err != nil {
+	if _, err := d.Pool.Exec(ctx, `INSERT INTO "Subscription" ("id","name","channel","filter","config","enabled","createdAt") VALUES ('pk','n','WEBHOOK','{"keyword":"nike"}','{}',true,now())`); err != nil {
 		t.Fatal(err)
 	}
 	p, err := d.LoadProfile(ctx, "pk")

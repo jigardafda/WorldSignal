@@ -33,7 +33,6 @@ func (s *Server) registerEntityResolvers(q, m map[string]gql.FieldResolver) {
 	q["rawItem"] = s.resolveRawItem
 	q["deliveries"] = s.resolveDeliveries
 	q["delivery"] = s.resolveDelivery
-	q["subscribers"] = s.resolveSubscribers
 	q["subscription"] = s.resolveSubscription
 	q["taxonomyStats"] = s.resolveTaxonomyStats
 	q["jobs"] = s.resolveJobs
@@ -46,8 +45,6 @@ func (s *Server) registerEntityResolvers(q, m map[string]gql.FieldResolver) {
 	m["updateSubscription"] = s.mutUpdateSubscription
 	m["deleteSubscription"] = s.mutDeleteSubscription
 	m["testSubscription"] = s.mutTestSubscription
-	m["createSubscriber"] = s.mutCreateSubscriber
-	m["deleteSubscriber"] = s.mutDeleteSubscriber
 	m["retryDelivery"] = s.mutRetryDelivery
 	m["retryJob"] = s.mutRetryJob
 }
@@ -358,26 +355,7 @@ func (s *Server) mutRetryDelivery(ctx context.Context, args map[string]any) (any
 	return true, nil
 }
 
-// ---- subscribers / subscriptions ----
-
-func subscriberMap(s db.Subscriber) map[string]any {
-	return map[string]any{"id": s.ID, "name": s.Name, "status": s.Status, "createdAt": s.CreatedAt, "subscriptionCount": s.SubscriptionCount}
-}
-
-func (s *Server) resolveSubscribers(ctx context.Context, _ map[string]any) (any, error) {
-	if err := authz(ctx, auth.PermSubscriptionsRead); err != nil {
-		return nil, err
-	}
-	subs, err := s.DB.ListSubscribers(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]any, len(subs))
-	for i, sub := range subs {
-		out[i] = subscriberMap(sub)
-	}
-	return out, nil
-}
+// ---- subscriptions ----
 
 func (s *Server) resolveSubscription(ctx context.Context, args map[string]any) (any, error) {
 	if err := authz(ctx, auth.PermSubscriptionsRead); err != nil {
@@ -391,7 +369,7 @@ func (s *Server) resolveSubscription(ctx context.Context, args map[string]any) (
 	for _, sub := range subs {
 		if sub.ID == id {
 			return map[string]any{
-				"id": sub.ID, "subscriberId": sub.SubscriberID, "name": sub.Name, "channel": sub.Channel,
+				"id": sub.ID, "accountId": sub.AccountID, "name": sub.Name, "channel": sub.Channel,
 				"enabled": sub.Enabled, "filter": sub.Filter, "config": sub.Config, "createdAt": sub.CreatedAt,
 			}, nil
 		}
@@ -422,7 +400,7 @@ func (s *Server) mutUpdateSubscription(ctx context.Context, args map[string]any)
 		return nil, err
 	}
 	return map[string]any{
-		"id": sub.ID, "subscriberId": sub.SubscriberID, "name": sub.Name, "channel": sub.Channel,
+		"id": sub.ID, "accountId": sub.AccountID, "name": sub.Name, "channel": sub.Channel,
 		"enabled": sub.Enabled, "filter": sub.Filter, "config": sub.Config, "createdAt": sub.CreatedAt,
 	}, nil
 }
@@ -463,28 +441,6 @@ func (s *Server) mutTestSubscription(ctx context.Context, args map[string]any) (
 		_ = s.Enqueue.EnqueueSendDelivery(deliveryID) // POST to the webhook URL
 	}
 	return map[string]any{"ok": true, "channel": sub.Channel, "message": "Test event sent to “" + sub.Name + "”."}, nil
-}
-
-func (s *Server) mutCreateSubscriber(ctx context.Context, args map[string]any) (any, error) {
-	if err := authz(ctx, auth.PermSubscriptionsWrite); err != nil {
-		return nil, err
-	}
-	name := strVal(args["name"])
-	if name == "" {
-		return nil, errValidation
-	}
-	sub, err := s.DB.CreateSubscriber(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	return subscriberMap(*sub), nil
-}
-
-func (s *Server) mutDeleteSubscriber(ctx context.Context, args map[string]any) (any, error) {
-	if err := authz(ctx, auth.PermSubscriptionsWrite); err != nil {
-		return nil, err
-	}
-	return s.DB.DeleteSubscriber(ctx, strVal(args["id"]))
 }
 
 // ---- taxonomy stats ----

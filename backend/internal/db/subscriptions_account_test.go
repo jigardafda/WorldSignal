@@ -38,7 +38,7 @@ func TestSubscriptionAccountScoping(t *testing.T) {
 
 	// Account-scoped list includes only the account's subscriptions with includes.
 	subs, err := d.ListSubscriptionsByAccount(ctx, acc.ID)
-	if err != nil || len(subs) != 1 || subs[0].Subscriber == nil {
+	if err != nil || len(subs) != 1 || subs[0].Account == nil {
 		t.Fatalf("ListSubscriptionsByAccount: %+v %v", subs, err)
 	}
 
@@ -80,14 +80,14 @@ func TestSubscriptionAccountScopingDBErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Subscriber gone → getSubscriber include error.
-	if _, err := d.Pool.Exec(ctx, `ALTER TABLE "Subscriber" RENAME TO "Subscriber__h"`); err != nil {
+	// Account gone → owning-account include error.
+	if _, err := d.Pool.Exec(ctx, `ALTER TABLE "Account" RENAME TO "Account__h"`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := d.ListSubscriptionsByAccount(ctx, acc.ID); err == nil {
-		t.Fatal("ListSubscriptionsByAccount should error (subscriber include)")
+		t.Fatal("ListSubscriptionsByAccount should error (account include)")
 	}
-	if _, err := d.Pool.Exec(ctx, `ALTER TABLE "Subscriber__h" RENAME TO "Subscriber"`); err != nil {
+	if _, err := d.Pool.Exec(ctx, `ALTER TABLE "Account__h" RENAME TO "Account"`); err != nil {
 		t.Fatal(err)
 	}
 

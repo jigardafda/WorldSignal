@@ -1,5 +1,5 @@
 -- Deterministic seed for end-to-end tests (applied to worldsignal_e2e).
-TRUNCATE TABLE "DeliveryEvent","Subscription","Subscriber","SignalTag","SignalArticle","Signal","Article","RawItem","Source","TaxonomyTag" RESTART IDENTITY CASCADE;
+TRUNCATE TABLE "DeliveryEvent","Subscription","SignalTag","SignalArticle","Signal","Article","RawItem","Source","TaxonomyTag" RESTART IDENTITY CASCADE;
 TRUNCATE TABLE "Session","TeamMember","Team","User" RESTART IDENTITY CASCADE;
 
 -- Admin account used to log in during e2e. Password is "admin12345" (bcrypt cost 10).
@@ -30,6 +30,5 @@ INSERT INTO "Account" ("id","name","slug","plan","status") VALUES ('e_acct','Ten
 INSERT INTO "User" ("id","email","name","passwordHash","role","status","accountId","createdAt","updatedAt")
 VALUES ('e_tenant','tenant@acme.test','Acme User','$2a$10$nRmQ72FEbXqLz461pnCWX.OUTUqgAssob6YLoJfMHgd0GAb6g/MRa','ADMIN','ACTIVE','e_acct',now(),now());
 
-INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','Default Subscriber',now());
-INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","enabled","createdAt")
-VALUES ('e_sub','__default__','All signals (polling)','POLLING','{}','{}',true,now());
+INSERT INTO "Subscription" ("id","accountId","name","channel","filter","config","enabled","createdAt")
+VALUES ('e_sub','e_acct','All signals (polling)','POLLING','{}','{}',true,now());

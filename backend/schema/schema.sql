@@ -56,11 +56,6 @@ CREATE TYPE public."SourceType" AS ENUM (
     'WEBHOOK',
     'MANUAL'
 );
-CREATE TYPE public."SubscriberStatus" AS ENUM (
-    'ACTIVE',
-    'SUSPENDED',
-    'DELETED'
-);
 CREATE TABLE public."Article" (
     id text NOT NULL,
     "rawItemId" text,
@@ -196,15 +191,8 @@ CREATE TABLE public."Source" (
     metadata jsonb,
     "cooldownUntil" timestamp with time zone
 );
-CREATE TABLE public."Subscriber" (
-    id text NOT NULL,
-    name text NOT NULL,
-    status public."SubscriberStatus" DEFAULT 'ACTIVE'::public."SubscriberStatus" NOT NULL,
-    "createdAt" timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
 CREATE TABLE public."Subscription" (
     id text NOT NULL,
-    "subscriberId" text NOT NULL,
     name text NOT NULL,
     channel public."DeliveryChannel" DEFAULT 'WEBHOOK'::public."DeliveryChannel" NOT NULL,
     filter jsonb NOT NULL,
@@ -237,8 +225,6 @@ ALTER TABLE ONLY public."Signal"
     ADD CONSTRAINT "Signal_pkey" PRIMARY KEY (id);
 ALTER TABLE ONLY public."Source"
     ADD CONSTRAINT "Source_pkey" PRIMARY KEY (id);
-ALTER TABLE ONLY public."Subscriber"
-    ADD CONSTRAINT "Subscriber_pkey" PRIMARY KEY (id);
 ALTER TABLE ONLY public."Subscription"
     ADD CONSTRAINT "Subscription_pkey" PRIMARY KEY (id);
 ALTER TABLE ONLY public."TaxonomyTag"
@@ -303,7 +289,5 @@ ALTER TABLE ONLY public."SignalTag"
     ADD CONSTRAINT "SignalTag_signalId_fkey" FOREIGN KEY ("signalId") REFERENCES public."Signal"(id) ON UPDATE CASCADE ON DELETE CASCADE;
 ALTER TABLE ONLY public."SignalTag"
     ADD CONSTRAINT "SignalTag_tagId_fkey" FOREIGN KEY ("tagId") REFERENCES public."TaxonomyTag"(id) ON UPDATE CASCADE ON DELETE CASCADE;
-ALTER TABLE ONLY public."Subscription"
-    ADD CONSTRAINT "Subscription_subscriberId_fkey" FOREIGN KEY ("subscriberId") REFERENCES public."Subscriber"(id) ON UPDATE CASCADE ON DELETE CASCADE;
 ALTER TABLE ONLY public."TaxonomyTag"
     ADD CONSTRAINT "TaxonomyTag_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES public."TaxonomyTag"(id) ON UPDATE CASCADE ON DELETE SET NULL;

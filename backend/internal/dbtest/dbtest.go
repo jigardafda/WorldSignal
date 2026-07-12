@@ -24,7 +24,7 @@ func URL() string {
 
 // tables are truncated in dependency-safe order (CASCADE handles the rest).
 var tables = []string{
-	"DigestQueue", "DeliveryEvent", "Subscription", "Subscriber", "SignalTag", "SignalArticle",
+	"DigestQueue", "DeliveryEvent", "Subscription", "SignalTag", "SignalArticle",
 	"Signal", "Article", "RawItem", "SourceValidationLog", "Source", "TaxonomyTag",
 	"ApiKeyUsage", "ApiKey", "LLMKey", "EmailConnector", "AuditLog", "Session", "TeamMember", "Team", "User", "Account",
 }

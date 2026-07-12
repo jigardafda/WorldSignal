@@ -27,7 +27,6 @@ const RESP: Record<string, unknown> = {
   subscriptionFeed: [{ id: "s", score: 9.2, reasons: ["tag:DISASTER"] }],
   subscriptionInterests: { "tag:DISASTER": 5 }, setSubscriptionInterests: { ok: true },
   recordSignalFeedback: true, draftProfileFromDocument: { name: "P", source: "llm", interests: {}, reasons: [] },
-  subscribers: [{ id: "sb" }], createSubscriber: { id: "sb" }, deleteSubscriber: true,
   emailConnectors: [{ id: "c" }], emailProviders: [{ code: "GMAIL" }], createEmailConnector: { id: "c" },
   updateEmailConnector: { id: "c" }, setActiveEmailConnector: { id: "c" }, testEmailConnector: { ok: true },
   sendTestEmail: { ok: true }, deleteEmailConnector: true,
@@ -121,9 +120,6 @@ describe("api wrappers", () => {
     expect(await api.setSubscriptionInterests("x", { "tag:DISASTER": 5 })).toEqual(RESP.setSubscriptionInterests);
     expect(await api.recordSignalFeedback("x", "s", "UP")).toBe(true);
     expect(await api.draftProfileFromDocument("a document long enough")).toEqual(RESP.draftProfileFromDocument);
-    expect(await api.subscribers()).toEqual(RESP.subscribers);
-    expect(await api.createSubscriber("n")).toEqual(RESP.createSubscriber);
-    expect(await api.deleteSubscriber("sb")).toBe(true);
 
     expect(await api.emailConnectors()).toEqual(RESP.emailConnectors);
     expect(await api.emailProviders()).toEqual(RESP.emailProviders);

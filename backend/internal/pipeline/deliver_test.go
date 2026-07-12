@@ -96,9 +96,8 @@ func TestMatchSubscriptionsCreatesDeliveries(t *testing.T) {
 	ex := func(q string, a ...any) { mustExec(t, d, q, a...) }
 	ex(`INSERT INTO "Signal" ("id","title","summary","severity","confidence","country","sourceCount","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','T','S','HIGH',0.8,'US',1,now(),now(),now())`)
 	ex(`INSERT INTO "SignalTag" ("signalId","tagId","confidence") SELECT 'sg',"id",0.9 FROM "TaxonomyTag" WHERE "code"='DISASTER.EARTHQUAKE'`)
-	ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('m','__default__','match','POLLING','{"tags":["DISASTER"]}','{}',now())`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('nm','__default__','nomatch','WEBHOOK','{"tags":["ECONOMY"]}','{}',now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('m','match','POLLING','{"tags":["DISASTER"]}','{}',now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('nm','nomatch','WEBHOOK','{"tags":["ECONOMY"]}','{}',now())`)
 
 	ids, err := MatchSubscriptions(ctx, d, "sg", time.Now(), nil)
 	if err != nil {
@@ -142,8 +141,7 @@ func TestSendDeliveryPaths(t *testing.T) {
 	seedDel := func(channel, config string) {
 		dbtest.Reset(t, d)
 		ex := func(q string, a ...any) { mustExec(t, d, q, a...) }
-		ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-		ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('sub','__default__','S',$1::"DeliveryChannel",'{}',$2,now())`, channel, config)
+		ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('sub','S',$1::"DeliveryChannel",'{}',$2,now())`, channel, config)
 		ex(`INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','T','S',now(),now(),now())`)
 		ex(`INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload","attempts","createdAt") VALUES ('del','sub','sg',$1::"DeliveryChannel",'PENDING','{"event_id":"e","x":1}',0,now())`, channel)
 	}

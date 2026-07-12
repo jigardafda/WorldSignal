@@ -111,8 +111,7 @@ func TestStagePostQueryErrors(t *testing.T) {
 		dbtest.SeedTaxonomy(t, d)
 		mk(`INSERT INTO "Signal" ("id","title","summary","severity","confidence","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','T','S','HIGH',0.8,now(),now(),now())`)
 		mk(`INSERT INTO "SignalTag" ("signalId","tagId","confidence") SELECT 'sg',"id",0.9 FROM "TaxonomyTag" WHERE "code"='DISASTER.FLOOD'`)
-		mk(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-		mk(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('sub','__default__','S','POLLING','{}','{}',now())`)
+		mk(`INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('sub','S','POLLING','{}','{}',now())`)
 		defer hide(t, d, "DeliveryEvent")()
 		if _, err := MatchSubscriptions(ctx, d, "sg", now, nil); err == nil {
 			t.Fatal("expected createDelivery error")

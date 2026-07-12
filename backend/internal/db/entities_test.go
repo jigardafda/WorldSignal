@@ -47,12 +47,6 @@ func TestEntityDBClosedErrors(t *testing.T) {
 	e("UpdateSubscription", err)
 	_, err = d.DeleteSubscription(ctx, "x")
 	e("DeleteSubscription", err)
-	_, err = d.ListSubscribers(ctx)
-	e("ListSubscribers", err)
-	_, err = d.CreateSubscriber(ctx, "n")
-	e("CreateSubscriber", err)
-	_, err = d.DeleteSubscriber(ctx, "x")
-	e("DeleteSubscriber", err)
 	_, err = d.CountSignals(ctx, db.SignalFilter{})
 	e("CountSignals", err)
 	_, err = d.SignalsBySeverity(ctx)
@@ -88,8 +82,7 @@ func TestEntityDBHappyEdges(t *testing.T) {
 	ex(`INSERT INTO "Article" ("id","sourceId","title","body") VALUES ('a','s','Quake','body')`)
 	ex(`INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','T','S',now(),now(),now())`)
 	ex(`INSERT INTO "SignalArticle" ("signalId","articleId","relationType") VALUES ('sg','a','PRIMARY')`)
-	ex(`INSERT INTO "Subscriber" ("id","name") VALUES ('__default__','D')`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config") VALUES ('sub','__default__','All','POLLING','{}','{}')`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config") VALUES ('sub','All','POLLING','{}','{}')`)
 	ex(`INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload") VALUES ('d','sub','sg','POLLING','FAILED','{}')`)
 
 	// Filtered lists + clampLimit branches.
@@ -148,21 +141,6 @@ func TestEntityDBHappyEdges(t *testing.T) {
 	}
 	if sub, err := d.UpdateSubscription(ctx, "sub", db.SubscriptionPatch{}); err != nil || sub == nil { // no-op path
 		t.Fatalf("update subscription no-op: %v %v", sub, err)
-	}
-
-	// Subscribers.
-	if subs, err := d.ListSubscribers(ctx); err != nil || len(subs) != 1 || subs[0].SubscriptionCount != 1 {
-		t.Fatalf("ListSubscribers: %+v %v", subs, err)
-	}
-	ns, err := d.CreateSubscriber(ctx, "New")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ok, err := d.DeleteSubscriber(ctx, ns.ID); err != nil || !ok {
-		t.Fatalf("delete subscriber: %v %v", ok, err)
-	}
-	if ok, _ := d.DeleteSubscriber(ctx, "missing"); ok {
-		t.Fatal("delete missing subscriber should be false")
 	}
 
 	// Counts + analytics.

@@ -47,8 +47,6 @@ func TestDBErrorPaths(t *testing.T) {
 	mustErr("GetSignal", err)
 	_, err = d.SignalAttributes(ctx, "x")
 	mustErr("SignalAttributes", err)
-	_, err = d.ListSubscriptions(ctx)
-	mustErr("ListSubscriptions", err)
 	_, err = d.ListSubscriptionsBasic(ctx)
 	mustErr("ListSubscriptionsBasic", err)
 	_, err = d.ListDeliveries(ctx, 10)
@@ -59,7 +57,6 @@ func TestDBErrorPaths(t *testing.T) {
 	mustErr("SetSourceEnabled", err)
 	_, err = d.UpdateSource(ctx, "x", db.SourcePatch{})
 	mustErr("UpdateSource", err)
-	mustErr("UpsertDefaultSubscriber", d.UpsertDefaultSubscriber(ctx))
 	_, err = d.CreateSubscription(ctx, db.CreateSubscriptionInput{Name: "n"})
 	mustErr("CreateSubscription", err)
 	_, err = d.GetRawItem(ctx, "x")
@@ -248,8 +245,7 @@ func TestCreateDeliveryConflict(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	ex(`INSERT INTO "Subscriber" ("id","name","createdAt") VALUES ('__default__','D',now())`)
-	ex(`INSERT INTO "Subscription" ("id","subscriberId","name","channel","filter","config","createdAt") VALUES ('sub','__default__','S','POLLING','{}','{}',now())`)
+	ex(`INSERT INTO "Subscription" ("id","name","channel","filter","config","createdAt") VALUES ('sub','S','POLLING','{}','{}',now())`)
 	ex(`INSERT INTO "Signal" ("id","title","summary","firstSeenAt","lastSeenAt","updatedAt") VALUES ('sg','T','S',now(),now(),now())`)
 
 	id1, err := d.CreateDeliveryIfNew(ctx, "sub", "sg", "POLLING", []byte(`{}`))

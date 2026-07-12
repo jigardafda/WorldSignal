@@ -54,16 +54,25 @@ func (s *Server) createSubscriptionREST(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusCreated, restSubscriptionScalar{
-		ID: sub.ID, SubscriberID: sub.SubscriberID, Name: sub.Name, Channel: sub.Channel,
+		ID: sub.ID, AccountID: sub.AccountID, Name: sub.Name, Channel: sub.Channel,
 		Filter: sub.Filter, Config: sub.Config, Enabled: sub.Enabled, CreatedAt: db.NewTime(sub.CreatedAt),
 	})
 }
 
-type restSubscriber struct {
-	ID        string        `json:"id"`
-	Name      string        `json:"name"`
-	Status    string        `json:"status"`
-	CreatedAt db.PrismaTime `json:"createdAt"`
+// restAccountRef is the owning-account object embedded on subscription rows.
+type restAccountRef struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Slug   string `json:"slug"`
+	Plan   string `json:"plan"`
+	Status string `json:"status"`
+}
+
+func accountRef(a *db.Account) restAccountRef {
+	if a == nil {
+		return restAccountRef{}
+	}
+	return restAccountRef{ID: a.ID, Name: a.Name, Slug: a.Slug, Plan: a.Plan, Status: a.Status}
 }
 
 type restCount struct {
@@ -71,30 +80,30 @@ type restCount struct {
 }
 
 // restSubscriptionFull mirrors GET /v1/subscriptions rows: scalar fields then the
-// subscriber relation then the _count aggregate.
+// owning account then the _count aggregate.
 type restSubscriptionFull struct {
-	ID           string         `json:"id"`
-	SubscriberID string         `json:"subscriberId"`
-	Name         string         `json:"name"`
-	Channel      string         `json:"channel"`
-	Filter       db.RawJSON     `json:"filter"`
-	Config       db.RawJSON     `json:"config"`
-	Enabled      bool           `json:"enabled"`
-	CreatedAt    db.PrismaTime  `json:"createdAt"`
-	Subscriber   restSubscriber `json:"subscriber"`
-	Count        restCount      `json:"_count"`
+	ID        string         `json:"id"`
+	AccountID string         `json:"accountId"`
+	Name      string         `json:"name"`
+	Channel   string         `json:"channel"`
+	Filter    db.RawJSON     `json:"filter"`
+	Config    db.RawJSON     `json:"config"`
+	Enabled   bool           `json:"enabled"`
+	CreatedAt db.PrismaTime  `json:"createdAt"`
+	Account   restAccountRef `json:"account"`
+	Count     restCount      `json:"_count"`
 }
 
 // restSubscriptionScalar mirrors a Subscription without includes.
 type restSubscriptionScalar struct {
-	ID           string        `json:"id"`
-	SubscriberID string        `json:"subscriberId"`
-	Name         string        `json:"name"`
-	Channel      string        `json:"channel"`
-	Filter       db.RawJSON    `json:"filter"`
-	Config       db.RawJSON    `json:"config"`
-	Enabled      bool          `json:"enabled"`
-	CreatedAt    db.PrismaTime `json:"createdAt"`
+	ID        string        `json:"id"`
+	AccountID string        `json:"accountId"`
+	Name      string        `json:"name"`
+	Channel   string        `json:"channel"`
+	Filter    db.RawJSON    `json:"filter"`
+	Config    db.RawJSON    `json:"config"`
+	Enabled   bool          `json:"enabled"`
+	CreatedAt db.PrismaTime `json:"createdAt"`
 }
 
 func (s *Server) listSubscriptions(w http.ResponseWriter, r *http.Request) {
@@ -107,13 +116,10 @@ func (s *Server) listSubscriptions(w http.ResponseWriter, r *http.Request) {
 	out := make([]restSubscriptionFull, len(subs))
 	for i, sub := range subs {
 		out[i] = restSubscriptionFull{
-			ID: sub.ID, SubscriberID: sub.SubscriberID, Name: sub.Name, Channel: sub.Channel,
+			ID: sub.ID, AccountID: sub.AccountID, Name: sub.Name, Channel: sub.Channel,
 			Filter: sub.Filter, Config: sub.Config, Enabled: sub.Enabled, CreatedAt: db.NewTime(sub.CreatedAt),
-			Subscriber: restSubscriber{
-				ID: sub.Subscriber.ID, Name: sub.Subscriber.Name,
-				Status: sub.Subscriber.Status, CreatedAt: db.NewTime(sub.Subscriber.CreatedAt),
-			},
-			Count: restCount{Deliveries: sub.DeliveryCount},
+			Account: accountRef(sub.Account),
+			Count:   restCount{Deliveries: sub.DeliveryCount},
 		}
 	}
 	writeJSON(w, http.StatusOK, struct {
@@ -163,7 +169,7 @@ func (s *Server) listDeliveries(w http.ResponseWriter, r *http.Request) {
 			DeliveredAt: db.NewTimePtr(e.DeliveredAt), FailedAt: db.NewTimePtr(e.FailedAt),
 			ErrorMessage: e.ErrorMessage, CreatedAt: db.NewTime(e.CreatedAt),
 			Subscription: restSubscriptionScalar{
-				ID: e.Subscription.ID, SubscriberID: e.Subscription.SubscriberID, Name: e.Subscription.Name,
+				ID: e.Subscription.ID, AccountID: e.Subscription.AccountID, Name: e.Subscription.Name,
 				Channel: e.Subscription.Channel, Filter: e.Subscription.Filter, Config: e.Subscription.Config,
 				Enabled: e.Subscription.Enabled, CreatedAt: db.NewTime(e.Subscription.CreatedAt),
 			},

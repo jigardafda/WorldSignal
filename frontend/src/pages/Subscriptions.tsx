@@ -4,7 +4,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { IconCheck, IconPlus, IconSend } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import { api, type EmailConnector, type Subscriber, type Subscription } from "../lib/api";
+import { api, type EmailConnector, type Subscription } from "../lib/api";
 import { useAsync } from "../lib/useAsync";
 import { useAuth } from "../lib/auth";
 import { AsyncBoundary } from "../components/States";
@@ -46,7 +46,6 @@ export function Subscriptions() {
   const { hasPerm } = useAuth();
   const canWrite = hasPerm("subscriptions:write");
   const state = useAsync<Subscription[]>(() => api.subscriptions(), []);
-  const subscribers = useAsync<Subscriber[]>(() => api.subscribers(), []);
   const connectors = useAsync<EmailConnector[]>(
     () => (typeof api.emailConnectors === "function" ? api.emailConnectors() : Promise.resolve([])),
     [],
@@ -56,17 +55,13 @@ export function Subscriptions() {
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<SubFilter>({});
   const [baseUrl, setBaseUrl] = useState("");
-  const [subscriberId, setSubscriberId] = useState<string>("");
   const [createdSub, setCreatedSub] = useState<Subscription | null>(null); // post-create view
   const [testing, setTesting] = useState(false);
 
-  // Default the base URL (shown in the code examples) and the subscriber picker.
+  // Default the base URL (shown in the code examples).
   useEffect(() => {
     if (!baseUrl && typeof window !== "undefined") setBaseUrl(window.location.origin);
   }, [baseUrl]);
-  useEffect(() => {
-    if (!subscriberId && subscribers.data?.length) setSubscriberId(subscribers.data[0].id);
-  }, [subscribers.data, subscriberId]);
 
   const form = useForm({
     initialValues: { name: "", channel: "WEBHOOK", url: "", connectorId: "", recipients: "", mode: "instant" },
@@ -121,7 +116,6 @@ export function Subscriptions() {
         channel: v.channel,
         filter: cleanFilter(filter),
         config: buildConfig(v),
-        ...(subscriberId ? { subscriberId } : {}),
       });
       notifications.show({ message: "Subscription created", color: "green" });
       setCreatedSub(sub); // switch the modal into its post-create "studio" view
@@ -144,7 +138,6 @@ export function Subscriptions() {
     ...(connectors.data ?? []).map((c) => ({ value: c.id, label: `${c.name} (${c.fromEmail})` })),
   ];
   const noConnectors = !!connectors.data && connectors.data.length === 0;
-  const subscriberOptions = (subscribers.data ?? []).map((s) => ({ value: s.id, label: s.name }));
 
   return (
     <>
@@ -232,9 +225,6 @@ export function Subscriptions() {
             {/* Left: configuration */}
             <ScrollArea.Autosize style={{ flex: "0 0 420px" }} mah="74vh" pr="sm" data-testid="sub-config">
               <Stack gap="sm">
-                {subscriberOptions.length > 0 && (
-                  <Select label="Subscriber" data={subscriberOptions} value={subscriberId} onChange={(v) => setSubscriberId(v ?? "")} data-testid="sub-subscriber" />
-                )}
                 <TextInput label="Name" required {...form.getInputProps("name")} data-testid="sub-name" />
                 <Select label="Delivery channel" data={CHANNELS} allowDeselect={false} {...form.getInputProps("channel")} data-testid="sub-channel" />
 
