@@ -101,6 +101,36 @@ func TestMultiTenantSecurity(t *testing.T) {
 		t.Fatalf("owner create should succeed: %s", body)
 	}
 
+	// ===== GraphQL relevance (For You) resolvers are ownership-scoped for tenants =====
+	// A manages the smart-signals feed on its OWN subscription through the console.
+	if _, body := postGQL(t, ht.URL, `{"query":"mutation($id:ID!,$i:JSON){setSubscriptionInterests(id:$id,interests:$i){ok}}","variables":{"id":"`+subA.ID+`","i":{"tag:DISASTER":5}}}`); !strings.Contains(body, `"ok":true`) {
+		t.Fatalf("owner setSubscriptionInterests should succeed: %s", body)
+	}
+	if _, body := postGQL(t, ht.URL, `{"query":"query($id:ID!){subscriptionInterests(id:$id)}","variables":{"id":"`+subA.ID+`"}}`); !strings.Contains(body, "tag:DISASTER") {
+		t.Fatalf("owner subscriptionInterests should succeed: %s", body)
+	}
+	if _, body := postGQL(t, ht.URL, `{"query":"query($id:ID!){subscriptionFeed(id:$id,limit:5){id}}","variables":{"id":"`+subA.ID+`"}}`); strings.Contains(body, "forbidden") || strings.Contains(body, "error") {
+		t.Fatalf("owner subscriptionFeed should succeed: %s", body)
+	}
+	if _, body := postGQL(t, ht.URL, `{"query":"mutation($s:ID!,$g:ID!){recordSignalFeedback(subscriptionId:$s,signalId:$g,action:\"UP\")}","variables":{"s":"`+subA.ID+`","g":"sg"}}`); !strings.Contains(body, "true") {
+		t.Fatalf("owner recordSignalFeedback should succeed: %s", body)
+	}
+	// A cannot read or write the For You feed of B's subscription (cross-tenant IDOR closed).
+	for _, q := range []string{
+		`{"query":"query($id:ID!){subscriptionFeed(id:$id,limit:5){id}}","variables":{"id":"` + subB.ID + `"}}`,
+		`{"query":"query($id:ID!){subscriptionInterests(id:$id)}","variables":{"id":"` + subB.ID + `"}}`,
+		`{"query":"mutation($id:ID!,$i:JSON){setSubscriptionInterests(id:$id,interests:$i){ok}}","variables":{"id":"` + subB.ID + `","i":{"tag:X":5}}}`,
+		`{"query":"mutation($s:ID!,$g:ID!){recordSignalFeedback(subscriptionId:$s,signalId:$g,action:\"UP\")}","variables":{"s":"` + subB.ID + `","g":"sg"}}`,
+	} {
+		if _, body := postGQL(t, ht.URL, q); !strings.Contains(body, "forbidden") {
+			t.Fatalf("cross-tenant relevance op must be forbidden %s: %s", q, body)
+		}
+	}
+	// draftProfileFromDocument touches no subscription, so any authenticated tenant may use it.
+	if _, body := postGQL(t, ht.URL, `{"query":"mutation($t:String!){draftProfileFromDocument(text:$t){source}}","variables":{"t":"Alert me about major earthquakes across the United States please."}}`); strings.Contains(body, "forbidden") {
+		t.Fatalf("tenant draftProfileFromDocument should not be forbidden: %s", body)
+	}
+
 	// ============ GraphQL: tenant cannot reach operator/admin surfaces ============
 	for _, q := range []string{
 		`{"query":"{subscriptions{id}}"}`, // operator cross-tenant list
