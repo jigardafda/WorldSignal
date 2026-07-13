@@ -1,6 +1,13 @@
 -- Deterministic seed for end-to-end tests (applied to worldsignal_e2e).
 TRUNCATE TABLE "DeliveryEvent","Subscription","SignalTag","SignalArticle","Signal","Article","RawItem","Source","TaxonomyTag" RESTART IDENTITY CASCADE;
-TRUNCATE TABLE "Session","TeamMember","Team","User" RESTART IDENTITY CASCADE;
+-- Include Account + ApiKey so accounts/keys created during a test run don't
+-- persist and collide (e.g. a duplicate slug) on the next run.
+TRUNCATE TABLE "Session","TeamMember","Team","ApiKey","User","Account" RESTART IDENTITY CASCADE;
+
+-- The default account is normally created by the Go migration at boot; re-seed
+-- it here since the TRUNCATE above wiped it (the migration only runs once).
+INSERT INTO "Account" ("id","name","slug") VALUES ('acct_default','Default Account','default')
+  ON CONFLICT ("id") DO NOTHING;
 
 -- Admin account used to log in during e2e. Password is "admin12345" (bcrypt cost 10).
 INSERT INTO "User" ("id","email","name","passwordHash","role","status","createdAt","updatedAt")
