@@ -21,8 +21,32 @@ func (s *Server) registerRelevanceResolvers(q, m map[string]gql.FieldResolver) {
 	m["draftProfileFromDocument"] = s.mutDraftProfileFromDocument
 }
 
+// authorizeSubscriptionRelevance authorizes a subscription-scoped relevance op
+// on the GraphQL surface. A tenant (account-scoped identity) is authorized by
+// OWNERSHIP — it may only touch its own subscriptions, and needs no operator
+// permission to manage them — which both lets customers use their console and
+// closes the cross-tenant IDOR. Platform staff are gated on staffPerm and may
+// act on any subscription. This mirrors s.tenantOwnsSubscription on the REST API.
+func (s *Server) authorizeSubscriptionRelevance(ctx context.Context, subID, staffPerm string) error {
+	id, err := auth.Require(ctx)
+	if err != nil {
+		return err
+	}
+	if id.AccountID != nil {
+		owner, err := s.DB.SubscriptionAccountID(ctx, subID)
+		if err != nil {
+			return err
+		}
+		if owner == "" || owner != *id.AccountID {
+			return auth.ErrForbidden
+		}
+		return nil
+	}
+	return authz(ctx, staffPerm)
+}
+
 func (s *Server) resolveSubscriptionFeed(ctx context.Context, args map[string]any) (any, error) {
-	if err := authz(ctx, auth.PermSignalsRead); err != nil {
+	if err := s.authorizeSubscriptionRelevance(ctx, strVal(args["id"]), auth.PermSignalsRead); err != nil {
 		return nil, err
 	}
 	id := strVal(args["id"])
@@ -57,7 +81,7 @@ func (s *Server) resolveSubscriptionFeed(ctx context.Context, args map[string]an
 }
 
 func (s *Server) resolveSubscriptionInterests(ctx context.Context, args map[string]any) (any, error) {
-	if err := authz(ctx, auth.PermSignalsRead); err != nil {
+	if err := s.authorizeSubscriptionRelevance(ctx, strVal(args["id"]), auth.PermSignalsRead); err != nil {
 		return nil, err
 	}
 	p, err := s.DB.LoadProfile(ctx, strVal(args["id"]))
@@ -72,7 +96,7 @@ func (s *Server) resolveSubscriptionInterests(ctx context.Context, args map[stri
 }
 
 func (s *Server) mutSetSubscriptionInterests(ctx context.Context, args map[string]any) (any, error) {
-	if err := authz(ctx, auth.PermSubscriptionsWrite); err != nil {
+	if err := s.authorizeSubscriptionRelevance(ctx, strVal(args["id"]), auth.PermSubscriptionsWrite); err != nil {
 		return nil, err
 	}
 	id := strVal(args["id"])
@@ -91,10 +115,10 @@ func (s *Server) mutSetSubscriptionInterests(ctx context.Context, args map[strin
 }
 
 func (s *Server) mutRecordSignalFeedback(ctx context.Context, args map[string]any) (any, error) {
-	if err := authz(ctx, auth.PermSubscriptionsWrite); err != nil {
+	sub, sig, action := strVal(args["subscriptionId"]), strVal(args["signalId"]), strVal(args["action"])
+	if err := s.authorizeSubscriptionRelevance(ctx, sub, auth.PermSubscriptionsWrite); err != nil {
 		return nil, err
 	}
-	sub, sig, action := strVal(args["subscriptionId"]), strVal(args["signalId"]), strVal(args["action"])
 	if sub == "" || sig == "" || !validFeedback[action] {
 		return false, nil
 	}
@@ -105,8 +129,17 @@ func (s *Server) mutRecordSignalFeedback(ctx context.Context, args map[string]an
 }
 
 func (s *Server) mutDraftProfileFromDocument(ctx context.Context, args map[string]any) (any, error) {
-	if err := authz(ctx, auth.PermSubscriptionsWrite); err != nil {
+	// Drafting a profile touches no stored subscription (pure LLM inference), so
+	// any authenticated tenant may use it from the customer console; platform
+	// staff are held to the operator write permission.
+	id, err := auth.Require(ctx)
+	if err != nil {
 		return nil, err
+	}
+	if id.AccountID == nil {
+		if err := authz(ctx, auth.PermSubscriptionsWrite); err != nil {
+			return nil, err
+		}
 	}
 	text := strVal(args["text"])
 	if len(text) < 20 {
