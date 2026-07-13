@@ -6,6 +6,7 @@ build/
 *.log
 .DS_Store
 coverage/
+backend/coverage.out
 backend/prisma/*.db
 .vite/
 
