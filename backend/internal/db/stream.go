@@ -41,10 +41,16 @@ func (d *DB) GetStreamSubscription(ctx context.Context, id string) (*StreamSubsc
 // signals yet.
 func (d *DB) SendTestDelivery(ctx context.Context, subID string) (string, error) {
 	var id string
+	// Push channels (WEBHOOK) must actually be delivered by the worker, so the row
+	// starts PENDING and mutTestSubscription enqueues a send job that POSTs it to
+	// the configured URL. Pull channels (POLLING/SSE/WEBSOCKET) have no push step —
+	// the row IS the delivery that clients poll/stream — so it starts SENT.
 	err := d.Pool.QueryRow(ctx, `
-WITH sig AS (SELECT * FROM "Signal" ORDER BY "lastSeenAt" DESC LIMIT 1)
+WITH sig AS (SELECT * FROM "Signal" ORDER BY "lastSeenAt" DESC LIMIT 1),
+     sub AS (SELECT "channel" FROM "Subscription" WHERE "id"=$1)
 INSERT INTO "DeliveryEvent" ("id","subscriptionId","signalId","channel","status","payload","createdAt")
-SELECT $2::text, $1::text, sig.id, (SELECT "channel" FROM "Subscription" WHERE "id"=$1), 'SENT',
+SELECT $2::text, $1::text, sig.id, sub."channel",
+  (CASE WHEN sub."channel"='WEBHOOK' THEN 'PENDING' ELSE 'SENT' END)::"DeliveryStatus",
   jsonb_build_object(
     'schema_version','2026-06-01', 'event_type','signal.test', 'event_id',$2::text,
     'created_at', to_char(now() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
@@ -54,10 +60,11 @@ SELECT $2::text, $1::text, sig.id, (SELECT "channel" FROM "Subscription" WHERE "
       'status',sig."status",'severity',sig."severity",'confidence',sig."confidence",
       'country',sig."country",'source_count',sig."sourceCount")
   ), now()
-FROM sig
+FROM sig, sub
 ON CONFLICT ("subscriptionId","signalId") DO UPDATE
   SET "seq"=nextval('"DeliveryEvent_seq_seq"'), "payload"=EXCLUDED."payload",
-      "createdAt"=now(), "status"='SENT'
+      "createdAt"=now(), "status"=EXCLUDED."status", "attempts"=0,
+      "errorMessage"=NULL, "failedAt"=NULL, "deliveredAt"=NULL
 RETURNING "id"`, subID, cuid.New()).Scan(&id)
 	if err == pgx.ErrNoRows {
 		return "", nil // no signals to test with yet

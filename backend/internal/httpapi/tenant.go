@@ -12,8 +12,11 @@ import (
 )
 
 // tenantAPIScopes is the capability set a tenant may grant its own API keys.
-// It is a read-only subset of APIScopes — tenants cannot mint write credentials.
-var tenantAPIScopes = []string{"signals:read", "stats:read", "subscriptions:read", "deliveries:read"}
+// It covers reading the shared corpus + managing the tenant's own subscriptions
+// and feedback (subscriptions:write is safe: every subscription write is
+// ownership-scoped to the key's account). It never includes operator scopes
+// (sources:write, etc.).
+var tenantAPIScopes = []string{"signals:read", "stats:read", "subscriptions:read", "subscriptions:write", "deliveries:read"}
 
 func validTenantScope(s string) bool {
 	for _, v := range tenantAPIScopes {
