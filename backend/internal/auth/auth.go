@@ -105,7 +105,7 @@ func Can(role, perm string) bool {
 	return false
 }
 
-// CanScoped reports whether a principal may exercise perm, honouring tenant
+// CanScoped reports whether a principal may exercise perm, honoring tenant
 // scoping: tenant users are limited to the tenant capability set.
 func CanScoped(role string, tenant bool, perm string) bool {
 	if tenant {
