@@ -134,7 +134,7 @@ func TestTenantPermissions(t *testing.T) {
 		t.Fatalf("staff admin effective perms = %d", len(got))
 	}
 
-	// RequirePermission honours the identity's account scope.
+	// RequirePermission honors the identity's account scope.
 	acct := "acct_x"
 	ctx := WithIdentity(context.Background(), &Identity{UserID: "u", Role: RoleAdmin, AccountID: &acct})
 	if !IsTenant(ctx) {
